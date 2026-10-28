@@ -8,6 +8,9 @@ export interface AppConfig {
     refreshSecret: string;
     refreshExpiresIn: string;
   };
+  encryption: {
+    secret: string;
+  };
 }
 
 export default (): AppConfig => ({
@@ -19,5 +22,8 @@ export default (): AppConfig => ({
     expiresIn: process.env.JWT_EXPIRES_IN ?? '15m',
     refreshSecret: process.env.JWT_REFRESH_SECRET ?? 'portal-dev-refresh-secret',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
+  },
+  encryption: {
+    secret: process.env.ENCRYPTION_SECRET ?? 'portal-dev-encryption-secret',
   },
 });

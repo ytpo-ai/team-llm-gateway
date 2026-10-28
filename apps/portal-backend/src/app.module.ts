@@ -7,6 +7,8 @@ import configuration from './config/configuration.js';
 import { ApiKeysModule } from './modules/api-keys/api-keys.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { HealthModule } from './modules/health/health.module.js';
+import { ModelsModule } from './modules/models/models.module.js';
+import { ProvidersModule } from './modules/providers/providers.module.js';
 import { TeamsModule } from './modules/teams/teams.module.js';
 
 @Module({
@@ -21,6 +23,8 @@ import { TeamsModule } from './modules/teams/teams.module.js';
     AuthModule,
     TeamsModule,
     ApiKeysModule,
+    ProvidersModule,
+    ModelsModule,
     HealthModule,
   ],
   controllers: [AppController],

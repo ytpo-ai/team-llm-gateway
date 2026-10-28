@@ -1,0 +1,158 @@
+import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Test, TestingModule } from '@nestjs/testing';
+import { Types } from 'mongoose';
+import { decrypt, encrypt } from '../../common/crypto/cipher.js';
+import { ProvidersService } from './providers.service.js';
+import { ProviderStatus, ProviderType } from './schemas/provider.schema.js';
+
+describe('ProvidersService', () => {
+  let service: ProvidersService;
+
+  const tenantId = String(new Types.ObjectId());
+  const teamId = String(new Types.ObjectId());
+  const providerId = new Types.ObjectId();
+  const secret = 'test-encryption-secret';
+
+  const providerModel = {
+    create: vi.fn(),
+    find: vi.fn(),
+    findOne: vi.fn(),
+  };
+
+  const configService = {
+    getOrThrow: vi.fn().mockReturnValue(secret),
+  };
+
+  const makeProvider = (overrides: Record<string, unknown> = {}) => ({
+    _id: providerId,
+    tenantId,
+    teamId,
+    name: 'OpenAI 直连',
+    type: ProviderType.OPENAI_COMPATIBLE,
+    baseUrl: 'https://api.openai.com/v1',
+    apiKeyCiphertext: 'cipher',
+    apiKeyHint: 'sk-***abcd',
+    status: ProviderStatus.ACTIVE,
+    createdAt: new Date(),
+    save: vi.fn(async function (this: Record<string, unknown>) {
+      return this;
+    }),
+    ...overrides,
+  });
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    configService.getOrThrow.mockReturnValue(secret);
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        ProvidersService,
+        { provide: 'ProviderModel', useValue: providerModel },
+        { provide: ConfigService, useValue: configService },
+      ],
+    }).compile();
+
+    service = module.get(ProvidersService);
+  });
+
+  describe('create', () => {
+    it('should encrypt apiKey and never store plaintext', async () => {
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(null),
+      });
+      providerModel.create.mockImplementation(async (input: any) => ({
+        ...makeProvider(),
+        ...input,
+      }));
+
+      const result = await service.create(tenantId, teamId, {
+        name: 'OpenAI 直连',
+        baseUrl: 'https://api.openai.com/v1',
+        apiKey: 'sk-live-1234567890abcd',
+      });
+
+      const createArg = providerModel.create.mock.calls[0][0];
+      expect(createArg.apiKeyCiphertext).not.toContain('sk-live');
+      expect(decrypt(secret, createArg.apiKeyCiphertext)).toBe(
+        'sk-live-1234567890abcd',
+      );
+      expect(createArg.apiKey).toBeUndefined();
+      expect(result.apiKeyHint).toBe('sk-***abcd');
+    });
+
+    it('should reject duplicate name', async () => {
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(makeProvider()),
+      });
+
+      await expect(
+        service.create(tenantId, teamId, {
+          name: 'OpenAI 直连',
+          baseUrl: 'https://api.openai.com/v1',
+          apiKey: 'sk-x',
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('list', () => {
+    it('should filter by tenant and team', async () => {
+      providerModel.find.mockReturnValue({
+        sort: vi.fn().mockReturnThis(),
+        exec: vi.fn().mockResolvedValue([makeProvider()]),
+      });
+
+      await service.list(tenantId, teamId);
+
+      expect(providerModel.find.mock.calls[0][0]).toEqual({
+        tenantId,
+        teamId,
+      });
+    });
+  });
+
+  describe('update', () => {
+    it('should re-encrypt apiKey when provided', async () => {
+      const provider = makeProvider();
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(provider),
+      });
+
+      await service.update(tenantId, teamId, String(providerId), {
+        apiKey: 'sk-new-key-9999',
+      });
+
+      expect(decrypt(secret, provider.apiKeyCiphertext)).toBe('sk-new-key-9999');
+    });
+
+    it('should throw NotFound when missing', async () => {
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(null),
+      });
+
+      await expect(
+        service.update(tenantId, teamId, String(providerId), { name: 'x' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('remove', () => {
+    it('should soft-disable', async () => {
+      const provider = makeProvider();
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(provider),
+      });
+
+      const result = await service.remove(tenantId, teamId, String(providerId));
+
+      expect(provider.status).toBe(ProviderStatus.DISABLED);
+      expect(result.status).toBe(ProviderStatus.DISABLED);
+    });
+  });
+
+  it('round-trips encryption', () => {
+    const ciphertext = encrypt(secret, 'sk-plain-0000');
+    expect(decrypt(secret, ciphertext)).toBe('sk-plain-0000');
+  });
+});
