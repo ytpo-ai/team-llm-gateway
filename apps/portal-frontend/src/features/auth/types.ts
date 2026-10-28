@@ -12,6 +12,7 @@ export interface User {
   name: string
   role: Role
   tenantId: string
+  teamId: string | null
 }
 
 export interface AuthResponse {

@@ -29,6 +29,13 @@ export interface InvitationContext {
   team: TeamDocument;
 }
 
+export interface TeamView {
+  id: string;
+  name: string;
+  status: TeamStatus;
+  tenantId: string;
+}
+
 export interface InvitationView {
   id: string;
   email: string;
@@ -58,27 +65,32 @@ export class TeamsService {
     return this.teamModel.create({ tenantId, name });
   }
 
-  async listTeams(tenantId: string): Promise<TeamDocument[]> {
-    return this.teamModel.find({ tenantId }).sort({ createdAt: 1 }).exec();
+  async listTeams(tenantId: string): Promise<TeamView[]> {
+    const teams = await this.teamModel
+      .find({ tenantId })
+      .sort({ createdAt: 1 })
+      .exec();
+    return teams.map((team) => this.toTeamView(team));
   }
 
-  async createTeam(tenantId: string, name: string): Promise<TeamDocument> {
+  async createTeam(tenantId: string, name: string): Promise<TeamView> {
     const existing = await this.teamModel.findOne({ tenantId, name }).exec();
     if (existing) {
       throw new ConflictException('团队名称已存在');
     }
-    return this.teamModel.create({ tenantId, name });
+    const team = await this.teamModel.create({ tenantId, name });
+    return this.toTeamView(team);
   }
 
   async renameTeam(
     tenantId: string,
     teamId: string,
     name: string,
-  ): Promise<TeamDocument> {
+  ): Promise<TeamView> {
     const team = await this.findTeamInTenant(tenantId, teamId);
     team.name = name;
     await team.save();
-    return team;
+    return this.toTeamView(team);
   }
 
   async listMembers(tenantId: string, teamId: string) {
@@ -230,6 +242,15 @@ export class TeamsService {
       status: invitation.status,
       expiresAt: invitation.expiresAt,
       createdAt: invitation.createdAt,
+    };
+  }
+
+  private toTeamView(team: TeamDocument): TeamView {
+    return {
+      id: String(team._id),
+      name: team.name,
+      status: team.status,
+      tenantId: String(team.tenantId),
     };
   }
 

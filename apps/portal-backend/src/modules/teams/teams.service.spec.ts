@@ -105,7 +105,12 @@ describe('TeamsService', () => {
         tenantId: String(tenantId),
         name: '研发组',
       });
-      expect(result).toEqual(team);
+      expect(result).toEqual({
+        id: String(teamId),
+        name: '默认团队',
+        status: TeamStatus.ACTIVE,
+        tenantId: String(tenantId),
+      });
     });
   });
 

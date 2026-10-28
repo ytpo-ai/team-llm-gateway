@@ -17,6 +17,18 @@ export function register(input: RegisterInput): Promise<AuthResponse> {
   })
 }
 
+export function acceptInvite(input: {
+  token: string
+  name: string
+  password: string
+}): Promise<AuthResponse> {
+  return request<AuthResponse>('/auth/accept-invite', {
+    method: 'POST',
+    body: input,
+    auth: false,
+  })
+}
+
 export function refresh(refreshToken: string): Promise<TokenPair> {
   return request<TokenPair>('/auth/refresh', {
     method: 'POST',

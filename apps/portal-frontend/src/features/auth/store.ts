@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import {
+  acceptInvite as apiAcceptInvite,
   getProfile,
   login as apiLogin,
   refresh as apiRefresh,
@@ -14,6 +15,7 @@ interface AuthState {
   refreshToken: string | null
   login: (input: LoginInput) => Promise<void>
   register: (input: RegisterInput) => Promise<void>
+  acceptInvite: (input: { token: string; name: string; password: string }) => Promise<void>
   logout: () => void
   refreshAccessToken: () => Promise<string | null>
   fetchProfile: () => Promise<void>
@@ -37,6 +39,15 @@ export const useAuthStore = create<AuthState>()(
 
       async register(input) {
         const res = await apiRegister(input)
+        set({
+          user: res.user,
+          accessToken: res.accessToken,
+          refreshToken: res.refreshToken,
+        })
+      },
+
+      async acceptInvite(input) {
+        const res = await apiAcceptInvite(input)
         set({
           user: res.user,
           accessToken: res.accessToken,

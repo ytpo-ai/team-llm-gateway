@@ -1,8 +1,9 @@
 import { LogOut, Moon, Sun } from 'lucide-react'
-import { Link, Outlet, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useTheme } from '@/components/theme/theme-provider'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/features/auth/store'
+import { cn } from '@/lib/utils'
 
 export function AppLayout() {
   const { theme, toggle } = useTheme()
@@ -15,12 +16,30 @@ export function AppLayout() {
     navigate('/login', { replace: true })
   }
 
+  const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+    cn(
+      'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+      isActive
+        ? 'bg-muted text-foreground'
+        : 'text-muted-foreground hover:text-foreground',
+    )
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border px-6">
-        <Link to="/" className="text-lg font-semibold tracking-tight">
-          Portal
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link to="/" className="text-lg font-semibold tracking-tight">
+            Portal
+          </Link>
+          <nav className="flex items-center gap-1">
+            <NavLink to="/" end className={navLinkClass}>
+              概览
+            </NavLink>
+            <NavLink to="/team" className={navLinkClass}>
+              团队
+            </NavLink>
+          </nav>
+        </div>
         <div className="flex items-center gap-2">
           {user && <span className="text-sm text-muted-foreground">{user.name}</span>}
           <Button variant="ghost" size="icon" onClick={toggle} aria-label="切换主题">
