@@ -8,7 +8,7 @@
 | 所属 plan | `docs/plan/TENANT_AUTH_PLAN.md` |
 | 需求管理 ID | — |
 | 分支 | `feat/tenant-auth-frontend` |
-| 状态 | `draft` |
+| 状态 | `in-progress` |
 
 ## 2. 需求描述
 
@@ -40,6 +40,6 @@
 | fix | — |
 
 ## 5. 状态跟踪
-- [ ] 开发中
+- [x] 开发中
 - [ ] 待验收
 - [ ] 已交付
