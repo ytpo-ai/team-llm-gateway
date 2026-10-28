@@ -41,8 +41,8 @@ Portal 工程骨架已就绪（REQ-001/002/003 已交付），`modules/auth/` �
 ## 5. 里程碑
 
 1. ✅ REQ-001 后端租户与认证（本文档拆解）。
-2. 🔄 REQ-002 前端认证闭环（进行中）。
-3. ⬜ 下游模块（team_member → api_key → …）复用 tenant/user 上下文。
+2. ✅ REQ-002 前端认证闭环（已交付）。
+3. 🔄 下游模块（team_member 进行中 → api_key → …）复用 tenant/user 上下文。
 
 ## 6. 待决事项与风险
 
