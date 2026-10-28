@@ -20,11 +20,16 @@ interface RequestOptions extends Omit<RequestInit, 'body'> {
 async function readError(res: Response): Promise<ApiError> {
   let message = `请求失败（${res.status}）`
   try {
-    const data = (await res.json()) as { message?: string | string[] }
-    if (Array.isArray(data.message)) {
-      message = data.message.join('；')
-    } else if (data.message) {
-      message = data.message
+    const data = (await res.json()) as { message?: unknown }
+    const raw = data.message
+    if (Array.isArray(raw)) {
+      message = raw.filter((m) => typeof m === 'string').join('；')
+    } else if (typeof raw === 'string') {
+      message = raw
+    } else if (raw && typeof raw === 'object') {
+      const nested = raw as { message?: unknown; error?: unknown }
+      if (typeof nested.message === 'string') message = nested.message
+      else if (typeof nested.error === 'string') message = nested.error
     }
   } catch {
     // 忽略非 JSON 错误响应体
