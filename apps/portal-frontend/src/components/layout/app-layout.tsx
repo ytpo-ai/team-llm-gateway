@@ -38,6 +38,9 @@ export function AppLayout() {
             <NavLink to="/team" className={navLinkClass}>
               团队
             </NavLink>
+            <NavLink to="/api-keys" className={navLinkClass}>
+              API Key
+            </NavLink>
           </nav>
         </div>
         <div className="flex items-center gap-2">

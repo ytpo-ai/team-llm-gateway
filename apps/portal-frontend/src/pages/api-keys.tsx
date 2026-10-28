@@ -1,0 +1,375 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState, type FormEvent } from 'react'
+import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import {
+  createApiKey,
+  listApiKeys,
+  revokeApiKey,
+  rotateApiKey,
+  updateApiKey,
+} from '@/features/api-keys/api'
+import type {
+  ApiKey,
+  ApiKeyInput,
+  ApiKeyPatch,
+} from '@/features/api-keys/types'
+import { ApiError } from '@/lib/http'
+
+function formatDate(value: string | null): string {
+  if (!value) return '永久'
+  return new Date(value).toLocaleDateString()
+}
+
+function formatLimits(key: ApiKey): string {
+  const parts: string[] = []
+  if (key.allowedModels.length > 0) parts.push(`模型: ${key.allowedModels.join(', ')}`)
+  if (key.rateLimitPerMinute) parts.push(`${key.rateLimitPerMinute}/min`)
+  if (key.maxTokens) parts.push(`预算: ${key.maxTokens.toLocaleString()} tokens`)
+  return parts.length > 0 ? parts.join(' · ') : '不限'
+}
+
+interface FormState {
+  name: string
+  allowedModels: string
+  rateLimitPerMinute: string
+  maxTokens: string
+  expiresAt: string
+}
+
+const emptyForm: FormState = {
+  name: '',
+  allowedModels: '',
+  rateLimitPerMinute: '',
+  maxTokens: '',
+  expiresAt: '',
+}
+
+function parseModels(raw: string): string[] {
+  return raw
+    .split(',')
+    .map((m) => m.trim())
+    .filter(Boolean)
+}
+
+function toForm(key: ApiKey): FormState {
+  return {
+    name: key.name ?? '',
+    allowedModels: key.allowedModels.join(', '),
+    rateLimitPerMinute: key.rateLimitPerMinute
+      ? String(key.rateLimitPerMinute)
+      : '',
+    maxTokens: key.maxTokens ? String(key.maxTokens) : '',
+    expiresAt: key.expiresAt ? key.expiresAt.slice(0, 10) : '',
+  }
+}
+
+export function ApiKeysPage() {
+  const queryClient = useQueryClient()
+
+  const [form, setForm] = useState<FormState>(emptyForm)
+  const [editing, setEditing] = useState<ApiKey | null>(null)
+  const [revealed, setRevealed] = useState<{ key: string; name: string | null } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  const keysQuery = useQuery({ queryKey: ['api-keys'], queryFn: () => listApiKeys() })
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ['api-keys'] })
+
+  const resetForm = () => {
+    setForm(emptyForm)
+    setEditing(null)
+    setError(null)
+  }
+
+  const submitMutation = useMutation({
+    mutationFn: () => {
+      const models = parseModels(form.allowedModels)
+      if (editing) {
+        const patch: ApiKeyPatch = {
+          name: form.name.trim() || null,
+          expiresAt: form.expiresAt || null,
+          allowedModels: models,
+          rateLimitPerMinute: form.rateLimitPerMinute
+            ? Number(form.rateLimitPerMinute)
+            : null,
+          maxTokens: form.maxTokens ? Number(form.maxTokens) : null,
+        }
+        return updateApiKey(editing.id, patch)
+      }
+      const input: ApiKeyInput = {
+        name: form.name.trim() || undefined,
+        expiresAt: form.expiresAt || undefined,
+        allowedModels: models,
+        rateLimitPerMinute: form.rateLimitPerMinute
+          ? Number(form.rateLimitPerMinute)
+          : undefined,
+        maxTokens: form.maxTokens ? Number(form.maxTokens) : undefined,
+      }
+      return createApiKey(input).then((r) => r.apiKey)
+    },
+    onSuccess: () => {
+      resetForm()
+      invalidate()
+    },
+    onError: (err) => {
+      setError(err instanceof ApiError ? err.message : '操作失败，请稍后重试')
+    },
+  })
+
+  const revokeMutation = useMutation({
+    mutationFn: (id: string) => revokeApiKey(id),
+    onSuccess: invalidate,
+  })
+
+  const rotateMutation = useMutation({
+    mutationFn: (id: string) => rotateApiKey(id),
+    onSuccess: (result) => {
+      setRevealed({ key: result.key, name: result.apiKey.name })
+      invalidate()
+    },
+  })
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    submitMutation.mutate()
+  }
+
+  const startEdit = (key: ApiKey) => {
+    setEditing(key)
+    setForm(toForm(key))
+    setError(null)
+  }
+
+  const copyKey = async () => {
+    if (revealed) {
+      await navigator.clipboard.writeText(revealed.key)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }
+  }
+
+  const keys: ApiKey[] = keysQuery.data ?? []
+  const pending =
+    submitMutation.isPending ||
+    revokeMutation.isPending ||
+    rotateMutation.isPending
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-semibold">API Key</h1>
+        <p className="text-sm text-muted-foreground">
+          为成员签发 API Key，并按 key 设置模型白名单、速率、预算与过期时间
+        </p>
+      </div>
+
+      {revealed && (
+        <Card className="border-primary">
+          <CardHeader>
+            <CardTitle>请立即保存 API Key</CardTitle>
+            <CardDescription>
+              完整 key 仅此一次可见，关闭后将无法再次查看
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-2 rounded-md border border-input bg-muted/50 p-2">
+              <code className="flex-1 break-all text-sm">{revealed.key}</code>
+              <Button variant="outline" size="sm" onClick={copyKey}>
+                {copied ? '已复制' : '复制'}
+              </Button>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setRevealed(null)}>
+              我已保存，关闭
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{editing ? '编辑 API Key' : '创建 API Key'}</CardTitle>
+          <CardDescription>
+            {editing
+              ? `正在编辑 ${editing.keyPrefix}…`
+              : '创建后完整 key 仅展示一次，请及时保存'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <form className="grid gap-3 sm:grid-cols-2" onSubmit={handleSubmit}>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-sm text-muted-foreground">
+                名称
+              </label>
+              <Input
+                placeholder="如：我的开发密钥（可选）"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                模型白名单（逗号分隔，留空不限）
+              </label>
+              <Input
+                placeholder="gpt-4o-mini, claude-sonnet"
+                value={form.allowedModels}
+                onChange={(e) =>
+                  setForm({ ...form, allowedModels: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                过期时间（留空永久）
+              </label>
+              <Input
+                type="date"
+                value={form.expiresAt}
+                onChange={(e) => setForm({ ...form, expiresAt: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                速率限制（次/分钟，留空不限）
+              </label>
+              <Input
+                type="number"
+                min={1}
+                placeholder="60"
+                value={form.rateLimitPerMinute}
+                onChange={(e) =>
+                  setForm({ ...form, rateLimitPerMinute: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                预算上限（tokens，留空不限）
+              </label>
+              <Input
+                type="number"
+                min={1}
+                placeholder="1000000"
+                value={form.maxTokens}
+                onChange={(e) => setForm({ ...form, maxTokens: e.target.value })}
+              />
+            </div>
+
+            {error && <p className="text-sm text-red-500 sm:col-span-2">{error}</p>}
+
+            <div className="flex gap-2 sm:col-span-2">
+              <Button type="submit" disabled={pending}>
+                {editing ? '保存修改' : '创建'}
+              </Button>
+              {editing && (
+                <Button type="button" variant="outline" onClick={resetForm}>
+                  取消
+                </Button>
+              )}
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Key 列表</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {keysQuery.isLoading ? (
+            <div className="text-sm text-muted-foreground">加载中…</div>
+          ) : keys.length === 0 ? (
+            <div className="text-sm text-muted-foreground">
+              暂无 API Key，点击上方创建。
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="py-2 pr-4 font-medium">名称</th>
+                    <th className="py-2 pr-4 font-medium">Key</th>
+                    <th className="py-2 pr-4 font-medium">状态</th>
+                    <th className="py-2 pr-4 font-medium">限制</th>
+                    <th className="py-2 pr-4 font-medium">过期</th>
+                    <th className="py-2 pr-4 font-medium">最近使用</th>
+                    <th className="py-2 font-medium">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {keys.map((key) => (
+                    <tr key={key.id} className="border-b last:border-0">
+                      <td className="py-2 pr-4">
+                        {key.name ?? <span className="text-muted-foreground">—</span>}
+                      </td>
+                      <td className="py-2 pr-4">
+                        <code className="text-xs">{key.keyPrefix}…</code>
+                      </td>
+                      <td className="py-2 pr-4">
+                        {key.status === 'active' ? (
+                          <span className="text-green-600">正常</span>
+                        ) : (
+                          <span className="text-muted-foreground">已吊销</span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-4 text-muted-foreground">
+                        {formatLimits(key)}
+                      </td>
+                      <td className="py-2 pr-4 text-muted-foreground">
+                        {formatDate(key.expiresAt)}
+                      </td>
+                      <td className="py-2 pr-4 text-muted-foreground">
+                        {key.lastUsedAt ? formatDate(key.lastUsedAt) : '—'}
+                      </td>
+                      <td className="py-2">
+                        {key.status === 'active' && (
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={pending}
+                              onClick={() => startEdit(key)}
+                            >
+                              编辑
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={pending}
+                              onClick={() => rotateMutation.mutate(key.id)}
+                            >
+                              轮换
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={pending}
+                              onClick={() => revokeMutation.mutate(key.id)}
+                            >
+                              吊销
+                            </Button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
