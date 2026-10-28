@@ -42,7 +42,7 @@
 
 | 类型 | 文档 |
 |---|---|
-| development | `docs/development/TENANT_AUTH_REQ-001_DEVELOPMENT.md`（待补充） |
+| development | `docs/development/TENANT_AUTH_REQ-001_DEVELOPMENT.md` |
 | fix | — |
 
 ## 5. 状态跟踪
