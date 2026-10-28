@@ -41,6 +41,14 @@ export function AppLayout() {
             <NavLink to="/api-keys" className={navLinkClass}>
               API Key
             </NavLink>
+            <NavLink to="/models" className={navLinkClass}>
+              模型
+            </NavLink>
+            {user?.role === 'team_admin' && (
+              <NavLink to="/providers" className={navLinkClass}>
+                上游
+              </NavLink>
+            )}
           </nav>
         </div>
         <div className="flex items-center gap-2">
