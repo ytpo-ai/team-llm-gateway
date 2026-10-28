@@ -64,11 +64,11 @@ Portal 从零开始。产品矩阵中 Portal（团队接入平台）是差异化
 ## 6. 里程碑
 
 1. ✅ 功能清单 + 技术选型定稿（本文档）。
-2. ⬜ 文档体系 + feature 骨架（本 plan）。
-3. ⬜ monorepo 骨架 + 工程基线（REQ-001）。
-4. ⬜ 后端基础框架（REQ-002）。
-5. ⬜ 前端基础框架（REQ-003）。
-6. ⬜ 功能模块逐步开发（后续 plan：tenant_auth → team_member → api_key → model_provider → usage_metering → billing_quota → model_recommendation）。
+2. ✅ 文档体系 + feature 骨架（本 plan）。
+3. ✅ monorepo 骨架 + 工程基线（REQ-001）。
+4. ✅ 后端基础框架（REQ-002）。
+5. ✅ 前端基础框架（REQ-003）。
+6. 🔄 功能模块逐步开发（tenant_auth 进行中 → team_member → api_key → model_provider → usage_metering → billing_quota → model_recommendation）。
 
 ## 7. 待决事项与风险
 
