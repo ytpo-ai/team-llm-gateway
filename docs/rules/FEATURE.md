@@ -1,0 +1,165 @@
+# Agent 功能文档维护规范
+
+## 1. 功能文档层级结构
+
+系统功能分为 **3级**：
+- **1级（主要功能模块）**：如 `agent`（智能体）、`memo`（备忘录）、`meeting`（会议）
+- **2级（具体功能）**：如 `agent/agent_mcp`（Agent MCP）、`memo/memo_mcp`（备忘录 MCP）
+- **3级（子功能）**：2级功能下的细分功能
+
+### 命名规范
+```
+1级/2级/3级
+agent/memo/memo_mcp
+meeting/orchestration/session
+```
+
+---
+
+## 2. 功能文档规范
+
+### 2.1 每个 2级功能 对应一个功能文档
+
+- 路径：`docs/feature/<1级>_<2级>.md`
+- 示例：
+  - `docs/feature/agent_memo.md`（Agent + 备忘录）
+  - `docs/feature/meeting_orchestration.md`（会议 + 编排）
+  - `docs/feature/agent_skill.md`（Agent + 技能）
+
+### 2.2 功能文档内容要求
+
+每个功能文档应包含：
+
+```markdown
+# 功能名称
+
+## 1. 功能设计
+- 目标
+- 数据结构
+- 核心逻辑
+
+## 2. 需求追溯
+
+| Plan | Requirement | Development | Fix |
+|------|------------|-------------|-----|
+| [plan 名称](../plan/xxx.md) | [REQ-001 简述](../requirement/xxx.md) | [开发记录](../development/xxx.md) | [fix](../issue/fix/xxx.md) |
+
+## 3. 相关文档
+- 规划文档 (docs/plan/)
+- 需求文档 (docs/requirement/)
+- 开发总结 (docs/development/)
+- 技术文档 (docs/technical/)
+- API文档 (docs/api/)
+
+## 4. 相关代码文件
+- 后端代码
+- 前端代码
+```
+
+### 2.3 需求追溯表规范（新增）
+
+每个 feature 文档**必须**维护一张 **需求追溯表**，串联 plan → requirement → development → fix 的完整链路：
+
+```markdown
+## 需求追溯
+
+| Plan | Requirement | Development | Fix |
+|------|------------|-------------|-----|
+| [PLAN 名称](../plan/<PLAN>.md) | [REQ-001 简述](../requirement/<REQ>.md) | [开发记录](../development/<DEV>.md) | [fix-1](../issue/fix/<FIX>.md) |
+| 同上 | [REQ-002 简述](../requirement/<REQ>.md) | [开发记录](../development/<DEV>.md) | — |
+```
+
+**维护规则**：
+- 新建 plan 时，在追溯表中添加 plan 行
+- plan 拆解 requirement 时，补充 requirement 列
+- development 完成时，补充 development 列
+- fix 产生时，追加 fix 列
+- 追溯表与 `docs/requirement/RULES.md` 中的关联约定互为双向索引
+
+### 2.4 文档依赖关系
+
+功能文档 **引用** 而非重复以下文档内容：
+| 文档类型 | 位置 | 说明 |
+|----------|------|------|
+| 规划文档 | `docs/plan/` | 需求背景、技术方案、里程碑 |
+| 需求文档 | `docs/requirement/` | 需求拆解、验收条件、状态跟踪 |
+| 开发总结 | `docs/development/` | 实现细节、踩坑记录 |
+| 技术文档 | `docs/technical/` | 底层设计、技术原理、数据模型设计(`docs/technical/db_schema/`) |
+| API文档 | `docs/api/` | 接口定义 |
+
+---
+
+## 3. 开发规范
+
+### 3.1 开发前必须阅读功能文档
+
+**规则**：
+1. 接到开发需求后，先找到对应的 **2级功能文档**
+2. 如果功能文档存在且信息足够，则 **不必扫描代码文件**
+3. 如果功能文档信息不足，再补充文档或查看代码
+
+### 3.2 文档更新时机
+
+| 操作 | 文档更新要求 |
+|------|-------------|
+| 新增功能 | 创建/更新功能文档 |
+| 功能重构 | 更新功能文档 |
+| API变更 | 更新功能文档 + API文档 |
+| 技术优化 | 更新技术文档 |
+
+### 3.3 Prompt 与 Skill 设计边界（新增）
+
+为避免业务代码中堆积场景化提示词，避免在代码中用prompt也优化Agent在特殊场景的表现，统一采用“代码负责路由，Skill 承载场景策略”的设计原则：
+
+1. **代码层（业务服务/Runtime）职责最小化**
+   - 仅负责识别上下文与事件（如 `meeting.ended`）、选择要激活的 skill、透传必要运行参数。
+   - 避免在 `buildPrompt` 或业务代码中内嵌大段场景规则、步骤清单、固定回执文案。
+
+2. **Skill 层承载场景策略**
+   - 将工具调用顺序、强制动作、异常处理、幂等规则、回执模板统一沉淀到 `docs/skill/*.md`。
+   - 新增场景能力优先新增/更新 skill，而不是继续扩展代码内 prompt。
+
+3. **自动激活优先**
+   - 当 Agent 命中特定场景时，应优先走 skill 自动激活链路。
+   - 仅在 skill 无法表达或平台能力不足时，才补充最小必要代码提示。
+
+4. **可维护性与可演进性要求**
+   - 场景策略迭代应优先改 skill 文档，减少代码改动面。
+   - 功能文档需说明“场景 -> skill -> 工具”映射关系，保证可追踪与可审计。
+
+### 3.4 相关前后端开发规范
+- 前端开发必须遵循 `docs/guide/FRONTEND_GUIDELINE.md` 中的规范
+- 后端开发必须遵循 `docs/guide/BACKEND_GUIDELINE.md`
+---
+
+## 4. 现有功能模块
+
+docs/feature/INDEX.md 中列出了当前系统的主要功能模块
+
+---
+
+## 5. 文档层级全景（feature → plan → requirement → development/fix）
+
+```
+feature (功能模块)           docs/feature/<MODULE>.md
+  └── plan (计划方案)        docs/plan/<MODULE>_<PLAN_NAME>_PLAN.md
+        └── requirement      docs/requirement/<MODULE>_REQ-<NNN>_<BRIEF>.md
+              ├── development docs/development/<MODULE>_REQ-<NNN>_DEVELOPMENT.md
+              └── fix         docs/issue/fix/YYYY-MM-DD-<brief>.md
+```
+
+- 各层文档模板见对应目录下的 `TEMPLATE.md`
+- requirement 管理规范见 `docs/requirement/RULES.md`
+- 各层之间通过**文件名约定 + 文档内链接 + feature 追溯表**三重关联
+
+---
+
+## 6. 约束执行检查点
+
+在 opencode 完成功能开发后，必须检查：
+
+- [ ] 功能文档是否已更新？
+- [ ] 功能文档的**需求追溯表**是否已补充？
+- [ ] 是否引用了相关的规划/需求/开发/技术/API文档？
+- [ ] 代码文件清单是否与文档一致？
+- [ ] 新建 requirement 时，是否已在对应 plan 文档中关联？

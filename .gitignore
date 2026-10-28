@@ -1,0 +1,36 @@
+# 依赖
+node_modules/
+
+# 构建产物
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# 环境配置
+.env
+.env.local
+.env.*.local
+
+# Worktree
+.worktrees/
+
+# 参考仓库（独立 git，不纳入本项目）
+forks/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+logs/
+
+# turbo
+.turbo/

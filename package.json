@@ -1,0 +1,21 @@
+{
+  "name": "team-llm-gateway",
+  "private": true,
+  "version": "0.1.0",
+  "description": "面向小型产研/办公团队的 AI 接入服务网关（团队接入平台）",
+  "packageManager": "pnpm@10.14.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "turbo": "^2.11.10"
+  }
+}
