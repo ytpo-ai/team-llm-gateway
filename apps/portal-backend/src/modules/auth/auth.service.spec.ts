@@ -6,6 +6,7 @@ import * as bcrypt from 'bcryptjs';
 import { Types } from 'mongoose';
 import { Role } from '../../common/enums/role.enum.js';
 import { TenantService } from '../tenant/tenant.service.js';
+import { TeamsService } from '../teams/teams.service.js';
 import { UserStatus } from '../users/schemas/user.schema.js';
 import { UsersService } from '../users/users.service.js';
 import { AuthService } from './auth.service.js';
@@ -14,16 +15,24 @@ describe('AuthService', () => {
   let service: AuthService;
 
   const tenantId = new Types.ObjectId();
+  const teamId = new Types.ObjectId();
   const userId = new Types.ObjectId();
 
   const usersService = {
     findByEmail: vi.fn(),
     findById: vi.fn(),
     create: vi.fn(),
+    updateById: vi.fn(),
   };
 
   const tenantService = {
     ensureDefaultTenant: vi.fn(),
+  };
+
+  const teamsService = {
+    ensureDefaultTeam: vi.fn(),
+    validateInvitation: vi.fn(),
+    markInvitationAccepted: vi.fn(),
   };
 
   const jwtService = {
@@ -39,6 +48,16 @@ describe('AuthService', () => {
     }),
   };
 
+  const baseUser = {
+    _id: userId,
+    tenantId,
+    teamId,
+    email: 'admin@example.com',
+    name: '张三',
+    role: Role.TEAM_ADMIN,
+    status: UserStatus.ACTIVE,
+  };
+
   beforeEach(async () => {
     vi.clearAllMocks();
 
@@ -48,6 +67,13 @@ describe('AuthService', () => {
       name: '默认团队',
       status: 'active',
       config: {},
+    });
+
+    teamsService.ensureDefaultTeam.mockResolvedValue({
+      _id: teamId,
+      tenantId,
+      name: '默认团队',
+      status: 'active',
     });
 
     jwtService.signAsync.mockImplementation(
@@ -60,6 +86,7 @@ describe('AuthService', () => {
         AuthService,
         { provide: UsersService, useValue: usersService },
         { provide: TenantService, useValue: tenantService },
+        { provide: TeamsService, useValue: teamsService },
         { provide: JwtService, useValue: jwtService },
         { provide: ConfigService, useValue: configService },
       ],
@@ -69,12 +96,13 @@ describe('AuthService', () => {
   });
 
   describe('register', () => {
-    it('should create default tenant + admin and return tokens', async () => {
+    it('should create default tenant + team + admin and return tokens', async () => {
       const password = 'password123';
       usersService.findByEmail.mockResolvedValue(null);
       usersService.create.mockImplementation(async (input: any) => ({
         _id: userId,
         tenantId: input.tenantId,
+        teamId: input.teamId,
         email: input.email,
         passwordHash: input.passwordHash,
         name: input.name,
@@ -89,8 +117,12 @@ describe('AuthService', () => {
       });
 
       expect(tenantService.ensureDefaultTenant).toHaveBeenCalledWith(undefined);
+      expect(teamsService.ensureDefaultTeam).toHaveBeenCalledWith(
+        tenantId,
+        '默认团队',
+      );
       expect(usersService.create).toHaveBeenCalledWith(
-        expect.objectContaining({ role: Role.TEAM_ADMIN }),
+        expect.objectContaining({ role: Role.TEAM_ADMIN, teamId }),
       );
       const createdHash = usersService.create.mock.calls[0][0].passwordHash;
       expect(createdHash).not.toBe(password);
@@ -103,6 +135,7 @@ describe('AuthService', () => {
           name: '张三',
           role: Role.TEAM_ADMIN,
           tenantId: String(tenantId),
+          teamId: String(teamId),
         },
         accessToken: 'access-token',
         refreshToken: 'refresh-token',
@@ -126,13 +159,8 @@ describe('AuthService', () => {
     it('should return tokens when credentials are valid', async () => {
       const password = 'password123';
       usersService.findByEmail.mockResolvedValue({
-        _id: userId,
-        tenantId,
-        email: 'admin@example.com',
-        name: '张三',
+        ...baseUser,
         passwordHash: await bcrypt.hash(password, 4),
-        role: Role.TEAM_ADMIN,
-        status: UserStatus.ACTIVE,
       });
 
       const result = await service.login({
@@ -143,17 +171,13 @@ describe('AuthService', () => {
       expect(result.accessToken).toBe('access-token');
       expect(result.refreshToken).toBe('refresh-token');
       expect(result.user.id).toBe(String(userId));
+      expect(result.user.teamId).toBe(String(teamId));
     });
 
     it('should throw UnauthorizedException for wrong password', async () => {
       usersService.findByEmail.mockResolvedValue({
-        _id: userId,
-        tenantId,
-        email: 'admin@example.com',
-        name: '张三',
+        ...baseUser,
         passwordHash: await bcrypt.hash('another-password', 4),
-        role: Role.TEAM_ADMIN,
-        status: UserStatus.ACTIVE,
       });
 
       await expect(
@@ -176,16 +200,10 @@ describe('AuthService', () => {
         sub: String(userId),
         email: 'admin@example.com',
         tenantId: String(tenantId),
+        teamId: String(teamId),
         role: Role.TEAM_ADMIN,
       });
-      usersService.findById.mockResolvedValue({
-        _id: userId,
-        tenantId,
-        email: 'admin@example.com',
-        name: '张三',
-        role: Role.TEAM_ADMIN,
-        status: UserStatus.ACTIVE,
-      });
+      usersService.findById.mockResolvedValue(baseUser);
 
       const result = await service.refresh({ refreshToken: 'refresh-token' });
 
@@ -201,6 +219,72 @@ describe('AuthService', () => {
       await expect(
         service.refresh({ refreshToken: 'invalid' }),
       ).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('acceptInvite', () => {
+    it('should create member and return tokens for a valid invitation', async () => {
+      const invitation = {
+        _id: new Types.ObjectId(),
+        teamId,
+        email: 'member@example.com',
+        role: Role.MEMBER,
+        tokenHash: 'hash',
+        expiresAt: new Date(Date.now() + 10000),
+        status: 'pending',
+      };
+      teamsService.validateInvitation.mockResolvedValue({
+        invitation,
+        team: { _id: teamId, tenantId, name: '默认团队', status: 'active' },
+      });
+      usersService.findByEmail.mockResolvedValue(null);
+      usersService.create.mockImplementation(async (input: any) => ({
+        _id: userId,
+        tenantId: input.tenantId,
+        teamId: input.teamId,
+        email: input.email,
+        passwordHash: input.passwordHash,
+        name: input.name,
+        role: input.role,
+        status: UserStatus.ACTIVE,
+      }));
+      teamsService.markInvitationAccepted.mockResolvedValue(undefined);
+
+      const result = await service.acceptInvite({
+        token: 'token-abc',
+        name: '李四',
+        password: 'password123',
+      });
+
+      expect(usersService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ role: Role.MEMBER, teamId }),
+      );
+      expect(teamsService.markInvitationAccepted).toHaveBeenCalledWith(
+        invitation._id,
+      );
+      expect(result.user.role).toBe(Role.MEMBER);
+      expect(result.accessToken).toBe('access-token');
+    });
+
+    it('should throw ConflictException when email already registered', async () => {
+      teamsService.validateInvitation.mockResolvedValue({
+        invitation: {
+          _id: new Types.ObjectId(),
+          teamId,
+          email: 'member@example.com',
+          role: Role.MEMBER,
+        },
+        team: { _id: teamId, tenantId, name: '默认团队', status: 'active' },
+      });
+      usersService.findByEmail.mockResolvedValue({ _id: userId });
+
+      await expect(
+        service.acceptInvite({
+          token: 'token-abc',
+          name: '李四',
+          password: 'password123',
+        }),
+      ).rejects.toThrow(ConflictException);
     });
   });
 });

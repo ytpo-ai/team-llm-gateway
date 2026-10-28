@@ -2,14 +2,21 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Role } from '../../common/enums/role.enum.js';
-import { User, UserDocument } from './schemas/user.schema.js';
+import { User, UserDocument, UserStatus } from './schemas/user.schema.js';
 
 export interface CreateUserInput {
   tenantId: Types.ObjectId;
+  teamId?: Types.ObjectId;
   email: string;
   name: string;
   passwordHash: string;
   role: Role;
+}
+
+export interface UpdateUserInput {
+  role?: Role;
+  status?: UserStatus;
+  teamId?: Types.ObjectId;
 }
 
 @Injectable()
@@ -31,7 +38,18 @@ export class UsersService {
     return this.userModel.findById(id).exec();
   }
 
+  listByTeam(tenantId: string, teamId: string): Promise<UserDocument[]> {
+    return this.userModel.find({ tenantId, teamId }).sort({ createdAt: 1 }).exec();
+  }
+
   create(input: CreateUserInput): Promise<UserDocument> {
     return this.userModel.create(input);
+  }
+
+  updateById(
+    id: string,
+    patch: UpdateUserInput,
+  ): Promise<UserDocument | null> {
+    return this.userModel.findByIdAndUpdate(id, patch, { new: true }).exec();
   }
 }

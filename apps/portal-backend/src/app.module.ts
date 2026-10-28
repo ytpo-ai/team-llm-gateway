@@ -6,6 +6,7 @@ import { AppService } from './app.service.js';
 import configuration from './config/configuration.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { HealthModule } from './modules/health/health.module.js';
+import { TeamsModule } from './modules/teams/teams.module.js';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { HealthModule } from './modules/health/health.module.js';
       }),
     }),
     AuthModule,
+    TeamsModule,
     HealthModule,
   ],
   controllers: [AppController],

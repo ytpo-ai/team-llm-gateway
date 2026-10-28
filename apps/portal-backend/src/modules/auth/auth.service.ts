@@ -6,10 +6,13 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import { Types } from 'mongoose';
 import { Role } from '../../common/enums/role.enum.js';
 import { TenantService } from '../tenant/tenant.service.js';
+import { TeamsService } from '../teams/teams.service.js';
 import { UserStatus, type UserDocument } from '../users/schemas/user.schema.js';
 import { UsersService } from '../users/users.service.js';
+import { AcceptInviteDto } from './dto/accept-invite.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RefreshTokenDto } from './dto/refresh-token.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
@@ -18,6 +21,7 @@ export interface JwtPayload {
   sub: string;
   email: string;
   tenantId: string;
+  teamId: string;
   role: Role;
 }
 
@@ -26,12 +30,14 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly tenantService: TenantService,
+    private readonly teamsService: TeamsService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {}
 
   async register(dto: RegisterDto) {
     const tenant = await this.tenantService.ensureDefaultTenant(dto.tenantName);
+    const team = await this.teamsService.ensureDefaultTeam(tenant._id, tenant.name);
 
     const existing = await this.usersService.findByEmail(
       tenant._id,
@@ -44,13 +50,14 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const user = await this.usersService.create({
       tenantId: tenant._id,
+      teamId: team._id,
       email: dto.email,
       name: dto.name,
       passwordHash,
       role: Role.TEAM_ADMIN,
     });
 
-    const tokens = await this.issueTokens(user);
+    const tokens = await this.issueTokens(user, team._id);
     return { user: this.toPublicUser(user), ...tokens };
   }
 
@@ -70,7 +77,8 @@ export class AuthService {
       throw new UnauthorizedException('邮箱或密码错误');
     }
 
-    const tokens = await this.issueTokens(user);
+    const teamId = await this.resolveTeamId(user);
+    const tokens = await this.issueTokens(user, teamId);
     return { user: this.toPublicUser(user), ...tokens };
   }
 
@@ -92,7 +100,36 @@ export class AuthService {
       throw new UnauthorizedException('无效的刷新令牌');
     }
 
-    return this.issueTokens(user);
+    const teamId = await this.resolveTeamId(user);
+    return this.issueTokens(user, teamId);
+  }
+
+  async acceptInvite(dto: AcceptInviteDto) {
+    const { invitation, team } =
+      await this.teamsService.validateInvitation(dto.token);
+
+    const existing = await this.usersService.findByEmail(
+      team.tenantId,
+      invitation.email,
+    );
+    if (existing) {
+      throw new ConflictException('该邮箱已注册');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const user = await this.usersService.create({
+      tenantId: team.tenantId,
+      teamId: team._id,
+      email: invitation.email,
+      name: dto.name,
+      passwordHash,
+      role: invitation.role,
+    });
+
+    await this.teamsService.markInvitationAccepted(invitation._id);
+
+    const tokens = await this.issueTokens(user, team._id);
+    return { user: this.toPublicUser(user), ...tokens };
   }
 
   async getProfile(userId: string) {
@@ -103,11 +140,21 @@ export class AuthService {
     return this.toPublicUser(user);
   }
 
-  private async issueTokens(user: UserDocument) {
+  private async resolveTeamId(user: UserDocument): Promise<Types.ObjectId> {
+    if (user.teamId) {
+      return user.teamId;
+    }
+    const team = await this.teamsService.ensureDefaultTeam(user.tenantId);
+    await this.usersService.updateById(String(user._id), { teamId: team._id });
+    return team._id;
+  }
+
+  private async issueTokens(user: UserDocument, teamId: Types.ObjectId) {
     const payload: JwtPayload = {
       sub: String(user._id),
       email: user.email,
       tenantId: String(user.tenantId),
+      teamId: String(teamId),
       role: user.role,
     };
     const accessToken = await this.jwtService.signAsync(payload);
@@ -127,6 +174,7 @@ export class AuthService {
       name: user.name,
       role: user.role,
       tenantId: String(user.tenantId),
+      teamId: user.teamId ? String(user.teamId) : null,
     };
   }
 }

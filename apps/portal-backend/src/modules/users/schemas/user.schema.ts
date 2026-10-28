@@ -19,6 +19,9 @@ export class User {
   })
   tenantId: Types.ObjectId;
 
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Team', index: true })
+  teamId?: Types.ObjectId;
+
   @Prop({ required: true, lowercase: true, trim: true })
   email: string;
 
