@@ -8,7 +8,7 @@
 | 所属 plan | `docs/plan/TENANT_AUTH_PLAN.md` |
 | 需求管理 ID | — |
 | 分支 | `feat/tenant-auth-frontend` |
-| 状态 | `in-review` |
+| 状态 | `done` |
 
 ## 2. 需求描述
 
@@ -22,11 +22,11 @@
 - refresh 自动续期：access 过期时用 refresh 换取新 access。
 
 ### 验收条件
-- [ ] `pnpm --filter portal-frontend dev` 启动成功。
-- [ ] `pnpm --filter portal-frontend build` 通过。
-- [ ] 初始化/登录闭环可用：注册管理员 → 登录 → 进入受保护页面。
-- [ ] 未登录访问受保护页面自动跳转登录页。
-- [ ] access 过期自动 refresh 续期（或明确回退登录）。
+- [x] `pnpm --filter portal-frontend dev` 启动成功。
+- [x] `pnpm --filter portal-frontend build` 通过。
+- [x] 初始化/登录闭环可用：注册管理员 → 登录 → 进入受保护页面。
+- [x] 未登录访问受保护页面自动跳转登录页。
+- [x] access 过期自动 refresh 续期（或明确回退登录）。
 
 ## 3. 技术方案摘要
 - Vite + React 19 + TS + Tailwind + shadcn/ui + React Router + TanStack Query + Zustand。
@@ -42,4 +42,4 @@
 ## 5. 状态跟踪
 - [x] 开发中
 - [x] 待验收
-- [ ] 已交付
+- [x] 已交付

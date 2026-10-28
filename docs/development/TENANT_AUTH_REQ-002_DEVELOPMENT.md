@@ -42,6 +42,7 @@
 
 1. **Vite 默认绑定 localhost（::1）**：`curl 127.0.0.1:5173` 连不上（status 000），改用 `localhost` 验证代理正常。属环境差异，非代码缺陷。
 2. **本地 27017 Mongo 开启鉴权**：与 REQ-001 一致，`Command find requires authentication`；冒烟改用临时无鉴权 Mongo 容器（端口 27018）完成。
+3. **登录错误提示显示 `[object Object]`**：后端 `HttpExceptionFilter` 对 `UnauthorizedException('xxx')` 的 `getResponse()`（已是 `{ message, error, statusCode }` 对象）整体塞入 `message`，造成双重包裹；前端 `readError` 拿到对象后渲染为 `[object Object]`。修复：后端 filter 提取字符串/数组 message，前端 `readError` 同步做防御性解析（提交 `403d786`）。
 
 ## 4. 验证结果
 
@@ -54,6 +55,12 @@
   - `profile`（带 access）→ 200 返回当前用户；无 token → 401。
   - `refresh` → 200 换取新 access/refresh。
 - Vite 代理冒烟：`POST localhost:5173/api/auth/login` → 401（转发成功），`GET /api/health` → `{ status: ok, mongo: up }`。
+- 浏览器端 E2E（Playwright + 系统 Chrome，headless，8 项断言全部通过）：
+  - 未登录访问 `/` → 重定向 `/login`。
+  - 初始化注册管理员 → 进入受保护首页，布局显示用户名。
+  - 退出登录 → 跳转 `/login`。
+  - 登录 → 进入受保护首页，布局显示用户名。
+  - 错误密码 → 展示「邮箱或密码错误」提示，且停留 `/login`。
 
 ## 5. 关联
 
