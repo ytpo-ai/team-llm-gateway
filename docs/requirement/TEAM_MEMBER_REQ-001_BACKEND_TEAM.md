@@ -8,7 +8,7 @@
 | 所属 plan | `docs/plan/TEAM_MEMBER_PLAN.md` |
 | 需求管理 ID | — |
 | 分支 | `feat/team-member-backend` |
-| 状态 | `draft` |
+| 状态 | `done` |
 
 ## 2. 需求描述
 
@@ -24,11 +24,11 @@
 - 租户隔离：所有查询按 `tenantId` 过滤。
 
 ### 验收条件
-- [ ] `pnpm --filter portal-backend start:dev` 启动成功。
-- [ ] Swagger 可调 `GET/POST /teams`、`PATCH /teams/:id`、`GET /teams/:id/members`、`PATCH/DELETE /teams/:id/members/:userId`、`POST/GET/DELETE /teams/:id/invitations`、`POST /auth/accept-invite`。
-- [ ] 注册后默认团队创建、`user.teamId` 回填；登录返回 JWT 含 `teamId`。
-- [ ] 邀请 → 接受 → 成员可见闭环落库正确。
-- [ ] `pnpm --filter portal-backend lint` / `typecheck` / `test` 通过。
+- [x] `pnpm --filter portal-backend start:dev` 启动成功。
+- [x] Swagger 可调 `GET/POST /teams`、`PATCH /teams/:id`、`GET /teams/:id/members`、`PATCH/DELETE /teams/:id/members/:userId`、`POST/GET/DELETE /teams/:id/invitations`、`POST /auth/accept-invite`。
+- [x] 注册后默认团队创建、`user.teamId` 回填；登录返回 JWT 含 `teamId`。
+- [x] 邀请 → 接受 → 成员可见闭环落库正确。
+- [x] `pnpm --filter portal-backend lint` / `typecheck` / `test` 通过。
 
 ## 3. 技术方案摘要
 - 复用 Nest.js + Mongoose + class-validator + Swagger 既有模式（参考 `apps/portal-backend/src/modules/auth/`、`users/`、`tenant/`）。
@@ -42,6 +42,6 @@
 | fix | — |
 
 ## 5. 状态跟踪
-- [ ] 开发中
-- [ ] 待验收
-- [ ] 已交付
+- [x] 开发中
+- [x] 待验收
+- [x] 已交付

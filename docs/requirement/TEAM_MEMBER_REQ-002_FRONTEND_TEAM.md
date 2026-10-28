@@ -8,7 +8,7 @@
 | 所属 plan | `docs/plan/TEAM_MEMBER_PLAN.md` |
 | 需求管理 ID | — |
 | 分支 | `feat/team-member-frontend` |
-| 状态 | `draft` |
+| 状态 | `done` |
 
 ## 2. 需求描述
 
@@ -21,10 +21,10 @@
 - 路由与导航接入；非 `team_admin` 隐藏管理入口。
 
 ### 验收条件
-- [ ] `pnpm --filter portal-frontend dev` 启动成功。
-- [ ] `pnpm --filter portal-frontend build` 通过。
-- [ ] 邀请 → 打开链接 → 接受 → 成员列表可见的闭环可用。
-- [ ] 角色编辑 / 禁用 / 移除操作可用；非管理员不可见管理入口。
+- [x] `pnpm --filter portal-frontend dev` 启动成功。
+- [x] `pnpm --filter portal-frontend build` 通过。
+- [x] 邀请 → 打开链接 → 接受 → 成员列表可见的闭环可用。
+- [x] 角色编辑 / 禁用 / 移除操作可用；非管理员不可见管理入口。
 
 ## 3. 技术方案摘要
 - 复用 `src/lib/http.ts`（`request<T>`）、Zustand `useAuthStore`、React Router、shadcn/ui、TanStack Query。
@@ -38,6 +38,6 @@
 | fix | — |
 
 ## 5. 状态跟踪
-- [ ] 开发中
-- [ ] 待验收
-- [ ] 已交付
+- [x] 开发中
+- [x] 待验收
+- [x] 已交付
