@@ -1,6 +1,8 @@
 import { createBrowserRouter } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/app-layout'
 import { ProtectedRoute } from '@/features/auth/protected-route'
+import { AdminOverviewPage } from '@/pages/admin-overview'
+import { AdminTenantsPage } from '@/pages/admin-tenants'
 import { ApiKeysPage } from '@/pages/api-keys'
 import { AuditLogsPage } from '@/pages/audit-logs'
 import { BillingPage } from '@/pages/billing'
@@ -38,6 +40,8 @@ export const router = createBrowserRouter([
           { path: 'recommendation', element: <RecommendationPage /> },
           { path: 'settings', element: <SettingsPage /> },
           { path: 'audit-logs', element: <AuditLogsPage /> },
+          { path: 'admin/tenants', element: <AdminTenantsPage /> },
+          { path: 'admin/overview', element: <AdminOverviewPage /> },
         ],
       },
     ],
