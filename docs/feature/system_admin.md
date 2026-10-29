@@ -9,20 +9,25 @@
 - 服务商/系统角色在开源单团队版中隐藏。
 
 ### 数据结构
-- 待设计。
+- `SystemSetting`（租户级 KV 配置）：`tenantId + key` 唯一，`value` JSON，`updatedBy`。见 `docs/technical/db_schema/SYSTEM_ADMIN_SCHEMA.MD`。
+- `AuditLog`（审计流水）：`tenantId/teamId/userId` + `action/resourceType/resourceId/summary` + `before/after` 快照 + `ip/userAgent`，只增不改。见 `docs/technical/db_schema/SYSTEM_ADMIN_SCHEMA.MD`。
 
 ### 核心逻辑
-- 待设计。
+- `SystemSettingsService`：`GET/PUT /system/settings`（批量 upsert，`team_admin`）。
+- `AuditService`：`log()` 进程内埋点 + `GET /system/audit-logs`（分页 + 筛选，`team_admin`）。
+- 审计埋点：billing（recharge/adjust）、api-keys（create/revoke/rotate）、models（create/disable）、providers（create/disable）、teams（角色变更/移除/邀请）。
+- 通知：本期不实现，`SystemSetting` 预留 `notification.*` 配置键。
 
 ## 2. 需求追溯
 
 | Plan | Requirement | Development | Fix |
 |------|------------|-------------|-----|
-| [PORTAL_FOUNDATION](../plan/PORTAL_FOUNDATION_PLAN.md) | — | — | — |
+| [SYSTEM_ADMIN](../plan/SYSTEM_ADMIN_PLAN.md) | [REQ-001](../requirement/SYSTEM_ADMIN_REQ-001_BACKEND_SYSTEM.md)、[REQ-002](../requirement/SYSTEM_ADMIN_REQ-002_FRONTEND_SYSTEM.md) | — | — |
 
 ## 3. 相关文档
-- 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（§5.3）
+- 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（§5.2/§5.3）
+- 数据模型：`docs/technical/db_schema/SYSTEM_ADMIN_SCHEMA.MD`
 
 ## 4. 相关代码文件
 - 后端：`apps/portal-backend/src/modules/system/`
-- 前端：`apps/portal-frontend/src/features/system/`
+- 前端：`apps/portal-frontend/src/features/system/`、`apps/portal-frontend/src/pages/settings.tsx`、`apps/portal-frontend/src/pages/audit-logs.tsx`
