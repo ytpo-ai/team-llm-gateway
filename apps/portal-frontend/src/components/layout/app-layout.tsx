@@ -47,6 +47,9 @@ export function AppLayout() {
             <NavLink to="/models" className={navLinkClass}>
               模型
             </NavLink>
+            <NavLink to="/recommendation" className={navLinkClass}>
+              选型建议
+            </NavLink>
             {user?.role === 'team_admin' && (
               <NavLink to="/providers" className={navLinkClass}>
                 上游

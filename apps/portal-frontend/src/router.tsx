@@ -8,6 +8,7 @@ import { InvitePage } from '@/pages/invite'
 import { LoginPage } from '@/pages/login'
 import { ModelsPage } from '@/pages/models'
 import { ProvidersPage } from '@/pages/providers'
+import { RecommendationPage } from '@/pages/recommendation'
 import { TeamPage } from '@/pages/team'
 
 export const router = createBrowserRouter([
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
           { path: 'billing', element: <BillingPage /> },
           { path: 'providers', element: <ProvidersPage /> },
           { path: 'models', element: <ModelsPage /> },
+          { path: 'recommendation', element: <RecommendationPage /> },
         ],
       },
     ],
