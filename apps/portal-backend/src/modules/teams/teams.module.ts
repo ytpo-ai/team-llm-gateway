@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module.js';
+import { SystemModule } from '../system/system.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { Invitation, InvitationSchema } from './schemas/invitation.schema.js';
 import { Team, TeamSchema } from './schemas/team.schema.js';
@@ -10,6 +11,7 @@ import { TeamsService } from './teams.service.js';
 @Module({
   imports: [
     forwardRef(() => AuthModule),
+    SystemModule,
     UsersModule,
     MongooseModule.forFeature([
       { name: Team.name, schema: TeamSchema },
