@@ -8,20 +8,25 @@
 - 相对参考项目（New API/LiteLLM/Portkey）的核心差异化能力（§8、D-02）。
 
 ### 数据结构
-- 待设计（场景模板 / 模型能力标签 / 推荐规则）。
+- 无新增数据集合：办公场景为后端静态模板（`SCENARIOS` 常量），推荐结果实时计算。
+- 依赖 `Model.capabilities`（能力标签）与 `Model.multiplier`（倍率）作为匹配与成本排序的单一事实来源（`docs/technical/db_schema/MODEL_PROVIDER_SCHEMA.MD`）。
 
 ### 核心逻辑
-- 待设计（推荐引擎，D-02）。
+- 规范能力标签字典：`chat`/`code`/`reasoning`/`vision`/`writing`/`translation`/`summarization`/`long-context`。
+- 8 个办公场景模板（日常对话/代码生成/代码审查/文档撰写/翻译/长文总结/数据分析/图像理解），每场景含必需/可选能力、缓存提示、成本建议、典型任务。
+- 推荐引擎：团队 active 模型 → 必需能力全匹配候选 → 按 `multiplier` 升序（成本优先）→ 首选 + 替代；无全匹配时部分匹配兜底。
 
 ## 2. 需求追溯
 
 | Plan | Requirement | Development | Fix |
 |------|------------|-------------|-----|
-| [PORTAL_FOUNDATION](../plan/PORTAL_FOUNDATION_PLAN.md) | — | — | — |
+| [MODEL_RECOMMENDATION](../plan/MODEL_RECOMMENDATION_PLAN.md) | [REQ-001 后端推荐引擎](../requirement/MODEL_RECOMMENDATION_REQ-001_BACKEND_RECOMMENDATION.md) | [开发记录](../development/MODEL_RECOMMENDATION_REQ-001_DEVELOPMENT.md) | — |
+| 同上 | [REQ-002 前端选型建议页](../requirement/MODEL_RECOMMENDATION_REQ-002_FRONTEND_RECOMMENDATION.md) | [开发记录](../development/MODEL_RECOMMENDATION_REQ-002_DEVELOPMENT.md) | — |
 
 ## 3. 相关文档
-- 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（§8、D-02）
+- 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（§8、D-02）、`docs/technical/db_schema/MODEL_PROVIDER_SCHEMA.MD`
+- 规划文档：`docs/plan/MODEL_RECOMMENDATION_PLAN.md`
 
 ## 4. 相关代码文件
 - 后端：`apps/portal-backend/src/modules/recommendation/`
-- 前端：`apps/portal-frontend/src/features/recommendation/`
+- 前端：`apps/portal-frontend/src/features/recommendation/`、`pages/recommendation.tsx`
