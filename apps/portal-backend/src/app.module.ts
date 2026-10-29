@@ -11,6 +11,7 @@ import { HealthModule } from './modules/health/health.module.js';
 import { ModelsModule } from './modules/models/models.module.js';
 import { ProvidersModule } from './modules/providers/providers.module.js';
 import { ProxyModule } from './modules/proxy/proxy.module.js';
+import { RecommendationModule } from './modules/recommendation/recommendation.module.js';
 import { TeamsModule } from './modules/teams/teams.module.js';
 import { UsageModule } from './modules/usage/usage.module.js';
 
@@ -31,6 +32,7 @@ import { UsageModule } from './modules/usage/usage.module.js';
     ModelsModule,
     UsageModule,
     ProxyModule,
+    RecommendationModule,
     HealthModule,
   ],
   controllers: [AppController],
