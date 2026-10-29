@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/app-layout'
 import { ProtectedRoute } from '@/features/auth/protected-route'
 import { ApiKeysPage } from '@/pages/api-keys'
+import { BillingPage } from '@/pages/billing'
 import { DashboardPage } from '@/pages/dashboard'
 import { InvitePage } from '@/pages/invite'
 import { LoginPage } from '@/pages/login'
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
           { index: true, element: <DashboardPage /> },
           { path: 'team', element: <TeamPage /> },
           { path: 'api-keys', element: <ApiKeysPage /> },
+          { path: 'billing', element: <BillingPage /> },
           { path: 'providers', element: <ProvidersPage /> },
           { path: 'models', element: <ModelsPage /> },
         ],

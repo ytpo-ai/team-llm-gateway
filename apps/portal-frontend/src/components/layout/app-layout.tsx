@@ -41,6 +41,9 @@ export function AppLayout() {
             <NavLink to="/api-keys" className={navLinkClass}>
               API Key
             </NavLink>
+            <NavLink to="/billing" className={navLinkClass}>
+              额度
+            </NavLink>
             <NavLink to="/models" className={navLinkClass}>
               模型
             </NavLink>
