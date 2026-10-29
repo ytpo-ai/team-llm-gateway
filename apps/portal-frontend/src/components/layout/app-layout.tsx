@@ -55,6 +55,16 @@ export function AppLayout() {
                 上游
               </NavLink>
             )}
+            {user?.role === 'team_admin' && (
+              <NavLink to="/settings" className={navLinkClass}>
+                设置
+              </NavLink>
+            )}
+            {user?.role === 'team_admin' && (
+              <NavLink to="/audit-logs" className={navLinkClass}>
+                审计
+              </NavLink>
+            )}
           </nav>
         </div>
         <div className="flex items-center gap-2">
