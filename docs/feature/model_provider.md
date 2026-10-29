@@ -15,7 +15,7 @@
 - 上游统一「OpenAI 兼容」抽象（§3 核心解耦原则）；`type` 保留 `anthropic` 位（协议翻译后续）。
 - 上游 key AES-256-GCM 加密落库，明文仅创建/更新时输入、绝不返回。
 - 模型目录：`modelId` + `multiplier`（倍率）+ `capabilities`（能力标签）+ `aliases`。
-- OpenAI 兼容转发层（成员 key → Portal → 上游 key 转发，D-05）延迟到后续运行时，与 usage_metering 联动交付。
+- OpenAI 兼容转发层（成员 key → Portal → 上游 key 转发，D-05）：已交付，见 `docs/plan/USAGE_METERING_PLAN.md`（M-01 闭环），代码在 `apps/portal-backend/src/modules/proxy/`。
 
 ## 2. 需求追溯
 
@@ -30,5 +30,5 @@
 - 上游：`docs/plan/API_KEY_PLAN.md`
 
 ## 4. 相关代码文件
-- 后端：`apps/portal-backend/src/modules/providers/`、`apps/portal-backend/src/modules/models/`、`apps/portal-backend/src/common/crypto/`
+- 后端：`apps/portal-backend/src/modules/providers/`、`apps/portal-backend/src/modules/models/`、`apps/portal-backend/src/modules/proxy/`（转发层）、`apps/portal-backend/src/common/crypto/`
 - 前端：`apps/portal-frontend/src/features/providers/`、`apps/portal-frontend/src/features/models/`、`pages/providers.tsx`、`pages/models.tsx`

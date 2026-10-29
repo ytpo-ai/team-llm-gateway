@@ -68,7 +68,7 @@ Portal 从零开始。产品矩阵中 Portal（团队接入平台）是差异化
 3. ✅ monorepo 骨架 + 工程基线（REQ-001）。
 4. ✅ 后端基础框架（REQ-002）。
 5. ✅ 前端基础框架（REQ-003）。
-6. 🔄 功能模块逐步开发（tenant_auth ✅ → team_member ✅ → api_key ✅ → model_provider 进行中 → usage_metering → billing_quota → model_recommendation）。
+6. 🔄 功能模块逐步开发（tenant_auth ✅ → team_member ✅ → api_key ✅ → model_provider ✅ → usage_metering ✅ → billing_quota → model_recommendation）。
 
 ## 7. 待决事项与风险
 

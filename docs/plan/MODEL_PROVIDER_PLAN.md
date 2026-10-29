@@ -52,13 +52,13 @@
 
 1. ✅ REQ-001 后端模型与上游（本文档拆解）。
 2. ✅ REQ-002 前端上游/模型管理闭环。
-3. ⬜ OpenAI 兼容转发层（`/v1/*` 代理 + key 校验 + provider 解析 + SSE 流式 + 协议翻译），与 `usage_metering` 计量联动交付。
+3. ✅ OpenAI 兼容转发层（`/v1/*` 代理 + key 校验 + provider 解析 + SSE 流式 + 协议翻译），与 `usage_metering` 计量联动交付（见 `docs/plan/USAGE_METERING_PLAN.md`）。
 
 ## 7. 待决事项与风险
 
 | 编号 | 事项 | 状态 |
 |---|---|---|
-| M-01 | OpenAI 兼容转发层（成员 key → Portal → 上游 key 转发） | 延迟到后续运行时，需 key 校验 + provider 解析 + SSE + 计量，与 usage_metering 一起交付 |
+| M-01 | OpenAI 兼容转发层（成员 key → Portal → 上游 key 转发） | ✅ 已交付（`docs/plan/USAGE_METERING_PLAN.md` REQ-002，含 key 校验 + provider 解析 + SSE + 计量联动） |
 | M-02 | Anthropic 协议翻译 | 首期仅落 `type` 枚举位，`openai-compatible` 为默认，翻译逻辑后续 |
 | M-03 | 上游连通性探活（`POST /providers/:id/test`） | 后续 |
 | M-04 | 上游 key 加密密钥管理（KMS / 轮换） | 首期 `ENCRYPTION_SECRET` 环境变量，密钥轮换留待后续 |
