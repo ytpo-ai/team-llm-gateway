@@ -4,6 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import configuration from './config/configuration.js';
+import { AdminModule } from './modules/admin/admin.module.js';
 import { ApiKeysModule } from './modules/api-keys/api-keys.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { BillingModule } from './modules/billing/billing.module.js';
@@ -35,6 +36,7 @@ import { UsageModule } from './modules/usage/usage.module.js';
     ProxyModule,
     RecommendationModule,
     SystemModule,
+    AdminModule,
     HealthModule,
   ],
   controllers: [AppController],

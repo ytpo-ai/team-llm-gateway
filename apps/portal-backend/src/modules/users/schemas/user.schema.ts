@@ -14,10 +14,10 @@ export class User {
   @Prop({
     type: MongooseSchema.Types.ObjectId,
     ref: 'Tenant',
-    required: true,
+    default: null,
     index: true,
   })
-  tenantId: Types.ObjectId;
+  tenantId?: Types.ObjectId | null;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Team', index: true })
   teamId?: Types.ObjectId;

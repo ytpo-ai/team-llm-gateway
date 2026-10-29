@@ -62,9 +62,20 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const tenant = await this.tenantService.ensureDefaultTenant();
+    const systemUser = await this.usersService.findSystemUserByEmail(dto.email);
+    if (systemUser) {
+      return this.loginUser(systemUser, dto.password);
+    }
 
+    const tenant = await this.tenantService.ensureDefaultTenant();
     const user = await this.usersService.findByEmail(tenant._id, dto.email);
+    return this.loginUser(user, dto.password);
+  }
+
+  private async loginUser(
+    user: UserDocument | null,
+    password: string,
+  ) {
     if (!user) {
       throw new UnauthorizedException('邮箱或密码错误');
     }
@@ -72,7 +83,7 @@ export class AuthService {
       throw new UnauthorizedException('账号已被禁用');
     }
 
-    const valid = await bcrypt.compare(dto.password, user.passwordHash);
+    const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
       throw new UnauthorizedException('邮箱或密码错误');
     }
@@ -140,21 +151,31 @@ export class AuthService {
     return this.toPublicUser(user);
   }
 
-  private async resolveTeamId(user: UserDocument): Promise<Types.ObjectId> {
+  private async resolveTeamId(
+    user: UserDocument,
+  ): Promise<Types.ObjectId | null> {
+    if (user.role === Role.SYSTEM) {
+      return null;
+    }
     if (user.teamId) {
       return user.teamId;
     }
-    const team = await this.teamsService.ensureDefaultTeam(user.tenantId);
+    const team = await this.teamsService.ensureDefaultTeam(
+      user.tenantId as Types.ObjectId,
+    );
     await this.usersService.updateById(String(user._id), { teamId: team._id });
     return team._id;
   }
 
-  private async issueTokens(user: UserDocument, teamId: Types.ObjectId) {
+  private async issueTokens(
+    user: UserDocument,
+    teamId: Types.ObjectId | null,
+  ) {
     const payload: JwtPayload = {
       sub: String(user._id),
       email: user.email,
-      tenantId: String(user.tenantId),
-      teamId: String(teamId),
+      tenantId: user.tenantId ? String(user.tenantId) : '',
+      teamId: teamId ? String(teamId) : '',
       role: user.role,
     };
     const accessToken = await this.jwtService.signAsync(payload);
@@ -173,7 +194,7 @@ export class AuthService {
       email: user.email,
       name: user.name,
       role: user.role,
-      tenantId: String(user.tenantId),
+      tenantId: user.tenantId ? String(user.tenantId) : '',
       teamId: user.teamId ? String(user.teamId) : null,
     };
   }

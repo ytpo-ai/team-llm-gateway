@@ -25,6 +25,9 @@ export class Tenant {
 
   @Prop({ type: Object, default: {} })
   config: Record<string, unknown>;
+
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export const TenantSchema = SchemaFactory.createForClass(Tenant);

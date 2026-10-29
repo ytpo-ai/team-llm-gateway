@@ -34,6 +34,12 @@ export class UsersService {
       .exec();
   }
 
+  findSystemUserByEmail(email: string): Promise<UserDocument | null> {
+    return this.userModel
+      .findOne({ email: email.toLowerCase(), role: Role.SYSTEM })
+      .exec();
+  }
+
   findById(id: string): Promise<UserDocument | null> {
     return this.userModel.findById(id).exec();
   }

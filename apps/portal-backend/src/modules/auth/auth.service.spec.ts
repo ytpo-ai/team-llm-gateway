@@ -20,6 +20,7 @@ describe('AuthService', () => {
 
   const usersService = {
     findByEmail: vi.fn(),
+    findSystemUserByEmail: vi.fn(),
     findById: vi.fn(),
     create: vi.fn(),
     updateById: vi.fn(),
@@ -60,6 +61,8 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+
+    usersService.findSystemUserByEmail.mockResolvedValue(null);
 
     tenantService.ensureDefaultTenant.mockResolvedValue({
       _id: tenantId,
@@ -172,6 +175,31 @@ describe('AuthService', () => {
       expect(result.refreshToken).toBe('refresh-token');
       expect(result.user.id).toBe(String(userId));
       expect(result.user.teamId).toBe(String(teamId));
+    });
+
+    it('should login a system (super admin) user without a team', async () => {
+      const password = 'password123';
+      usersService.findSystemUserByEmail.mockResolvedValue({
+        _id: userId,
+        tenantId: null,
+        teamId: null,
+        email: 'super@example.com',
+        name: '超级管理员',
+        role: Role.SYSTEM,
+        status: UserStatus.ACTIVE,
+        passwordHash: await bcrypt.hash(password, 4),
+      });
+
+      const result = await service.login({
+        email: 'super@example.com',
+        password,
+      });
+
+      expect(usersService.findByEmail).not.toHaveBeenCalled();
+      expect(result.user.role).toBe(Role.SYSTEM);
+      expect(result.user.teamId).toBeNull();
+      expect(result.user.tenantId).toBe('');
+      expect(result.accessToken).toBe('access-token');
     });
 
     it('should throw UnauthorizedException for wrong password', async () => {

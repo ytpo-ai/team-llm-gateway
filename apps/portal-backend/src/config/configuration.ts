@@ -11,6 +11,10 @@ export interface AppConfig {
   encryption: {
     secret: string;
   };
+  superAdmin: {
+    email: string;
+    password: string;
+  };
 }
 
 export default (): AppConfig => ({
@@ -25,5 +29,9 @@ export default (): AppConfig => ({
   },
   encryption: {
     secret: process.env.ENCRYPTION_SECRET ?? 'portal-dev-encryption-secret',
+  },
+  superAdmin: {
+    email: process.env.SUPER_ADMIN_EMAIL ?? '',
+    password: process.env.SUPER_ADMIN_PASSWORD ?? '',
   },
 });
