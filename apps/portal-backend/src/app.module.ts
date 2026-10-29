@@ -9,7 +9,9 @@ import { AuthModule } from './modules/auth/auth.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { ModelsModule } from './modules/models/models.module.js';
 import { ProvidersModule } from './modules/providers/providers.module.js';
+import { ProxyModule } from './modules/proxy/proxy.module.js';
 import { TeamsModule } from './modules/teams/teams.module.js';
+import { UsageModule } from './modules/usage/usage.module.js';
 
 @Module({
   imports: [
@@ -25,6 +27,8 @@ import { TeamsModule } from './modules/teams/teams.module.js';
     ApiKeysModule,
     ProvidersModule,
     ModelsModule,
+    UsageModule,
+    ProxyModule,
     HealthModule,
   ],
   controllers: [AppController],
