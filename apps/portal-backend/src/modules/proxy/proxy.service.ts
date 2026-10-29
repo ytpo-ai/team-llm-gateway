@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -10,6 +12,7 @@ import { randomUUID } from 'node:crypto';
 import type { Response as ExpressResponse } from 'express';
 import { Model, Types } from 'mongoose';
 import { decrypt } from '../../common/crypto/cipher.js';
+import { BillingService } from '../billing/billing.service.js';
 import { ApiKey } from '../api-keys/schemas/api-key.schema.js';
 import { Model as ModelEntity, ModelStatus } from '../models/schemas/model.schema.js';
 import {
@@ -20,6 +23,7 @@ import {
 import { UsageService } from '../usage/usage.service.js';
 import { UsageStatus } from '../usage/schemas/usage-log.schema.js';
 import type { ApiKeyContext } from './decorators/api-key-context.decorator.js';
+import { RateLimitService } from './rate-limit.service.js';
 
 interface ChatCompletionsBody {
   model?: unknown;
@@ -54,6 +58,8 @@ export class ProxyService {
     @InjectModel(ApiKey.name) private readonly apiKeyModel: Model<ApiKey>,
     private readonly configService: ConfigService,
     private readonly usageService: UsageService,
+    private readonly billingService: BillingService,
+    private readonly rateLimitService: RateLimitService,
   ) {}
 
   async listModels(ctx: ApiKeyContext) {
@@ -147,6 +153,8 @@ export class ProxyService {
     ctx: ApiKeyContext,
     body: ChatCompletionsBody,
   ): Promise<PreparedRequest> {
+    await this.enforceLimits(ctx);
+
     const requestedModel = body.model;
     if (typeof requestedModel !== 'string' || !requestedModel.trim()) {
       throw new BadRequestException('请求体缺少 model 字段');
@@ -213,6 +221,35 @@ export class ProxyService {
     };
   }
 
+  private async enforceLimits(ctx: ApiKeyContext): Promise<void> {
+    this.rateLimitService.assertAllowed(
+      ctx.apiKeyId,
+      ctx.apiKey.rateLimitPerMinute,
+    );
+
+    if (ctx.apiKey.maxTokens != null) {
+      const used = await this.usageService.sumTokensByApiKey(
+        ctx.tenantId,
+        ctx.apiKeyId,
+      );
+      if (used >= ctx.apiKey.maxTokens) {
+        throw new HttpException(
+          '该 API Key 的 Token 预算已用尽',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+    }
+
+    const balance = await this.billingService.getSpendableBalance(
+      ctx.tenantId,
+      ctx.teamId,
+      ctx.userId,
+    );
+    if (balance <= 0) {
+      throw new HttpException('额度余额不足', HttpStatus.PAYMENT_REQUIRED);
+    }
+  }
+
   private async requestUpstream(
     prepared: PreparedRequest,
   ): Promise<globalThis.Response> {
@@ -256,6 +293,16 @@ export class ProxyService {
       { _id: new Types.ObjectId(ctx.apiKeyId) },
       { lastUsedAt: new Date() },
     );
+
+    if (totalTokens > 0) {
+      await this.billingService.deduct({
+        tenantId: ctx.tenantId,
+        teamId: ctx.teamId,
+        userId: ctx.userId,
+        cost: prepared.multiplier * totalTokens,
+        referenceId: prepared.requestId,
+      });
+    }
   }
 
   private async recordError(

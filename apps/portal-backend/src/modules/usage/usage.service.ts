@@ -97,6 +97,24 @@ export class UsageService {
     });
   }
 
+  async sumTokensByApiKey(
+    tenantId: string,
+    apiKeyId: string,
+  ): Promise<number> {
+    const [result] = await this.usageLogModel
+      .aggregate<{ total: number }>([
+        {
+          $match: {
+            tenantId: new Types.ObjectId(tenantId),
+            apiKeyId: new Types.ObjectId(apiKeyId),
+          },
+        },
+        { $group: { _id: null, total: { $sum: '$totalTokens' } } },
+      ])
+      .exec();
+    return result?.total ?? 0;
+  }
+
   async summary(user: AuthUser, query: UsageQueryDto): Promise<UsageSummary> {
     const { from, to } = this.resolveRange(query);
     const match = this.buildMatch(user, from, to);

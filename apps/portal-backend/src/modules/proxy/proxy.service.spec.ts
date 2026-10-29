@@ -1,8 +1,13 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
 import { encrypt } from '../../common/crypto/cipher.js';
+import { BillingService } from '../billing/billing.service.js';
 import { ApiKeyStatus } from '../api-keys/schemas/api-key.schema.js';
 import { ModelStatus } from '../models/schemas/model.schema.js';
 import {
@@ -13,6 +18,7 @@ import { UsageStatus } from '../usage/schemas/usage-log.schema.js';
 import { UsageService } from '../usage/usage.service.js';
 import type { ApiKeyContext } from './decorators/api-key-context.decorator.js';
 import { ProxyService } from './proxy.service.js';
+import { RateLimitService } from './rate-limit.service.js';
 
 describe('ProxyService', () => {
   let service: ProxyService;
@@ -26,10 +32,15 @@ describe('ProxyService', () => {
   const modelModel = { find: vi.fn(), findOne: vi.fn() };
   const providerModel = { findOne: vi.fn() };
   const apiKeyModel = { updateOne: vi.fn() };
-  const usageService = { record: vi.fn() };
+  const usageService = { record: vi.fn(), sumTokensByApiKey: vi.fn() };
+  const billingService = { getSpendableBalance: vi.fn(), deduct: vi.fn() };
+  const rateLimitService = { assertAllowed: vi.fn() };
   const configService = { getOrThrow: vi.fn(() => 'test-secret') };
 
-  const makeContext = (allowedModels: string[] = []): ApiKeyContext => ({
+  const makeContext = (
+    allowedModels: string[] = [],
+    apiKeyOverrides: Record<string, unknown> = {},
+  ): ApiKeyContext => ({
     tenantId,
     teamId,
     userId,
@@ -48,6 +59,7 @@ describe('ProxyService', () => {
       maxTokens: null,
       lastUsedAt: null,
       _id: apiKeyId,
+      ...apiKeyOverrides,
     } as ApiKeyContext['apiKey'],
   });
 
@@ -96,8 +108,15 @@ describe('ProxyService', () => {
         { provide: 'ApiKeyModel', useValue: apiKeyModel },
         { provide: ConfigService, useValue: configService },
         { provide: UsageService, useValue: usageService },
+        { provide: BillingService, useValue: billingService },
+        { provide: RateLimitService, useValue: rateLimitService },
       ],
     }).compile();
+
+    usageService.sumTokensByApiKey.mockResolvedValue(0);
+    billingService.getSpendableBalance.mockResolvedValue(100);
+    billingService.deduct.mockResolvedValue(undefined);
+    rateLimitService.assertAllowed.mockReset();
 
     service = module.get(ProxyService);
   });
@@ -196,6 +215,46 @@ describe('ProxyService', () => {
           makeRes() as never,
         ),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('limits', () => {
+    it('should reject when maxTokens budget is exhausted', async () => {
+      usageService.sumTokensByApiKey.mockResolvedValue(1000);
+
+      await expect(
+        service.chatCompletions(
+          makeContext([], { maxTokens: 1000 }),
+          { model: 'gpt-4o-mini' },
+          makeRes() as never,
+        ),
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('should reject when quota balance is zero', async () => {
+      billingService.getSpendableBalance.mockResolvedValue(0);
+
+      await expect(
+        service.chatCompletions(
+          makeContext(),
+          { model: 'gpt-4o-mini' },
+          makeRes() as never,
+        ),
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('should reject when rate limit is exceeded', async () => {
+      rateLimitService.assertAllowed.mockImplementation(() => {
+        throw new HttpException('rate limited', 429);
+      });
+
+      await expect(
+        service.chatCompletions(
+          makeContext([], { rateLimitPerMinute: 1 }),
+          { model: 'gpt-4o-mini' },
+          makeRes() as never,
+        ),
+      ).rejects.toThrow(HttpException);
     });
   });
 
