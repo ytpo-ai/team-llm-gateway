@@ -68,14 +68,14 @@ Portal 从零开始。产品矩阵中 Portal（团队接入平台）是差异化
 3. ✅ monorepo 骨架 + 工程基线（REQ-001）。
 4. ✅ 后端基础框架（REQ-002）。
 5. ✅ 前端基础框架（REQ-003）。
-6. 🔄 功能模块逐步开发（tenant_auth ✅ → team_member ✅ → api_key ✅ → model_provider ✅ → usage_metering ✅ → billing_quota → model_recommendation）。
+6. 🔄 功能模块逐步开发（tenant_auth ✅ → team_member ✅ → api_key ✅ → model_provider ✅ → usage_metering ✅ → billing_quota ✅ → model_recommendation）。
 
 ## 7. 待决事项与风险
 
 | 编号 | 事项 | 状态 |
 |---|---|---|
 | D-02 | 选型建议详细设计（首期静态推荐） | 已给出初步建议，待展开 |
-| D-03 | 计费模式首发清单（充值/月结/赠送） | 已给出初步建议，待展开 |
+| D-03 | 计费模式首发清单（充值/月结/赠送） | ✅ 已解决（首发 `recharge` 充值 + `manual` 调整；`monthly`/`gift` 后置为插件，见 `BILLING_QUOTA_PLAN.md` §7 B-01） |
 | D-04 | 多租户隔离细节（tenantId 共享库） | 已给出初步建议，待展开 |
 | D-05 | 接口契约细化（OpenAI 兼容上游 + REST 管理 API） | 已给出初步建议，待展开 |
 | R-01 | `forks/` 参考仓库需 gitignore，避免嵌套 git | 本 plan 处理 |
