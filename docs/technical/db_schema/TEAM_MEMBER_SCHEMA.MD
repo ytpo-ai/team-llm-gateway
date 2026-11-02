@@ -20,6 +20,10 @@
 | `tenantId` | ObjectId | 必填、ref `Tenant`、索引 | 所属租户 |
 | `name` | string | 必填、trim | 团队显示名 |
 | `status` | enum | `active` / `suspended`，默认 `active` | 团队状态 |
+| `limitDaily` | number | 可选、默认 `null` | 团队日 token 上限（null = 不限） |
+| `limitWeekly` | number | 可选、默认 `null` | 团队周 token 上限（null = 不限） |
+| `limitMonthly` | number | 可选、默认 `null` | 团队月 token 上限（null = 不限） |
+| `providerIds` | ObjectId[] | 默认 `[]`、ref `Provider` | 团队可用渠道白名单（空 = 全部） |
 | `createdAt` | Date | 自动 | 创建时间 |
 | `updatedAt` | Date | 自动 | 更新时间 |
 

@@ -15,6 +15,7 @@ import {
 } from '../users/schemas/user.schema.js';
 import { UsersService } from '../users/users.service.js';
 import { CreateMemberDto } from './dto/create-member.dto.js';
+import { UpdateTeamDto } from './dto/update-team.dto.js';
 import {
   Invitation,
   InvitationDocument,
@@ -42,6 +43,10 @@ export interface TeamView {
   name: string;
   status: TeamStatus;
   tenantId: string;
+  limitDaily: number | null;
+  limitWeekly: number | null;
+  limitMonthly: number | null;
+  providerIds: string[];
 }
 
 export interface InvitationView {
@@ -97,6 +102,29 @@ export class TeamsService {
   ): Promise<TeamView> {
     const team = await this.findTeamInTenant(tenantId, teamId);
     team.name = name;
+    await team.save();
+    return this.toTeamView(team);
+  }
+
+  async updateTeam(
+    tenantId: string,
+    teamId: string,
+    patch: UpdateTeamDto,
+  ): Promise<TeamView> {
+    const team = await this.findTeamInTenant(tenantId, teamId);
+    if (patch.name !== undefined) team.name = patch.name;
+    if (patch.limitDaily !== undefined) {
+      team.limitDaily = patch.limitDaily ?? null;
+    }
+    if (patch.limitWeekly !== undefined) {
+      team.limitWeekly = patch.limitWeekly ?? null;
+    }
+    if (patch.limitMonthly !== undefined) {
+      team.limitMonthly = patch.limitMonthly ?? null;
+    }
+    if (patch.providerIds !== undefined) {
+      team.providerIds = patch.providerIds.map((id) => new Types.ObjectId(id));
+    }
     await team.save();
     return this.toTeamView(team);
   }
@@ -305,6 +333,10 @@ export class TeamsService {
       name: team.name,
       status: team.status,
       tenantId: String(team.tenantId),
+      limitDaily: team.limitDaily ?? null,
+      limitWeekly: team.limitWeekly ?? null,
+      limitMonthly: team.limitMonthly ?? null,
+      providerIds: team.providerIds?.map((id) => String(id)) ?? [],
     };
   }
 

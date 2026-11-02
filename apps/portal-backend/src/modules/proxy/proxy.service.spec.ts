@@ -8,6 +8,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
 import { encrypt } from '../../common/crypto/cipher.js';
 import { BillingService } from '../billing/billing.service.js';
+import { QuotaLimitService } from '../billing/quota-limit.service.js';
 import { ApiKeyStatus } from '../api-keys/schemas/api-key.schema.js';
 import { ModelStatus } from '../models/schemas/model.schema.js';
 import {
@@ -32,8 +33,13 @@ describe('ProxyService', () => {
   const modelModel = { find: vi.fn(), findOne: vi.fn() };
   const providerModel = { findOne: vi.fn() };
   const apiKeyModel = { updateOne: vi.fn() };
-  const usageService = { record: vi.fn(), sumTokensByApiKey: vi.fn() };
+  const usageService = { record: vi.fn(), sumTokensByApiKey: vi.fn(), sumTokens: vi.fn() };
   const billingService = { getSpendableBalance: vi.fn(), deduct: vi.fn() };
+  const quotaLimitService = {
+    resolve: vi.fn(),
+    isModelAllowed: vi.fn(() => true),
+    isProviderAllowed: vi.fn(() => true),
+  };
   const rateLimitService = { assertAllowed: vi.fn() };
   const configService = { getOrThrow: vi.fn(() => 'test-secret') };
 
@@ -57,6 +63,10 @@ describe('ProxyService', () => {
       allowedModels,
       rateLimitPerMinute: null,
       maxTokens: null,
+      limitDaily: null,
+      limitWeekly: null,
+      limitMonthly: null,
+      providerIds: [],
       lastUsedAt: null,
       _id: apiKeyId,
       ...apiKeyOverrides,
@@ -109,13 +119,22 @@ describe('ProxyService', () => {
         { provide: ConfigService, useValue: configService },
         { provide: UsageService, useValue: usageService },
         { provide: BillingService, useValue: billingService },
+        { provide: QuotaLimitService, useValue: quotaLimitService },
         { provide: RateLimitService, useValue: rateLimitService },
       ],
     }).compile();
 
     usageService.sumTokensByApiKey.mockResolvedValue(0);
+    usageService.sumTokens.mockResolvedValue(0);
     billingService.getSpendableBalance.mockResolvedValue(100);
     billingService.deduct.mockResolvedValue(undefined);
+    quotaLimitService.resolve.mockResolvedValue({
+      rateLimitPerMinute: null,
+      team: null,
+      memberTemplate: null,
+    });
+    quotaLimitService.isModelAllowed.mockReturnValue(true);
+    quotaLimitService.isProviderAllowed.mockReturnValue(true);
     rateLimitService.assertAllowed.mockReset();
 
     service = module.get(ProxyService);
@@ -187,6 +206,7 @@ describe('ProxyService', () => {
       modelModel.findOne.mockReturnValue({
         exec: vi.fn().mockResolvedValue(makeModel()),
       });
+      quotaLimitService.isModelAllowed.mockReturnValue(false);
 
       await expect(
         service.chatCompletions(

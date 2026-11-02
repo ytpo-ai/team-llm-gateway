@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -21,6 +21,7 @@ import {
   removeMember,
   revokeInvitation,
   updateMember,
+  updateTeam,
 } from '@/features/teams/api'
 import {
   ASSIGNABLE_ROLES,
@@ -88,6 +89,40 @@ export function TeamPage() {
     queryKey: ['role-templates'],
     queryFn: listRoleTemplates,
     enabled: isAdmin,
+  })
+
+  const [teamLimits, setTeamLimits] = useState({
+    limitDaily: '',
+    limitWeekly: '',
+    limitMonthly: '',
+  })
+
+  useEffect(() => {
+    if (team) {
+      setTeamLimits({
+        limitDaily: team.limitDaily != null ? String(team.limitDaily) : '',
+        limitWeekly: team.limitWeekly != null ? String(team.limitWeekly) : '',
+        limitMonthly: team.limitMonthly != null ? String(team.limitMonthly) : '',
+      })
+    }
+  }, [team?.id, team?.limitDaily, team?.limitWeekly, team?.limitMonthly])
+
+  const updateTeamMutation = useMutation({
+    mutationFn: () =>
+      updateTeam(team!.id, {
+        limitDaily: teamLimits.limitDaily
+          ? Number(teamLimits.limitDaily)
+          : null,
+        limitWeekly: teamLimits.limitWeekly
+          ? Number(teamLimits.limitWeekly)
+          : null,
+        limitMonthly: teamLimits.limitMonthly
+          ? Number(teamLimits.limitMonthly)
+          : null,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teams'] })
+    },
   })
 
   const invalidate = () =>
@@ -244,6 +279,66 @@ export function TeamPage() {
                 </ul>
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle>团队使用限额</CardTitle>
+            <CardDescription>
+              设置团队级日/周/月 token 上限，与成员角色、API Key 限额取最严格生效
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground">
+                  日 token 上限（留空不限）
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={teamLimits.limitDaily}
+                  onChange={(e) =>
+                    setTeamLimits({ ...teamLimits, limitDaily: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground">
+                  周 token 上限（留空不限）
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={teamLimits.limitWeekly}
+                  onChange={(e) =>
+                    setTeamLimits({ ...teamLimits, limitWeekly: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground">
+                  月 token 上限（留空不限）
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={teamLimits.limitMonthly}
+                  onChange={(e) =>
+                    setTeamLimits({ ...teamLimits, limitMonthly: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+            <Button
+              onClick={() => updateTeamMutation.mutate()}
+              disabled={updateTeamMutation.isPending}
+            >
+              {updateTeamMutation.isPending ? '保存中…' : '保存限额'}
+            </Button>
           </CardContent>
         </Card>
       )}

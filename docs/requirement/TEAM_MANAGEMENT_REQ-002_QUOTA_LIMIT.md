@@ -8,7 +8,7 @@
 | 所属 plan | `docs/plan/TEAM_MANAGEMENT_OPTIMIZATION_PLAN.md` |
 | 需求管理 ID | — |
 | 分支 | `feat/team-management-quota-limit` |
-| 状态 | `draft` |
+| 状态 | `in-review` |
 
 ## 2. 需求描述
 
@@ -42,6 +42,6 @@
 | fix | — |
 
 ## 5. 状态跟踪
-- [ ] 开发中
-- [ ] 待验收
+- [x] 开发中
+- [x] 待验收
 - [ ] 已交付

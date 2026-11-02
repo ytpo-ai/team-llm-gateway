@@ -44,6 +44,10 @@ describe('ApiKeysService', () => {
     allowedModels: [],
     rateLimitPerMinute: null,
     maxTokens: null,
+    limitDaily: null,
+    limitWeekly: null,
+    limitMonthly: null,
+    providerIds: [],
     lastUsedAt: null,
     createdAt: new Date(),
     save: vi.fn(async function (this: Record<string, unknown>) {

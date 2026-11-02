@@ -3,6 +3,7 @@ import {
   IsArray,
   IsDateString,
   IsInt,
+  IsMongoId,
   IsOptional,
   IsString,
   MaxLength,
@@ -38,4 +39,28 @@ export class UpdateApiKeyDto {
   @IsInt()
   @Min(1)
   maxTokens?: number | null;
+
+  @ApiPropertyOptional({ description: '日 token 上限', nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  limitDaily?: number | null;
+
+  @ApiPropertyOptional({ description: '周 token 上限', nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  limitWeekly?: number | null;
+
+  @ApiPropertyOptional({ description: '月 token 上限', nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  limitMonthly?: number | null;
+
+  @ApiPropertyOptional({ type: [String], description: '可用渠道白名单' })
+  @IsOptional()
+  @IsArray()
+  @IsMongoId({ each: true })
+  providerIds?: string[];
 }

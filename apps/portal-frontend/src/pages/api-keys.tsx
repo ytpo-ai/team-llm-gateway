@@ -33,6 +33,10 @@ function formatLimits(key: ApiKey): string {
   if (key.allowedModels.length > 0) parts.push(`模型: ${key.allowedModels.join(', ')}`)
   if (key.rateLimitPerMinute) parts.push(`${key.rateLimitPerMinute}/min`)
   if (key.maxTokens) parts.push(`预算: ${key.maxTokens.toLocaleString()} tokens`)
+  const period = [key.limitDaily, key.limitWeekly, key.limitMonthly]
+    .filter((v) => v)
+    .map((v) => v!.toLocaleString())
+  if (period.length > 0) parts.push(`日/周/月: ${period.join(' / ')}`)
   return parts.length > 0 ? parts.join(' · ') : '不限'
 }
 
@@ -41,6 +45,9 @@ interface FormState {
   allowedModels: string
   rateLimitPerMinute: string
   maxTokens: string
+  limitDaily: string
+  limitWeekly: string
+  limitMonthly: string
   expiresAt: string
 }
 
@@ -49,6 +56,9 @@ const emptyForm: FormState = {
   allowedModels: '',
   rateLimitPerMinute: '',
   maxTokens: '',
+  limitDaily: '',
+  limitWeekly: '',
+  limitMonthly: '',
   expiresAt: '',
 }
 
@@ -67,6 +77,9 @@ function toForm(key: ApiKey): FormState {
       ? String(key.rateLimitPerMinute)
       : '',
     maxTokens: key.maxTokens ? String(key.maxTokens) : '',
+    limitDaily: key.limitDaily ? String(key.limitDaily) : '',
+    limitWeekly: key.limitWeekly ? String(key.limitWeekly) : '',
+    limitMonthly: key.limitMonthly ? String(key.limitMonthly) : '',
     expiresAt: key.expiresAt ? key.expiresAt.slice(0, 10) : '',
   }
 }
@@ -103,6 +116,9 @@ export function ApiKeysPage() {
             ? Number(form.rateLimitPerMinute)
             : null,
           maxTokens: form.maxTokens ? Number(form.maxTokens) : null,
+          limitDaily: form.limitDaily ? Number(form.limitDaily) : null,
+          limitWeekly: form.limitWeekly ? Number(form.limitWeekly) : null,
+          limitMonthly: form.limitMonthly ? Number(form.limitMonthly) : null,
         }
         return updateApiKey(editing.id, patch)
       }
@@ -114,6 +130,9 @@ export function ApiKeysPage() {
           ? Number(form.rateLimitPerMinute)
           : undefined,
         maxTokens: form.maxTokens ? Number(form.maxTokens) : undefined,
+        limitDaily: form.limitDaily ? Number(form.limitDaily) : undefined,
+        limitWeekly: form.limitWeekly ? Number(form.limitWeekly) : undefined,
+        limitMonthly: form.limitMonthly ? Number(form.limitMonthly) : undefined,
       }
       return createApiKey(input).then((r) => r.apiKey)
     },
@@ -263,6 +282,42 @@ export function ApiKeysPage() {
                 placeholder="1000000"
                 value={form.maxTokens}
                 onChange={(e) => setForm({ ...form, maxTokens: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                日 token 上限（留空不限）
+              </label>
+              <Input
+                type="number"
+                min={1}
+                placeholder="100000"
+                value={form.limitDaily}
+                onChange={(e) => setForm({ ...form, limitDaily: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                周 token 上限（留空不限）
+              </label>
+              <Input
+                type="number"
+                min={1}
+                placeholder="500000"
+                value={form.limitWeekly}
+                onChange={(e) => setForm({ ...form, limitWeekly: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                月 token 上限（留空不限）
+              </label>
+              <Input
+                type="number"
+                min={1}
+                placeholder="2000000"
+                value={form.limitMonthly}
+                onChange={(e) => setForm({ ...form, limitMonthly: e.target.value })}
               />
             </div>
 

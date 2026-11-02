@@ -44,6 +44,10 @@ describe('TeamsService', () => {
     tenantId,
     name: '默认团队',
     status: TeamStatus.ACTIVE,
+    limitDaily: null,
+    limitWeekly: null,
+    limitMonthly: null,
+    providerIds: [],
     save: vi.fn(async () => team),
   };
 
@@ -110,6 +114,10 @@ describe('TeamsService', () => {
         name: '默认团队',
         status: TeamStatus.ACTIVE,
         tenantId: String(tenantId),
+        limitDaily: null,
+        limitWeekly: null,
+        limitMonthly: null,
+        providerIds: [],
       });
     });
   });

@@ -16,8 +16,17 @@ export function createTeam(name: string): Promise<Team> {
   return request<Team>('/teams', { method: 'POST', body: { name } })
 }
 
-export function renameTeam(teamId: string, name: string): Promise<Team> {
-  return request<Team>(`/teams/${teamId}`, { method: 'PATCH', body: { name } })
+export function updateTeam(
+  teamId: string,
+  patch: {
+    name?: string
+    limitDaily?: number | null
+    limitWeekly?: number | null
+    limitMonthly?: number | null
+    providerIds?: string[]
+  },
+): Promise<Team> {
+  return request<Team>(`/teams/${teamId}`, { method: 'PATCH', body: patch })
 }
 
 export function listMembers(teamId: string): Promise<Member[]> {

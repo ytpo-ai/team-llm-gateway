@@ -62,6 +62,22 @@ export class ApiKey {
   @Prop({ type: Number, default: null })
   maxTokens: number | null;
 
+  @Prop({ type: Number, default: null })
+  limitDaily: number | null;
+
+  @Prop({ type: Number, default: null })
+  limitWeekly: number | null;
+
+  @Prop({ type: Number, default: null })
+  limitMonthly: number | null;
+
+  @Prop({
+    type: [MongooseSchema.Types.ObjectId],
+    ref: 'Provider',
+    default: [],
+  })
+  providerIds: Types.ObjectId[];
+
   @Prop({ type: Date, default: null })
   lastUsedAt: Date | null;
 

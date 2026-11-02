@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { createHash, randomBytes } from 'node:crypto';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Role } from '../../common/enums/role.enum.js';
 import type { AuthUser } from '../auth/decorators/current-user.decorator.js';
 import { CreateApiKeyDto } from './dto/create-api-key.dto.js';
@@ -25,6 +25,10 @@ export interface ApiKeyView {
   allowedModels: string[];
   rateLimitPerMinute: number | null;
   maxTokens: number | null;
+  limitDaily: number | null;
+  limitWeekly: number | null;
+  limitMonthly: number | null;
+  providerIds: string[];
   lastUsedAt: Date | null;
   userId: string;
   createdAt?: Date;
@@ -87,6 +91,20 @@ export class ApiKeysService {
     if (dto.maxTokens !== undefined) {
       key.maxTokens = dto.maxTokens ?? null;
     }
+    if (dto.limitDaily !== undefined) {
+      key.limitDaily = dto.limitDaily ?? null;
+    }
+    if (dto.limitWeekly !== undefined) {
+      key.limitWeekly = dto.limitWeekly ?? null;
+    }
+    if (dto.limitMonthly !== undefined) {
+      key.limitMonthly = dto.limitMonthly ?? null;
+    }
+    if (dto.providerIds !== undefined) {
+      key.providerIds = (dto.providerIds ?? []).map(
+        (id) => new Types.ObjectId(id),
+      );
+    }
 
     await key.save();
     return this.toView(key);
@@ -113,6 +131,10 @@ export class ApiKeysService {
       allowedModels: old.allowedModels,
       rateLimitPerMinute: old.rateLimitPerMinute ?? undefined,
       maxTokens: old.maxTokens ?? undefined,
+      limitDaily: old.limitDaily ?? undefined,
+      limitWeekly: old.limitWeekly ?? undefined,
+      limitMonthly: old.limitMonthly ?? undefined,
+      providerIds: old.providerIds.map((id) => String(id)),
     });
   }
 
@@ -135,6 +157,10 @@ export class ApiKeysService {
       allowedModels: dto.allowedModels ?? [],
       rateLimitPerMinute: dto.rateLimitPerMinute ?? null,
       maxTokens: dto.maxTokens ?? null,
+      limitDaily: dto.limitDaily ?? null,
+      limitWeekly: dto.limitWeekly ?? null,
+      limitMonthly: dto.limitMonthly ?? null,
+      providerIds: (dto.providerIds ?? []).map((id) => new Types.ObjectId(id)),
     });
 
     return { apiKey: this.toView(doc), key };
@@ -171,6 +197,10 @@ export class ApiKeysService {
       allowedModels: key.allowedModels,
       rateLimitPerMinute: key.rateLimitPerMinute,
       maxTokens: key.maxTokens,
+      limitDaily: key.limitDaily ?? null,
+      limitWeekly: key.limitWeekly ?? null,
+      limitMonthly: key.limitMonthly ?? null,
+      providerIds: key.providerIds?.map((id) => String(id)) ?? [],
       lastUsedAt: key.lastUsedAt,
       userId: String(key.userId),
       createdAt: key.createdAt,

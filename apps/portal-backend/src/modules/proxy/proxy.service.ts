@@ -13,6 +13,10 @@ import type { Response as ExpressResponse } from 'express';
 import { Model, Types } from 'mongoose';
 import { decrypt } from '../../common/crypto/cipher.js';
 import { BillingService } from '../billing/billing.service.js';
+import {
+  QuotaLimitService,
+  type ResolvedQuotaLimits,
+} from '../billing/quota-limit.service.js';
 import { ApiKey } from '../api-keys/schemas/api-key.schema.js';
 import { Model as ModelEntity, ModelStatus } from '../models/schemas/model.schema.js';
 import {
@@ -49,6 +53,25 @@ interface PreparedRequest {
   startedAt: number;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function startOfDay(now: Date): Date {
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
+}
+
+function startOfWeek(now: Date): Date {
+  const day = startOfDay(now);
+  const weekday = day.getUTCDay();
+  const diff = (weekday + 6) % 7;
+  return new Date(day.getTime() - diff * DAY_MS);
+}
+
+function startOfMonth(now: Date): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
 @Injectable()
 export class ProxyService {
   constructor(
@@ -59,6 +82,7 @@ export class ProxyService {
     private readonly configService: ConfigService,
     private readonly usageService: UsageService,
     private readonly billingService: BillingService,
+    private readonly quotaLimitService: QuotaLimitService,
     private readonly rateLimitService: RateLimitService,
   ) {}
 
@@ -153,7 +177,7 @@ export class ProxyService {
     ctx: ApiKeyContext,
     body: ChatCompletionsBody,
   ): Promise<PreparedRequest> {
-    await this.enforceLimits(ctx);
+    const limits = await this.enforceLimits(ctx);
 
     const requestedModel = body.model;
     if (typeof requestedModel !== 'string' || !requestedModel.trim()) {
@@ -172,9 +196,14 @@ export class ProxyService {
       throw new NotFoundException(`模型不存在或已禁用：${requestedModel}`);
     }
 
-    const allowed = ctx.apiKey.allowedModels ?? [];
-    if (allowed.length > 0 && !allowed.includes(model.modelId)) {
-      throw new ForbiddenException('该 API Key 不允许访问此模型');
+    if (
+      !this.quotaLimitService.isModelAllowed(
+        limits.memberTemplate,
+        ctx.apiKey,
+        model.modelId,
+      )
+    ) {
+      throw new ForbiddenException('该 API Key 或成员角色不允许访问此模型');
     }
 
     const provider = await this.providerModel
@@ -190,6 +219,17 @@ export class ProxyService {
     }
     if (provider.type !== ProviderType.OPENAI_COMPATIBLE) {
       throw new BadRequestException('暂不支持 anthropic 上游协议');
+    }
+
+    if (
+      !this.quotaLimitService.isProviderAllowed(
+        limits.team,
+        limits.memberTemplate,
+        ctx.apiKey,
+        String(provider._id),
+      )
+    ) {
+      throw new ForbiddenException('该渠道不在允许范围内');
     }
 
     const upstreamKey = decrypt(
@@ -221,10 +261,18 @@ export class ProxyService {
     };
   }
 
-  private async enforceLimits(ctx: ApiKeyContext): Promise<void> {
+  private async enforceLimits(
+    ctx: ApiKeyContext,
+  ): Promise<ResolvedQuotaLimits> {
+    const limits = await this.quotaLimitService.resolve({
+      teamId: ctx.teamId,
+      userId: ctx.userId,
+      apiKey: ctx.apiKey,
+    });
+
     this.rateLimitService.assertAllowed(
       ctx.apiKeyId,
-      ctx.apiKey.rateLimitPerMinute,
+      limits.rateLimitPerMinute,
     );
 
     if (ctx.apiKey.maxTokens != null) {
@@ -240,6 +288,8 @@ export class ProxyService {
       }
     }
 
+    await this.assertPeriodLimits(ctx, limits);
+
     const balance = await this.billingService.getSpendableBalance(
       ctx.tenantId,
       ctx.teamId,
@@ -247,6 +297,80 @@ export class ProxyService {
     );
     if (balance <= 0) {
       throw new HttpException('额度余额不足', HttpStatus.PAYMENT_REQUIRED);
+    }
+
+    return limits;
+  }
+
+  private async assertPeriodLimits(
+    ctx: ApiKeyContext,
+    limits: ResolvedQuotaLimits,
+  ): Promise<void> {
+    const now = new Date();
+    const periods = [
+      {
+        label: '日',
+        start: startOfDay(now),
+        teamLimit: limits.team?.limitDaily,
+        memberLimit: limits.memberTemplate?.limitDaily,
+        keyLimit: ctx.apiKey.limitDaily,
+      },
+      {
+        label: '周',
+        start: startOfWeek(now),
+        teamLimit: limits.team?.limitWeekly,
+        memberLimit: limits.memberTemplate?.limitWeekly,
+        keyLimit: ctx.apiKey.limitWeekly,
+      },
+      {
+        label: '月',
+        start: startOfMonth(now),
+        teamLimit: limits.team?.limitMonthly,
+        memberLimit: limits.memberTemplate?.limitMonthly,
+        keyLimit: ctx.apiKey.limitMonthly,
+      },
+    ];
+
+    for (const period of periods) {
+      if (period.teamLimit != null) {
+        const used = await this.usageService.sumTokens({
+          tenantId: ctx.tenantId,
+          teamId: ctx.teamId,
+          since: period.start,
+        });
+        if (used >= period.teamLimit) {
+          throw new HttpException(
+            `团队${period.label} Token 限额已用尽`,
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
+      }
+      if (period.memberLimit != null) {
+        const used = await this.usageService.sumTokens({
+          tenantId: ctx.tenantId,
+          userId: ctx.userId,
+          since: period.start,
+        });
+        if (used >= period.memberLimit) {
+          throw new HttpException(
+            `成员${period.label} Token 限额已用尽`,
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
+      }
+      if (period.keyLimit != null) {
+        const used = await this.usageService.sumTokens({
+          tenantId: ctx.tenantId,
+          apiKeyId: ctx.apiKeyId,
+          since: period.start,
+        });
+        if (used >= period.keyLimit) {
+          throw new HttpException(
+            `API Key ${period.label} Token 限额已用尽`,
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
+      }
     }
   }
 

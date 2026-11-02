@@ -58,14 +58,14 @@ export class TeamsController {
 
   @Patch(':teamId')
   @UseGuards(RolesGuard)
-  @Roles(Role.TEAM_ADMIN)
-  @ApiOperation({ summary: '更新团队名称' })
-  rename(
+  @Roles(Role.TEAM_ADMIN, Role.SYSTEM)
+  @ApiOperation({ summary: '更新团队（名称/限额/渠道白名单）' })
+  update(
     @CurrentUser('tenantId') tenantId: string,
     @Param('teamId') teamId: string,
     @Body() dto: UpdateTeamDto,
   ) {
-    return this.teamsService.renameTeam(tenantId, teamId, dto.name);
+    return this.teamsService.updateTeam(tenantId, teamId, dto);
   }
 
   @Get(':teamId/members')

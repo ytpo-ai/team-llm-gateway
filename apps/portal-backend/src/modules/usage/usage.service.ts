@@ -115,6 +115,30 @@ export class UsageService {
     return result?.total ?? 0;
   }
 
+  async sumTokens(filter: {
+    tenantId: string;
+    teamId?: string;
+    userId?: string;
+    apiKeyId?: string;
+    since?: Date;
+  }): Promise<number> {
+    const match: Record<string, unknown> = {
+      tenantId: new Types.ObjectId(filter.tenantId),
+    };
+    if (filter.teamId) match.teamId = new Types.ObjectId(filter.teamId);
+    if (filter.userId) match.userId = new Types.ObjectId(filter.userId);
+    if (filter.apiKeyId) match.apiKeyId = new Types.ObjectId(filter.apiKeyId);
+    if (filter.since) match.createdAt = { $gte: filter.since };
+
+    const [result] = await this.usageLogModel
+      .aggregate<{ total: number }>([
+        { $match: match },
+        { $group: { _id: null, total: { $sum: '$totalTokens' } } },
+      ])
+      .exec();
+    return result?.total ?? 0;
+  }
+
   async summary(user: AuthUser, query: UsageQueryDto): Promise<UsageSummary> {
     const { from, to } = this.resolveRange(query);
     const match = this.buildMatch(user, from, to);

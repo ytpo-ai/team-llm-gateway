@@ -9,6 +9,10 @@ export interface ApiKey {
   allowedModels: string[]
   rateLimitPerMinute: number | null
   maxTokens: number | null
+  limitDaily: number | null
+  limitWeekly: number | null
+  limitMonthly: number | null
+  providerIds: string[]
   lastUsedAt: string | null
   userId: string
   createdAt?: string
@@ -25,6 +29,10 @@ export interface ApiKeyInput {
   allowedModels?: string[]
   rateLimitPerMinute?: number
   maxTokens?: number
+  limitDaily?: number
+  limitWeekly?: number
+  limitMonthly?: number
+  providerIds?: string[]
 }
 
 export interface ApiKeyPatch {
@@ -33,4 +41,8 @@ export interface ApiKeyPatch {
   allowedModels?: string[]
   rateLimitPerMinute?: number | null
   maxTokens?: number | null
+  limitDaily?: number | null
+  limitWeekly?: number | null
+  limitMonthly?: number | null
+  providerIds?: string[]
 }
