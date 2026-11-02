@@ -1,4 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
 import { ModelsService } from './models.service.js';
@@ -20,6 +21,10 @@ describe('ModelsService', () => {
 
   const providerModel = {
     findOne: vi.fn(),
+  };
+
+  const configService = {
+    get: vi.fn(),
   };
 
   const makeModel = (overrides: Record<string, unknown> = {}) => ({
@@ -48,6 +53,7 @@ describe('ModelsService', () => {
         ModelsService,
         { provide: 'ModelModel', useValue: modelModel },
         { provide: 'ProviderModel', useValue: providerModel },
+        { provide: ConfigService, useValue: configService },
       ],
     }).compile();
 
@@ -175,6 +181,51 @@ describe('ModelsService', () => {
           models: [{ modelId: 'gpt-4o' }],
         }),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getOfficialPresets', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('returns static catalog when no remote url configured', async () => {
+      configService.get.mockReturnValue('');
+
+      const presets = await service.getOfficialPresets();
+
+      expect(presets.length).toBeGreaterThan(0);
+      expect(presets[0]).toHaveProperty('type');
+      expect(presets[0]).toHaveProperty('models');
+    });
+
+    it('falls back to static catalog on remote fetch failure', async () => {
+      configService.get.mockReturnValue('https://example.com/presets.json');
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')));
+
+      const presets = await service.getOfficialPresets();
+
+      expect(presets.length).toBeGreaterThan(0);
+    });
+
+    it('returns remote catalog when fetch succeeds', async () => {
+      configService.get.mockReturnValue('https://example.com/presets.json');
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          new Response(
+            JSON.stringify([
+              { type: 'openai-compatible', label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', models: [] },
+            ]),
+            { status: 200 },
+          ),
+        ),
+      );
+
+      const presets = await service.getOfficialPresets();
+
+      expect(presets).toHaveLength(1);
+      expect(presets[0].label).toBe('OpenAI');
     });
   });
 });

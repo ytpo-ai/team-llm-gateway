@@ -52,7 +52,7 @@
 | 编号 | 事项 | 状态 |
 |---|---|---|
 | A-01 | Anthropic vision 远程图片 URL（非 data URL）是否首期支持 | 首期支持 `data:` base64；远程 URL 服务端拉取转 base64（含 SSRF 白名单校验），或后置 |
-| A-02 | OAuth token 缓存有效期与刷新策略 | access_token 通常 ~1h，内存缓存 + 提前刷新；多实例部署需引入 Redis 时后置 |
+| A-02 | OAuth token 缓存有效期与刷新策略 | ✅ 已交付（可插拔 `TokenCache`：默认内存缓存，配置 `REDIS_URL` 时切换 Redis，多实例共享） |
 | A-03 | 官方 SDK 是否作为翻译参考 | 仅作参考，不引入依赖 |
 
 ## 7. 关联

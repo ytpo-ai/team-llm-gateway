@@ -14,10 +14,10 @@ import {
   bulkCreateModels,
   createModel,
   listModels,
+  listOfficialPresets,
   removeModel,
   updateModel,
 } from '@/features/models/api'
-import { OFFICIAL_PRESETS } from '@/features/models/presets'
 import type { Model, ModelInput, ModelPatch } from '@/features/models/types'
 import { listProviders } from '@/features/providers/api'
 import type { Provider, ProviderType } from '@/features/providers/types'
@@ -79,6 +79,11 @@ export function ModelsPage() {
 
   const modelsQuery = useQuery({ queryKey: ['models'], queryFn: listModels })
 
+  const presetsQuery = useQuery({
+    queryKey: ['official-presets'],
+    queryFn: listOfficialPresets,
+  })
+
   const providersQuery = useQuery({
     queryKey: ['providers'],
     queryFn: listProviders,
@@ -88,7 +93,8 @@ export function ModelsPage() {
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['models'] })
 
-  const activePreset = OFFICIAL_PRESETS.find((p) => p.type === presetType)
+  const officialPresets = presetsQuery.data ?? []
+  const activePreset = officialPresets.find((p) => p.type === presetType)
 
   const toggleModel = (modelId: string) => {
     setSelectedModels((prev) =>
@@ -339,7 +345,7 @@ export function ModelsPage() {
                         setSelectedModels([])
                       }}
                     >
-                      {OFFICIAL_PRESETS.map((preset) => (
+                      {officialPresets.map((preset) => (
                         <option key={preset.type} value={preset.type}>
                           {preset.label}
                         </option>

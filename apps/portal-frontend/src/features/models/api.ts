@@ -1,5 +1,10 @@
 import { request } from '@/lib/http'
-import type { Model, ModelInput, ModelPatch } from './types'
+import type {
+  Model,
+  ModelInput,
+  ModelPatch,
+  OfficialProviderPreset,
+} from './types'
 
 export interface BulkModelItem {
   modelId: string
@@ -21,6 +26,10 @@ export interface BulkCreateModelsResult {
 
 export function listModels(): Promise<Model[]> {
   return request<Model[]>('/models')
+}
+
+export function listOfficialPresets(): Promise<OfficialProviderPreset[]> {
+  return request<OfficialProviderPreset[]>('/models/presets')
 }
 
 export function createModel(input: ModelInput): Promise<Model> {

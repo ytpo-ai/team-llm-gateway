@@ -1,7 +1,7 @@
 import { generateKeyPairSync } from 'node:crypto';
 import { ProviderAuthType, ProviderType } from '../../providers/schemas/provider.schema.js';
 import { GeminiAdapter } from './gemini.adapter.js';
-import { clearTokenCache } from './gemini-oauth.js';
+import { clearTokenCache } from './token-cache.js';
 
 describe('GeminiAdapter', () => {
   const adapter = new GeminiAdapter();
@@ -89,6 +89,36 @@ describe('GeminiAdapter', () => {
 
       expect(request.headers.authorization).toBe('Bearer ya29.token');
       expect(request.headers['x-goog-api-key']).toBeUndefined();
+    });
+
+    it('reuses cached access token on subsequent requests', async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ access_token: 'ya29.token', expires_in: 3600 }),
+            { status: 200 },
+          ),
+        );
+      vi.stubGlobal('fetch', fetchMock);
+
+      const input = {
+        baseUrl: 'https://generativelanguage.googleapis.com',
+        apiKey: JSON.stringify({
+          client_email: 'svc@project.iam.gserviceaccount.com',
+          private_key: privateKeyPem,
+          token_uri: 'https://oauth2.googleapis.com/token',
+        }),
+        modelId: 'gemini-1.5-pro',
+        body: { messages: [{ role: 'user', content: 'hi' }] },
+        stream: false,
+        authType: ProviderAuthType.OAUTH,
+      };
+
+      await adapter.buildRequest(input);
+      await adapter.buildRequest(input);
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     });
   });
 

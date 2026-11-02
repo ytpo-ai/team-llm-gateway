@@ -1,20 +1,13 @@
 import { createSign } from 'node:crypto';
+import { getTokenCache } from './token-cache.js';
 
 const SCOPE = 'https://www.googleapis.com/auth/generativelanguage';
-const TOKEN_REFRESH_MARGIN_MS = 60 * 1000;
 
 export interface ServiceAccount {
   client_email: string;
   private_key: string;
   token_uri: string;
 }
-
-interface CachedToken {
-  token: string;
-  expiresAt: number;
-}
-
-const tokenCache = new Map<string, CachedToken>();
 
 export function parseServiceAccount(json: string): ServiceAccount {
   const parsed = JSON.parse(json) as Record<string, unknown>;
@@ -51,7 +44,9 @@ function signJwt(sa: ServiceAccount): string {
   return `${signingInput}.${signature}`;
 }
 
-async function exchangeToken(sa: ServiceAccount): Promise<CachedToken> {
+async function exchangeToken(
+  sa: ServiceAccount,
+): Promise<{ token: string; ttlMs: number }> {
   const assertion = signJwt(sa);
   const res = await fetch(sa.token_uri, {
     method: 'POST',
@@ -71,7 +66,7 @@ async function exchangeToken(sa: ServiceAccount): Promise<CachedToken> {
   const expiresIn = Number(data.expires_in ?? 3600);
   return {
     token: data.access_token,
-    expiresAt: Date.now() + (expiresIn - 60) * 1000,
+    ttlMs: (expiresIn - 60) * 1000,
   };
 }
 
@@ -79,15 +74,10 @@ export async function getAccessToken(
   serviceAccountJson: string,
 ): Promise<string> {
   const sa = parseServiceAccount(serviceAccountJson);
-  const cached = tokenCache.get(sa.client_email);
-  if (cached && cached.expiresAt > Date.now() + TOKEN_REFRESH_MARGIN_MS) {
-    return cached.token;
-  }
+  const cache = getTokenCache();
+  const cached = await cache.get(sa.client_email);
+  if (cached) return cached;
   const fresh = await exchangeToken(sa);
-  tokenCache.set(sa.client_email, fresh);
+  await cache.set(sa.client_email, fresh.token, fresh.ttlMs);
   return fresh.token;
-}
-
-export function clearTokenCache(): void {
-  tokenCache.clear();
 }

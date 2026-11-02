@@ -1,22 +1,22 @@
-import type { ProviderType } from '@/features/providers/types'
+import { ProviderType } from '../providers/schemas/provider.schema.js';
 
 export interface OfficialModelPreset {
-  modelId: string
-  displayName: string
-  capabilities: string[]
-  multiplier: number
+  modelId: string;
+  displayName: string;
+  capabilities: string[];
+  multiplier: number;
 }
 
 export interface OfficialProviderPreset {
-  type: ProviderType
-  label: string
-  baseUrl: string
-  models: OfficialModelPreset[]
+  type: ProviderType;
+  label: string;
+  baseUrl: string;
+  models: OfficialModelPreset[];
 }
 
 export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   {
-    type: 'openai-compatible',
+    type: ProviderType.OPENAI_COMPATIBLE,
     label: 'OpenAI',
     baseUrl: 'https://api.openai.com/v1',
     models: [
@@ -47,7 +47,7 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
     ],
   },
   {
-    type: 'anthropic',
+    type: ProviderType.ANTHROPIC,
     label: 'Anthropic Claude',
     baseUrl: 'https://api.anthropic.com',
     models: [
@@ -72,7 +72,7 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
     ],
   },
   {
-    type: 'gemini',
+    type: ProviderType.GEMINI,
     label: 'Google Gemini',
     baseUrl: 'https://generativelanguage.googleapis.com',
     models: [
@@ -96,4 +96,4 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
       },
     ],
   },
-]
+];

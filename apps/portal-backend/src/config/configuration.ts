@@ -15,6 +15,9 @@ export interface AppConfig {
     email: string;
     password: string;
   };
+  modelPresets: {
+    url: string;
+  };
 }
 
 export default (): AppConfig => ({
@@ -33,5 +36,8 @@ export default (): AppConfig => ({
   superAdmin: {
     email: process.env.SUPER_ADMIN_EMAIL ?? '',
     password: process.env.SUPER_ADMIN_PASSWORD ?? '',
+  },
+  modelPresets: {
+    url: process.env.MODEL_PRESETS_URL ?? '',
   },
 });

@@ -46,6 +46,12 @@ export class ModelsController {
     return this.modelsService.list(tenantId, teamId);
   }
 
+  @Get('presets')
+  @ApiOperation({ summary: '官方模型预置目录（所有成员可读）' })
+  presets() {
+    return this.modelsService.getOfficialPresets();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: '模型详情' })
   get(
