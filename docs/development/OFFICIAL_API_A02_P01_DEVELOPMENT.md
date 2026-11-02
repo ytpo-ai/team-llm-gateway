@@ -38,7 +38,7 @@
 
 ## 3. 踩坑记录
 
-1. **`ioredis` 无法安装**（本环境网络受限），采用动态 `import('ioredis')`（非字面量 specifier）实现可选依赖：仅配置 `REDIS_URL` 时才加载，部署方需 `pnpm add ioredis`；typecheck 无需该包即可通过。
+1. **ioredis 类型**：ioredis v6 的 `Redis` 是「class + interface」声明合并，需用命名导入 `import { Redis } from 'ioredis'`（默认导入会解析为 namespace 报 TS2709）。Redis 缓存配置 `maxRetriesPerRequest: 1` + `enableOfflineQueue: false`，宕机时快速失败，`getAccessToken` 内 try/catch 降级为直接换 token。
 2. **Nest 路由顺序**：`GET /models/presets` 必须声明在 `GET /models/:id` 之前，否则 `presets` 会被当作 `:id` 匹配。
 
 ## 4. 验证结果

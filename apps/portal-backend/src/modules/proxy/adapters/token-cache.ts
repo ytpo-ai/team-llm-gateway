@@ -1,3 +1,5 @@
+import { Redis } from 'ioredis';
+
 export interface TokenCache {
   get(key: string): Promise<string | null>;
   set(key: string, value: string, ttlMs: number): Promise<void>;
@@ -24,38 +26,30 @@ export class MemoryTokenCache implements TokenCache {
   }
 }
 
-interface RedisClientLike {
-  get(key: string): Promise<string | null>;
-  set(key: string, value: string, mode: 'PX', ttl: number): Promise<unknown>;
-}
-
 export class RedisTokenCache implements TokenCache {
-  private client: RedisClientLike | null = null;
+  private client: Redis | null = null;
 
   constructor(
     private readonly url: string,
     private readonly keyPrefix = 'gemini:oauth:token:',
   ) {}
 
-  private async ensureClient(): Promise<RedisClientLike> {
-    if (this.client) return this.client;
-    // ioredis 为可选依赖：仅在配置 REDIS_URL 时才动态加载，部署方需 `pnpm add ioredis`
-    const specifier = 'ioredis';
-    const mod = (await import(specifier)) as {
-      default: new (url: string) => RedisClientLike;
-    };
-    this.client = new mod.default(this.url);
+  private ensureClient(): Redis {
+    if (!this.client) {
+      this.client = new Redis(this.url, {
+        maxRetriesPerRequest: 1,
+        enableOfflineQueue: false,
+      });
+    }
     return this.client;
   }
 
   async get(key: string): Promise<string | null> {
-    const client = await this.ensureClient();
-    return client.get(this.keyPrefix + key);
+    return this.ensureClient().get(this.keyPrefix + key);
   }
 
   async set(key: string, value: string, ttlMs: number): Promise<void> {
-    const client = await this.ensureClient();
-    await client.set(this.keyPrefix + key, value, 'PX', ttlMs);
+    await this.ensureClient().set(this.keyPrefix + key, value, 'PX', ttlMs);
   }
 }
 

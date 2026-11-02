@@ -75,9 +75,19 @@ export async function getAccessToken(
 ): Promise<string> {
   const sa = parseServiceAccount(serviceAccountJson);
   const cache = getTokenCache();
-  const cached = await cache.get(sa.client_email);
-  if (cached) return cached;
+
+  try {
+    const cached = await cache.get(sa.client_email);
+    if (cached) return cached;
+  } catch {
+    // 缓存不可用（如 Redis 宕机）时降级为直接换取 token
+  }
+
   const fresh = await exchangeToken(sa);
-  await cache.set(sa.client_email, fresh.token, fresh.ttlMs);
+  try {
+    await cache.set(sa.client_email, fresh.token, fresh.ttlMs);
+  } catch {
+    // 缓存写入失败不影响返回
+  }
   return fresh.token;
 }
