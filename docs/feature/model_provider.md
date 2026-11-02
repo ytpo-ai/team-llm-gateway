@@ -23,6 +23,10 @@
 |------|------------|-------------|-----|
 | [MODEL_PROVIDER](../plan/MODEL_PROVIDER_PLAN.md) | [REQ-001 后端模型与上游](../requirement/MODEL_PROVIDER_REQ-001_BACKEND_PROVIDER_MODEL.md) | [开发记录](../development/MODEL_PROVIDER_REQ-001_DEVELOPMENT.md) | — |
 | 同上 | [REQ-002 前端模型与上游管理](../requirement/MODEL_PROVIDER_REQ-002_FRONTEND_PROVIDER_MODEL.md) | [开发记录](../development/MODEL_PROVIDER_REQ-002_DEVELOPMENT.md) | — |
+| [OFFICIAL_API](../plan/OFFICIAL_API_PLAN.md) | [REQ-001 后端适配层](../requirement/OFFICIAL_API_REQ-001_BACKEND_ADAPTER.md) | [开发记录](../development/OFFICIAL_API_REQ-001_DEVELOPMENT.md) | — |
+| 同上 | [REQ-002 Anthropic 翻译](../requirement/OFFICIAL_API_REQ-002_ANTHROPIC.md) | [开发记录](../development/OFFICIAL_API_REQ-002_DEVELOPMENT.md) | — |
+| 同上 | [REQ-003 Gemini 翻译](../requirement/OFFICIAL_API_REQ-003_GEMINI.md) | [开发记录](../development/OFFICIAL_API_REQ-003_DEVELOPMENT.md) | — |
+| [OFFICIAL_API_PRESET](../plan/OFFICIAL_API_PRESET_PLAN.md) | [REQ-004 前端类型+预置+探活](../requirement/OFFICIAL_API_REQ-004_FRONTEND_PRESET_PROBE.md) | [开发记录](../development/OFFICIAL_API_REQ-004_DEVELOPMENT.md) | — |
 
 ## 3. 相关文档
 - 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（§3、ADR-09/10、D-05）、`docs/technical/db_schema/MODEL_PROVIDER_SCHEMA.MD`

@@ -83,6 +83,16 @@ export class ProvidersController {
     return this.providersService.get(tenantId, teamId, id);
   }
 
+  @Post(':id/test')
+  @ApiOperation({ summary: '上游连通性探活（最小探测请求，不落库不计量）' })
+  test(
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('teamId') teamId: string,
+    @Param('id') id: string,
+  ) {
+    return this.providersService.test(tenantId, teamId, id);
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: '更新上游渠道（可换 key）' })
   update(

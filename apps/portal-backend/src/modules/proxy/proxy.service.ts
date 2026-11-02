@@ -22,12 +22,18 @@ import { Model as ModelEntity, ModelStatus } from '../models/schemas/model.schem
 import {
   Provider,
   ProviderStatus,
-  ProviderType,
 } from '../providers/schemas/provider.schema.js';
 import { UsageService } from '../usage/usage.service.js';
 import { UsageStatus } from '../usage/schemas/usage-log.schema.js';
 import type { ApiKeyContext } from './decorators/api-key-context.decorator.js';
 import { RateLimitService } from './rate-limit.service.js';
+import { resolveAdapter } from './adapters/adapter.factory.js';
+import {
+  parseJsonObject,
+  type AdapterRequest,
+  type UpstreamAdapter,
+  type UpstreamUsage,
+} from './adapters/upstream-adapter.js';
 
 interface ChatCompletionsBody {
   model?: unknown;
@@ -36,19 +42,12 @@ interface ChatCompletionsBody {
   [key: string]: unknown;
 }
 
-interface UpstreamUsage {
-  prompt_tokens?: number;
-  completion_tokens?: number;
-  total_tokens?: number;
-}
-
 interface PreparedRequest {
   modelId: string;
   providerId: string;
   multiplier: number;
-  url: string;
-  upstreamKey: string;
-  upstreamBody: Record<string, unknown>;
+  adapter: UpstreamAdapter;
+  request: AdapterRequest;
   requestId: string;
   startedAt: number;
 }
@@ -121,16 +120,21 @@ export class ProxyService {
 
     const upstreamRes = await this.requestUpstream(prepared);
     const text = await upstreamRes.text();
-    const json = this.tryParseJson(text);
 
     if (upstreamRes.ok) {
-      await this.recordUsage(ctx, prepared, (json as { usage?: UpstreamUsage })?.usage);
-    } else {
-      await this.recordError(ctx, prepared, upstreamRes.status);
+      const openaiJson = prepared.adapter.parseResponse(text, prepared.modelId);
+      await this.recordUsage(
+        ctx,
+        prepared,
+        (openaiJson as { usage?: UpstreamUsage }).usage,
+      );
+      res.status(upstreamRes.status);
+      return openaiJson;
     }
 
+    await this.recordError(ctx, prepared, upstreamRes.status);
     res.status(upstreamRes.status);
-    return json;
+    return parseJsonObject(text) ?? { message: text };
   }
 
   async streamChatCompletions(
@@ -144,7 +148,7 @@ export class ProxyService {
     if (!upstreamRes.ok || !upstreamRes.body) {
       const text = await upstreamRes.text();
       await this.recordError(ctx, prepared, upstreamRes.status);
-      res.status(upstreamRes.status).json(this.tryParseJson(text));
+      res.status(upstreamRes.status).json(parseJsonObject(text) ?? { message: text });
       return;
     }
 
@@ -153,23 +157,23 @@ export class ProxyService {
     res.setHeader('cache-control', 'no-cache');
     res.setHeader('connection', 'keep-alive');
 
+    const transformer = prepared.adapter.createStreamTransformer();
     const reader = upstreamRes.body.getReader();
     const decoder = new TextDecoder();
-    let sseBuffer = '';
-    let usage: UpstreamUsage | undefined;
 
     try {
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
         const chunk = decoder.decode(value, { stream: true });
-        res.write(chunk);
-        sseBuffer = `${sseBuffer}${chunk}`.slice(-8192);
-        usage = this.extractUsage(sseBuffer) ?? usage;
+        const emit = transformer.push(chunk);
+        if (emit) res.write(emit);
       }
+      const tail = transformer.finish();
+      if (tail) res.write(tail);
     } finally {
       res.end();
-      await this.recordUsage(ctx, prepared, usage);
+      await this.recordUsage(ctx, prepared, transformer.getUsage());
     }
   }
 
@@ -217,9 +221,6 @@ export class ProxyService {
     if (!provider) {
       throw new NotFoundException('上游渠道不存在或已禁用');
     }
-    if (provider.type !== ProviderType.OPENAI_COMPATIBLE) {
-      throw new BadRequestException('暂不支持 anthropic 上游协议');
-    }
 
     if (
       !this.quotaLimitService.isProviderAllowed(
@@ -232,30 +233,26 @@ export class ProxyService {
       throw new ForbiddenException('该渠道不在允许范围内');
     }
 
+    const adapter = resolveAdapter(provider.type);
     const upstreamKey = decrypt(
       this.encryptionSecret(),
       provider.apiKeyCiphertext,
     );
-    const url = `${provider.baseUrl.replace(/\/+$/, '')}/chat/completions`;
-
-    const upstreamBody: Record<string, unknown> = {
-      ...body,
-      model: model.modelId,
-    };
-    if (body.stream) {
-      upstreamBody.stream_options = {
-        ...(body.stream_options as Record<string, unknown> | null | undefined),
-        include_usage: true,
-      };
-    }
+    const stream = body.stream === true;
+    const request = adapter.buildRequest({
+      baseUrl: provider.baseUrl,
+      apiKey: upstreamKey,
+      modelId: model.modelId,
+      body,
+      stream,
+    });
 
     return {
       modelId: model.modelId,
       providerId: String(provider._id),
       multiplier: model.multiplier,
-      url,
-      upstreamKey,
-      upstreamBody,
+      adapter,
+      request,
       requestId: `req_${randomUUID()}`,
       startedAt: Date.now(),
     };
@@ -377,13 +374,10 @@ export class ProxyService {
   private async requestUpstream(
     prepared: PreparedRequest,
   ): Promise<globalThis.Response> {
-    return fetch(prepared.url, {
+    return fetch(prepared.request.url, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${prepared.upstreamKey}`,
-      },
-      body: JSON.stringify(prepared.upstreamBody),
+      headers: prepared.request.headers,
+      body: prepared.request.body,
     });
   }
 
@@ -451,30 +445,6 @@ export class ProxyService {
       latencyMs: Date.now() - prepared.startedAt,
       scenario: `upstream_status:${upstreamStatus}`,
     });
-  }
-
-  private extractUsage(buffer: string): UpstreamUsage | undefined {
-    for (const line of buffer.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith('data:')) continue;
-      const payload = trimmed.slice(5).trim();
-      if (!payload || payload === '[DONE]') continue;
-      try {
-        const obj = JSON.parse(payload) as { usage?: UpstreamUsage };
-        if (obj.usage) return obj.usage;
-      } catch {
-        // 非 JSON chunk，忽略
-      }
-    }
-    return undefined;
-  }
-
-  private tryParseJson(text: string): unknown {
-    try {
-      return JSON.parse(text);
-    } catch {
-      return text;
-    }
   }
 
   private encryptionSecret(): string {

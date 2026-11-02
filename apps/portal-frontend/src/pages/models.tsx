@@ -10,10 +10,17 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useAuthStore } from '@/features/auth/store'
-import { createModel, listModels, removeModel, updateModel } from '@/features/models/api'
+import {
+  bulkCreateModels,
+  createModel,
+  listModels,
+  removeModel,
+  updateModel,
+} from '@/features/models/api'
+import { OFFICIAL_PRESETS } from '@/features/models/presets'
 import type { Model, ModelInput, ModelPatch } from '@/features/models/types'
 import { listProviders } from '@/features/providers/api'
-import type { Provider } from '@/features/providers/types'
+import type { Provider, ProviderType } from '@/features/providers/types'
 import { ApiError } from '@/lib/http'
 
 const selectClass =
@@ -64,6 +71,12 @@ export function ModelsPage() {
   const [editing, setEditing] = useState<Model | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  const [importOpen, setImportOpen] = useState(false)
+  const [presetType, setPresetType] = useState<ProviderType>('openai-compatible')
+  const [importProviderId, setImportProviderId] = useState('')
+  const [selectedModels, setSelectedModels] = useState<string[]>([])
+  const [importResult, setImportResult] = useState<string | null>(null)
+
   const modelsQuery = useQuery({ queryKey: ['models'], queryFn: listModels })
 
   const providersQuery = useQuery({
@@ -74,6 +87,44 @@ export function ModelsPage() {
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['models'] })
+
+  const activePreset = OFFICIAL_PRESETS.find((p) => p.type === presetType)
+
+  const toggleModel = (modelId: string) => {
+    setSelectedModels((prev) =>
+      prev.includes(modelId)
+        ? prev.filter((id) => id !== modelId)
+        : [...prev, modelId],
+    )
+  }
+
+  const importMutation = useMutation({
+    mutationFn: () => {
+      const preset = activePreset
+      const models = (preset?.models ?? [])
+        .filter((m) => selectedModels.includes(m.modelId))
+        .map((m) => ({
+          modelId: m.modelId,
+          displayName: m.displayName,
+          multiplier: m.multiplier,
+          capabilities: m.capabilities,
+          aliases: [],
+        }))
+      return bulkCreateModels({ providerId: importProviderId, models })
+    },
+    onSuccess: (result) => {
+      setImportResult(
+        `导入完成：新增 ${result.created.length} 个，跳过 ${result.skipped.length} 个（已存在）`,
+      )
+      setSelectedModels([])
+      invalidate()
+    },
+    onError: (err) => {
+      setImportResult(
+        err instanceof ApiError ? err.message : '导入失败，请稍后重试',
+      )
+    },
+  })
 
   const resetForm = () => {
     setForm(emptyForm)
@@ -252,6 +303,127 @@ export function ModelsPage() {
                 )}
               </div>
             </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle>官方预设导入</CardTitle>
+            <CardDescription>
+              从官方预置目录一键导入模型（能力标签与默认倍率自动填充），需先有对应协议类型的上游渠道
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!importOpen ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setImportOpen(true)}
+              >
+                打开官方预设导入
+              </Button>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-sm text-muted-foreground">
+                      官方协议类型
+                    </label>
+                    <select
+                      className={`${selectClass} w-full`}
+                      value={presetType}
+                      onChange={(e) => {
+                        setPresetType(e.target.value as ProviderType)
+                        setSelectedModels([])
+                      }}
+                    >
+                      {OFFICIAL_PRESETS.map((preset) => (
+                        <option key={preset.type} value={preset.type}>
+                          {preset.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm text-muted-foreground">
+                      目标渠道
+                    </label>
+                    <select
+                      className={`${selectClass} w-full`}
+                      value={importProviderId}
+                      onChange={(e) => setImportProviderId(e.target.value)}
+                      required
+                    >
+                      <option value="" disabled>
+                        请选择渠道
+                      </option>
+                      {providers
+                        .filter((p) => p.status === 'active')
+                        .map((provider) => (
+                          <option key={provider.id} value={provider.id}>
+                            {provider.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {(activePreset?.models ?? []).map((model) => (
+                    <label
+                      key={model.modelId}
+                      className="flex items-start gap-2 rounded-md border border-border p-2 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={selectedModels.includes(model.modelId)}
+                        onChange={() => toggleModel(model.modelId)}
+                      />
+                      <span>
+                        <code className="text-xs">{model.modelId}</code>
+                        <span className="ml-2 text-muted-foreground">
+                          {model.displayName} · ×{model.multiplier}
+                        </span>
+                        <span className="block text-xs text-muted-foreground">
+                          {model.capabilities.join(', ')}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+
+                {importResult && (
+                  <p className="text-sm text-muted-foreground">{importResult}</p>
+                )}
+
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    disabled={
+                      importMutation.isPending ||
+                      !importProviderId ||
+                      selectedModels.length === 0
+                    }
+                    onClick={() => importMutation.mutate()}
+                  >
+                    {importMutation.isPending ? '导入中…' : '导入所选模型'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setImportOpen(false)
+                      setImportResult(null)
+                    }}
+                  >
+                    收起
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

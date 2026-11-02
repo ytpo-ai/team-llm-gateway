@@ -6,6 +6,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Provider } from '../providers/schemas/provider.schema.js';
+import { BulkCreateModelDto } from './dto/bulk-create-model.dto.js';
 import { CreateModelDto } from './dto/create-model.dto.js';
 import { UpdateModelDto } from './dto/update-model.dto.js';
 import {
@@ -24,6 +25,11 @@ export interface ModelView {
   aliases: string[];
   status: ModelStatus;
   createdAt?: Date;
+}
+
+export interface BulkCreateResult {
+  created: ModelView[];
+  skipped: string[];
 }
 
 @Injectable()
@@ -69,6 +75,42 @@ export class ModelsService {
     });
 
     return this.toView(model);
+  }
+
+  async bulkCreate(
+    tenantId: string,
+    teamId: string,
+    dto: BulkCreateModelDto,
+  ): Promise<BulkCreateResult> {
+    await this.assertProviderInTeam(tenantId, teamId, dto.providerId);
+
+    const created: ModelView[] = [];
+    const skipped: string[] = [];
+
+    for (const item of dto.models) {
+      const existing = await this.modelModel
+        .findOne({ tenantId, teamId, modelId: item.modelId })
+        .exec();
+      if (existing) {
+        skipped.push(item.modelId);
+        continue;
+      }
+
+      const model = await this.modelModel.create({
+        tenantId,
+        teamId,
+        providerId: dto.providerId,
+        modelId: item.modelId,
+        displayName: item.displayName ?? '',
+        multiplier: item.multiplier ?? 1,
+        capabilities: item.capabilities ?? [],
+        aliases: item.aliases ?? [],
+        status: ModelStatus.ACTIVE,
+      });
+      created.push(this.toView(model));
+    }
+
+    return { created, skipped };
   }
 
   async update(

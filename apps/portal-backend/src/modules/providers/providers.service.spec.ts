@@ -56,6 +56,10 @@ describe('ProvidersService', () => {
     service = module.get(ProvidersService);
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   describe('create', () => {
     it('should encrypt apiKey and never store plaintext', async () => {
       providerModel.findOne.mockReturnValue({
@@ -148,6 +152,57 @@ describe('ProvidersService', () => {
 
       expect(provider.status).toBe(ProviderStatus.DISABLED);
       expect(result.status).toBe(ProviderStatus.DISABLED);
+    });
+  });
+
+  describe('test', () => {
+    const makeTestProvider = () =>
+      makeProvider({
+        apiKeyCiphertext: encrypt(secret, 'sk-upstream'),
+      });
+
+    it('should report connectivity success on 2xx', async () => {
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(makeTestProvider()),
+      });
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(new Response('{}', { status: 200 })),
+      );
+
+      const result = await service.test(tenantId, teamId, String(providerId));
+
+      expect(result.ok).toBe(true);
+      expect(result.message).toContain('连通正常');
+    });
+
+    it('should report auth failure on 401', async () => {
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(makeTestProvider()),
+      });
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(new Response('{}', { status: 401 })),
+      );
+
+      const result = await service.test(tenantId, teamId, String(providerId));
+
+      expect(result.ok).toBe(false);
+      expect(result.message).toContain('鉴权失败');
+    });
+
+    it('should report failure on network error', async () => {
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(makeTestProvider()),
+      });
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockRejectedValue(new Error('connection refused')),
+      );
+
+      const result = await service.test(tenantId, teamId, String(providerId));
+
+      expect(result.ok).toBe(false);
     });
   });
 

@@ -14,13 +14,16 @@ import {
   createProvider,
   listProviders,
   removeProvider,
+  testProvider,
   updateProvider,
 } from '@/features/providers/api'
 import {
+  PROVIDER_TYPE_BASE_URL_HINTS,
   PROVIDER_TYPE_LABELS,
   type Provider,
   type ProviderInput,
   type ProviderPatch,
+  type ProviderProbeResult,
   type ProviderType,
 } from '@/features/providers/types'
 import { ApiError } from '@/lib/http'
@@ -50,6 +53,10 @@ export function ProvidersPage() {
   const [form, setForm] = useState<FormState>(emptyForm)
   const [editing, setEditing] = useState<Provider | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [probeResults, setProbeResults] = useState<
+    Record<string, ProviderProbeResult>
+  >({})
+  const [probingId, setProbingId] = useState<string | null>(null)
 
   const providersQuery = useQuery({
     queryKey: ['providers'],
@@ -59,6 +66,14 @@ export function ProvidersPage() {
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['providers'] })
+
+  const testMutation = useMutation({
+    mutationFn: (id: string) => testProvider(id),
+    onMutate: (id) => setProbingId(id),
+    onSuccess: (result, id) =>
+      setProbeResults((prev) => ({ ...prev, [id]: result })),
+    onSettled: () => setProbingId(null),
+  })
 
   const resetForm = () => {
     setForm(emptyForm)
@@ -182,7 +197,7 @@ export function ProvidersPage() {
                 Base URL
               </label>
               <Input
-                placeholder="https://api.openai.com/v1"
+                placeholder={PROVIDER_TYPE_BASE_URL_HINTS[form.type]}
                 value={form.baseUrl}
                 onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
                 required
@@ -244,7 +259,22 @@ export function ProvidersPage() {
                 <tbody>
                   {providers.map((provider) => (
                     <tr key={provider.id} className="border-b last:border-0">
-                      <td className="py-2 pr-4">{provider.name}</td>
+                      <td className="py-2 pr-4">
+                        <div>{provider.name}</div>
+                        {probeResults[provider.id] && (
+                          <div
+                            className={`mt-1 text-xs ${
+                              probeResults[provider.id].ok
+                                ? 'text-green-600'
+                                : 'text-red-500'
+                            }`}
+                          >
+                            {probeResults[provider.id].ok ? '连通' : '失败'}（
+                            {probeResults[provider.id].latencyMs}ms）{' '}
+                            {probeResults[provider.id].message}
+                          </div>
+                        )}
+                      </td>
                       <td className="py-2 pr-4 text-muted-foreground">
                         {PROVIDER_TYPE_LABELS[provider.type]}
                       </td>
@@ -263,6 +293,14 @@ export function ProvidersPage() {
                       </td>
                       <td className="py-2">
                         <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={probingId === provider.id}
+                            onClick={() => testMutation.mutate(provider.id)}
+                          >
+                            {probingId === provider.id ? '测试中…' : '测试'}
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"

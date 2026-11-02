@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  HttpException,
-} from '@nestjs/common';
+import { ForbiddenException, HttpException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
@@ -215,26 +211,6 @@ describe('ProxyService', () => {
           makeRes() as never,
         ),
       ).rejects.toThrow(ForbiddenException);
-    });
-
-    it('should reject anthropic provider', async () => {
-      modelModel.findOne.mockReturnValue({
-        exec: vi.fn().mockResolvedValue(makeModel()),
-      });
-      providerModel.findOne.mockReturnValue({
-        exec: vi.fn().mockResolvedValue({
-          ...makeProvider(),
-          type: ProviderType.ANTHROPIC,
-        }),
-      });
-
-      await expect(
-        service.chatCompletions(
-          makeContext(),
-          { model: 'gpt-4o-mini' },
-          makeRes() as never,
-        ),
-      ).rejects.toThrow(BadRequestException);
     });
   });
 

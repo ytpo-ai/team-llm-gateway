@@ -3,6 +3,7 @@ import type {
   Provider,
   ProviderInput,
   ProviderPatch,
+  ProviderProbeResult,
 } from './types'
 
 export function listProviders(): Promise<Provider[]> {
@@ -22,4 +23,10 @@ export function updateProvider(
 
 export function removeProvider(id: string): Promise<Provider> {
   return request<Provider>(`/providers/${id}`, { method: 'DELETE' })
+}
+
+export function testProvider(id: string): Promise<ProviderProbeResult> {
+  return request<ProviderProbeResult>(`/providers/${id}/test`, {
+    method: 'POST',
+  })
 }

@@ -1,4 +1,4 @@
-export type ProviderType = 'openai-compatible' | 'anthropic'
+export type ProviderType = 'openai-compatible' | 'anthropic' | 'gemini'
 
 export type ProviderStatus = 'active' | 'disabled'
 
@@ -27,7 +27,20 @@ export interface ProviderPatch {
   status?: ProviderStatus
 }
 
+export interface ProviderProbeResult {
+  ok: boolean
+  latencyMs: number
+  message: string
+}
+
 export const PROVIDER_TYPE_LABELS: Record<ProviderType, string> = {
   'openai-compatible': 'OpenAI 兼容',
   anthropic: 'Anthropic',
+  gemini: 'Google Gemini',
+}
+
+export const PROVIDER_TYPE_BASE_URL_HINTS: Record<ProviderType, string> = {
+  'openai-compatible': 'https://api.openai.com/v1',
+  anthropic: 'https://api.anthropic.com',
+  gemini: 'https://generativelanguage.googleapis.com',
 }

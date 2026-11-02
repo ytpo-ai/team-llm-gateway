@@ -6,7 +6,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { buildApiKeyHint, encrypt } from '../../common/crypto/cipher.js';
+import {
+  buildApiKeyHint,
+  decrypt,
+  encrypt,
+} from '../../common/crypto/cipher.js';
+import { resolveAdapter } from '../proxy/adapters/adapter.factory.js';
 import { CreateProviderDto } from './dto/create-provider.dto.js';
 import { UpdateProviderDto } from './dto/update-provider.dto.js';
 import {
@@ -25,6 +30,18 @@ export interface ProviderView {
   status: ProviderStatus;
   createdAt?: Date;
 }
+
+export interface ProviderProbeResult {
+  ok: boolean;
+  latencyMs: number;
+  message: string;
+}
+
+const PROBE_MODEL: Record<ProviderType, string> = {
+  [ProviderType.OPENAI_COMPATIBLE]: 'gpt-4o-mini',
+  [ProviderType.ANTHROPIC]: 'claude-3-5-haiku-20241022',
+  [ProviderType.GEMINI]: 'gemini-1.5-flash',
+};
 
 @Injectable()
 export class ProvidersService {
@@ -102,6 +119,59 @@ export class ProvidersService {
     provider.status = ProviderStatus.DISABLED;
     await provider.save();
     return this.toView(provider);
+  }
+
+  async test(
+    tenantId: string,
+    teamId: string,
+    id: string,
+  ): Promise<ProviderProbeResult> {
+    const provider = await this.findInTeam(tenantId, teamId, id);
+
+    const upstreamKey = decrypt(
+      this.encryptionSecret(),
+      provider.apiKeyCiphertext,
+    );
+    const adapter = resolveAdapter(provider.type);
+    const startedAt = Date.now();
+
+    try {
+      const request = adapter.buildRequest({
+        baseUrl: provider.baseUrl,
+        apiKey: upstreamKey,
+        modelId: PROBE_MODEL[provider.type] ?? 'gpt-4o-mini',
+        body: {
+          messages: [{ role: 'user', content: 'ping' }],
+          max_tokens: 1,
+        },
+        stream: false,
+      });
+
+      const response = await fetch(request.url, {
+        method: 'POST',
+        headers: request.headers,
+        body: request.body,
+      });
+
+      const latencyMs = Date.now() - startedAt;
+      if (response.status === 401 || response.status === 403) {
+        return { ok: false, latencyMs, message: '鉴权失败，请检查上游 key' };
+      }
+      const ok = response.status >= 200 && response.status < 300;
+      return {
+        ok,
+        latencyMs,
+        message: ok
+          ? `连通正常（HTTP ${response.status}）`
+          : `上游返回 HTTP ${response.status}`,
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        latencyMs: Date.now() - startedAt,
+        message: err instanceof Error ? err.message : '连接失败',
+      };
+    }
   }
 
   private encryptionSecret(): string {

@@ -6,6 +6,7 @@ export type ProviderDocument = HydratedDocument<Provider>;
 export enum ProviderType {
   OPENAI_COMPATIBLE = 'openai-compatible',
   ANTHROPIC = 'anthropic',
+  GEMINI = 'gemini',
 }
 
 export enum ProviderStatus {

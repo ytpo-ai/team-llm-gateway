@@ -24,6 +24,7 @@ import {
 } from '../system/schemas/audit-log.schema.js';
 import { CreateModelDto } from './dto/create-model.dto.js';
 import { UpdateModelDto } from './dto/update-model.dto.js';
+import { BulkCreateModelDto } from './dto/bulk-create-model.dto.js';
 import { ModelsService } from './models.service.js';
 
 @ApiTags('models')
@@ -78,6 +79,34 @@ export class ModelsController {
       resourceId: result.id,
       summary: `创建模型（${result.modelId}）`,
       after: { id: result.id, modelId: result.modelId, multiplier: result.multiplier },
+      ip: req.ip ?? null,
+      userAgent: req.headers['user-agent'] ?? null,
+    });
+    return result;
+  }
+
+  @Post('bulk')
+  @UseGuards(RolesGuard)
+  @Roles(Role.TEAM_ADMIN)
+  @ApiOperation({ summary: '批量导入官方预设模型' })
+  async bulkCreate(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: BulkCreateModelDto,
+    @Req() req: Request,
+  ) {
+    const result = await this.modelsService.bulkCreate(
+      user.tenantId,
+      user.teamId,
+      dto,
+    );
+    await this.auditService.log({
+      tenantId: user.tenantId,
+      teamId: user.teamId,
+      actorUserId: user.id,
+      action: AuditAction.CREATE,
+      resourceType: AuditResourceType.MODEL,
+      resourceId: dto.providerId,
+      summary: `批量导入模型（${result.created.length} 新增，${result.skipped.length} 跳过）`,
       ip: req.ip ?? null,
       userAgent: req.headers['user-agent'] ?? null,
     });

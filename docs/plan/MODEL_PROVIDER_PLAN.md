@@ -5,7 +5,7 @@
 > - 上游决策：`docs/technical/SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-03/06/09/10、§3 核心解耦原则、§5.2、D-05）
 > - 上游 plan：`docs/plan/API_KEY_PLAN.md`（API Key 已交付，其 `allowedModels` 白名单将引用本模块模型目录）
 > - 定稿时间：2026-10-28
-> - 状态：已批准
+> - 状态：已完成
 
 ---
 
@@ -59,8 +59,8 @@
 | 编号 | 事项 | 状态 |
 |---|---|---|
 | M-01 | OpenAI 兼容转发层（成员 key → Portal → 上游 key 转发） | ✅ 已交付（`docs/plan/USAGE_METERING_PLAN.md` REQ-002，含 key 校验 + provider 解析 + SSE + 计量联动） |
-| M-02 | Anthropic 协议翻译 | 首期仅落 `type` 枚举位，`openai-compatible` 为默认，翻译逻辑后续 |
-| M-03 | 上游连通性探活（`POST /providers/:id/test`） | 后续 |
+| M-02 | Anthropic 协议翻译 | ✅ 已交付（`docs/plan/OFFICIAL_API_PLAN.md` REQ-002，连同 Gemini 一并交付） |
+| M-03 | 上游连通性探活（`POST /providers/:id/test`） | ✅ 已交付（`docs/plan/OFFICIAL_API_PRESET_PLAN.md` REQ-004） |
 | M-04 | 上游 key 加密密钥管理（KMS / 轮换） | 首期 `ENCRYPTION_SECRET` 环境变量，密钥轮换留待后续 |
 | M-05 | 模型目录归属粒度（团队级 vs 租户级 vs 全局） | 首期团队级（`tenantId + teamId`），随多团队演进再评估租户级共享 |
 

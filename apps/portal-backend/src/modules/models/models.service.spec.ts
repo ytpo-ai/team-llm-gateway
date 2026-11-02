@@ -134,4 +134,47 @@ describe('ModelsService', () => {
       expect(result.status).toBe(ModelStatus.DISABLED);
     });
   });
+
+  describe('bulkCreate', () => {
+    it('should create new models and skip existing', async () => {
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue({ _id: providerId }),
+      });
+      modelModel.findOne.mockReturnValue({
+        exec: vi
+          .fn()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(makeModel()),
+      });
+      modelModel.create.mockImplementation(async (input: any) => ({
+        ...makeModel(),
+        ...input,
+      }));
+
+      const result = await service.bulkCreate(tenantId, teamId, {
+        providerId: String(providerId),
+        models: [
+          { modelId: 'gpt-4o', displayName: 'GPT-4o', multiplier: 1 },
+          { modelId: 'gpt-4o-mini', multiplier: 0.3 },
+        ],
+      });
+
+      expect(result.created).toHaveLength(1);
+      expect(result.created[0].modelId).toBe('gpt-4o');
+      expect(result.skipped).toEqual(['gpt-4o-mini']);
+    });
+
+    it('should throw NotFound when provider missing', async () => {
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(null),
+      });
+
+      await expect(
+        service.bulkCreate(tenantId, teamId, {
+          providerId: String(providerId),
+          models: [{ modelId: 'gpt-4o' }],
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
 });
