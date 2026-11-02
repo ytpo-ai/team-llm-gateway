@@ -30,26 +30,35 @@
 |---|---|---|---|
 | `_id` | ObjectId | 主键 | 自动生成 |
 | `tenantId` | ObjectId | 必填、ref `Tenant`、索引 | 所属租户 |
-| `email` | string | 必填、小写、trim | 登录邮箱，同一租户内唯一 |
-| `passwordHash` | string | 必填 | bcrypt 哈希，绝不落明文 |
+| `email` | string | 可选、小写、trim、默认 `null` | 登录邮箱，同一租户内非空唯一 |
+| `passwordHash` | string | 可选、默认 `null` | bcrypt 哈希，绝不落明文；无密码的成员不可登录 |
 | `name` | string | 必填、trim | 显示名 |
-| `role` | enum | 见下方角色枚举，默认 `member` | RBAC 角色 |
+| `role` | enum | 见下方角色枚举，默认 `member` | RBAC 角色（角色A） |
+| `roleTemplateId` | ObjectId | 可选、ref `RoleTemplate`、默认 `null` | 角色B（LLM 使用限制模板） |
 | `status` | enum | `active` / `disabled`，默认 `active` | 用户状态 |
 | `createdAt` | Date | 自动 | 创建时间 |
 | `updatedAt` | Date | 自动 | 更新时间 |
 
-**复合唯一索引**：`{ tenantId, email }`，保证同租户内邮箱唯一。
+**部分唯一索引**：`{ tenantId, email }` 使用 `partialFilterExpression: { email: { $type: 'string' } }`，保证同租户内非空邮箱唯一（多个成员无邮箱不冲突）。
 
 ### 角色枚举（Role）
 
 | 值 | 说明 | 单团队版 |
 |---|---|---|
+| `system` | 系统管理员 | 可见 |
 | `team_admin` | 团队管理员 | 可见 |
-| `member` | 成员 | 可见 |
-| `finance` | 财务 | 可见 |
-| `viewer` | 只读 | 可见 |
-| `provider` | 服务商 | 隐藏（SaaS 预留） |
-| `system` | 系统 | 隐藏（SaaS 预留） |
+| `member` | 普通成员 | 可见 |
+
+> 已废弃并移除：`finance` / `viewer` / `provider`（2026-11-02 团队管理优化 REQ-001）。
+
+### 两层角色体系
+
+| 层 | 名称 | 是否固定 | 掌管字段 | 说明 |
+|---|---|---|---|---|
+| 角色A（管理范围） | system / team_admin / member | 固定 | `User.role` | 决定「谁能做管理操作」 |
+| 角色B（LLM 使用限制） | 设计师 / 开发人员 … | 不固定 | `User.roleTemplateId` | 决定「能用哪些渠道/多少额度」 |
+
+- 角色B 数据模型见 `docs/technical/db_schema/ROLE_TEMPLATE_SCHEMA.MD`。
 
 ## 4. JWT Payload
 

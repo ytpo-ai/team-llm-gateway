@@ -1,14 +1,8 @@
-export type Role =
-  | 'team_admin'
-  | 'member'
-  | 'finance'
-  | 'viewer'
-  | 'provider'
-  | 'system'
+export type Role = 'system' | 'team_admin' | 'member'
 
 export interface User {
   id: string
-  email: string
+  email: string | null
   name: string
   role: Role
   tenantId: string

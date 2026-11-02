@@ -110,7 +110,7 @@ export function BillingPage() {
     queryFn: () => listQuotaTransactions(),
   })
 
-  const canManage = user?.role === 'team_admin' || user?.role === 'finance'
+  const canManage = user?.role === 'team_admin' || user?.role === 'system'
 
   const rechargeMutation = useMutation({
     mutationFn: rechargeQuota,

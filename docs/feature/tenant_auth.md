@@ -23,6 +23,7 @@
 | [PORTAL_FOUNDATION](../plan/PORTAL_FOUNDATION_PLAN.md) | — | — | — |
 | [TENANT_AUTH](../plan/TENANT_AUTH_PLAN.md) | [REQ-001 后端租户与认证](../requirement/TENANT_AUTH_REQ-001_BACKEND_AUTH.md) | [开发记录](../development/TENANT_AUTH_REQ-001_DEVELOPMENT.md) | — |
 | 同上 | [REQ-002 前端认证闭环](../requirement/TENANT_AUTH_REQ-002_FRONTEND_AUTH.md) | [开发记录](../development/TENANT_AUTH_REQ-002_DEVELOPMENT.md) | — |
+| [TEAM_MANAGEMENT_OPTIMIZATION](../plan/TEAM_MANAGEMENT_OPTIMIZATION_PLAN.md) | [REQ-001 角色体系重构](../requirement/TEAM_MANAGEMENT_REQ-001_ROLE_SYSTEM.md) | — | — |
 
 ## 3. 相关文档
 - 技术文档：`docs/technical/SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-03/04、§6）、`docs/technical/db_schema/TENANT_USER_SCHEMA.MD`

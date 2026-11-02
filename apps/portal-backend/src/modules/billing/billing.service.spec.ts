@@ -87,7 +87,7 @@ describe('BillingService', () => {
         type: QuotaTransactionType.RECHARGE,
       });
 
-      const result = await service.recharge(makeUser({ role: Role.FINANCE }), {
+      const result = await service.recharge(makeUser({ role: Role.TEAM_ADMIN }), {
         amount: 500,
       });
 
@@ -114,7 +114,7 @@ describe('BillingService', () => {
       });
       quotaTransactionModel.create.mockResolvedValue({ amount: -300 });
 
-      const result = await service.adjust(makeUser({ role: Role.FINANCE }), {
+      const result = await service.adjust(makeUser({ role: Role.TEAM_ADMIN }), {
         amount: -300,
       });
 

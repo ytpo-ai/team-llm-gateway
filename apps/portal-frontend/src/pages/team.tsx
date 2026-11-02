@@ -11,6 +11,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { useAuthStore } from '@/features/auth/store'
 import type { Role } from '@/features/auth/types'
+import { listRoleTemplates } from '@/features/role-templates/api'
+import type { RoleTemplate } from '@/features/role-templates/types'
 import {
   createInvitation,
   listInvitations,
@@ -59,7 +61,7 @@ function RoleSelect({
 export function TeamPage() {
   const queryClient = useQueryClient()
   const user = useAuthStore((s) => s.user)
-  const isAdmin = user?.role === 'team_admin'
+  const isAdmin = user?.role === 'team_admin' || user?.role === 'system'
 
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<Role>('member')
@@ -82,12 +84,20 @@ export function TeamPage() {
     enabled: !!team && isAdmin,
   })
 
+  const roleTemplatesQuery = useQuery({
+    queryKey: ['role-templates'],
+    queryFn: listRoleTemplates,
+    enabled: isAdmin,
+  })
+
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['members', team?.id] })
 
   const updateMemberMutation = useMutation({
-    mutationFn: (args: { userId: string; patch: { role?: Role } }) =>
-      updateMember(team!.id, args.userId, args.patch),
+    mutationFn: (args: {
+      userId: string
+      patch: { role?: Role; roleTemplateId?: string | null }
+    }) => updateMember(team!.id, args.userId, args.patch),
     onSuccess: invalidate,
   })
 
@@ -144,6 +154,7 @@ export function TeamPage() {
 
   const members: Member[] = membersQuery.data ?? []
   const invitations: Invitation[] = invitationsQuery.data ?? []
+  const roleTemplates: RoleTemplate[] = roleTemplatesQuery.data ?? []
 
   return (
     <div className="space-y-6">
@@ -248,7 +259,8 @@ export function TeamPage() {
                 <tr className="border-b text-left text-muted-foreground">
                   <th className="py-2 pr-4 font-medium">姓名</th>
                   <th className="py-2 pr-4 font-medium">邮箱</th>
-                  <th className="py-2 pr-4 font-medium">角色</th>
+                  <th className="py-2 pr-4 font-medium">管理角色</th>
+                  <th className="py-2 pr-4 font-medium">使用角色</th>
                   <th className="py-2 pr-4 font-medium">状态</th>
                   {isAdmin && <th className="py-2 font-medium">操作</th>}
                 </tr>
@@ -258,7 +270,7 @@ export function TeamPage() {
                   <tr key={member.id} className="border-b last:border-0">
                     <td className="py-2 pr-4">{member.name}</td>
                     <td className="py-2 pr-4 text-muted-foreground">
-                      {member.email}
+                      {member.email ?? '—'}
                     </td>
                     <td className="py-2 pr-4">
                       {isAdmin && member.id !== user?.id ? (
@@ -273,6 +285,35 @@ export function TeamPage() {
                         />
                       ) : (
                         <span>{ROLE_LABELS[member.role]}</span>
+                      )}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {isAdmin ? (
+                        <select
+                          className={selectClass}
+                          value={member.roleTemplateId ?? ''}
+                          onChange={(e) =>
+                            updateMemberMutation.mutate({
+                              userId: member.id,
+                              patch: {
+                                roleTemplateId: e.target.value || null,
+                              },
+                            })
+                          }
+                        >
+                          <option value="">未分配</option>
+                          {roleTemplates.map((template) => (
+                            <option key={template.id} value={template.id}>
+                              {template.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span>
+                          {roleTemplates.find(
+                            (t) => t.id === member.roleTemplateId,
+                          )?.name ?? '未分配'}
+                        </span>
                       )}
                     </td>
                     <td className="py-2 pr-4">

@@ -82,6 +82,9 @@ export class AuthService {
     if (user.status !== UserStatus.ACTIVE) {
       throw new UnauthorizedException('账号已被禁用');
     }
+    if (!user.passwordHash) {
+      throw new UnauthorizedException('该成员未设置密码，无法登录');
+    }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
@@ -173,7 +176,7 @@ export class AuthService {
   ) {
     const payload: JwtPayload = {
       sub: String(user._id),
-      email: user.email,
+      email: user.email ?? '',
       tenantId: user.tenantId ? String(user.tenantId) : '',
       teamId: teamId ? String(teamId) : '',
       role: user.role,

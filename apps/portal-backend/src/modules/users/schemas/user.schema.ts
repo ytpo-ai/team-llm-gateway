@@ -22,17 +22,25 @@ export class User {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Team', index: true })
   teamId?: Types.ObjectId;
 
-  @Prop({ required: true, lowercase: true, trim: true })
-  email: string;
+  @Prop({ type: String, lowercase: true, trim: true, default: null })
+  email?: string | null;
 
-  @Prop({ required: true })
-  passwordHash: string;
+  @Prop({ type: String, default: null })
+  passwordHash?: string | null;
 
   @Prop({ required: true, trim: true })
   name: string;
 
   @Prop({ type: String, enum: Object.values(Role), default: Role.MEMBER })
   role: Role;
+
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'RoleTemplate',
+    default: null,
+    index: true,
+  })
+  roleTemplateId?: Types.ObjectId | null;
 
   @Prop({
     type: String,
@@ -44,4 +52,7 @@ export class User {
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
-UserSchema.index({ tenantId: 1, email: 1 }, { unique: true });
+UserSchema.index(
+  { tenantId: 1, email: 1 },
+  { unique: true, partialFilterExpression: { email: { $type: 'string' } } },
+);

@@ -22,6 +22,7 @@
 |------|------------|-------------|-----|
 | [TEAM_MEMBER](../plan/TEAM_MEMBER_PLAN.md) | [REQ-001 后端团队与成员](../requirement/TEAM_MEMBER_REQ-001_BACKEND_TEAM.md) | [开发记录](../development/TEAM_MEMBER_REQ-001_DEVELOPMENT.md) | — |
 | 同上 | [REQ-002 前端团队与成员管理](../requirement/TEAM_MEMBER_REQ-002_FRONTEND_TEAM.md) | [开发记录](../development/TEAM_MEMBER_REQ-002_DEVELOPMENT.md) | — |
+| [TEAM_MANAGEMENT_OPTIMIZATION](../plan/TEAM_MANAGEMENT_OPTIMIZATION_PLAN.md) | [REQ-001 角色体系重构](../requirement/TEAM_MANAGEMENT_REQ-001_ROLE_SYSTEM.md)、[REQ-003 系统管理员+菜单](../requirement/TEAM_MANAGEMENT_REQ-003_SYSTEM_ADMIN_MENU.md) | — | — |
 
 ## 3. 相关文档
 - 技术文档：`docs/technical/SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-03/06、§5.2、§7.1）、`docs/technical/db_schema/TEAM_MEMBER_SCHEMA.MD`

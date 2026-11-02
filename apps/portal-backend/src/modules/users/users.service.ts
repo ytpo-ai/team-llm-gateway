@@ -7,16 +7,18 @@ import { User, UserDocument, UserStatus } from './schemas/user.schema.js';
 export interface CreateUserInput {
   tenantId: Types.ObjectId;
   teamId?: Types.ObjectId;
-  email: string;
+  email?: string | null;
   name: string;
-  passwordHash: string;
+  passwordHash?: string | null;
   role: Role;
+  roleTemplateId?: Types.ObjectId | null;
 }
 
 export interface UpdateUserInput {
   role?: Role;
   status?: UserStatus;
   teamId?: Types.ObjectId;
+  roleTemplateId?: Types.ObjectId | null;
 }
 
 @Injectable()

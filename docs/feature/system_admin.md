@@ -23,6 +23,7 @@
 | Plan | Requirement | Development | Fix |
 |------|------------|-------------|-----|
 | [SYSTEM_ADMIN](../plan/SYSTEM_ADMIN_PLAN.md) | [REQ-001](../requirement/SYSTEM_ADMIN_REQ-001_BACKEND_SYSTEM.md)、[REQ-002](../requirement/SYSTEM_ADMIN_REQ-002_FRONTEND_SYSTEM.md) | — | — |
+| [TEAM_MANAGEMENT_OPTIMIZATION](../plan/TEAM_MANAGEMENT_OPTIMIZATION_PLAN.md) | [REQ-003 系统管理员+菜单](../requirement/TEAM_MANAGEMENT_REQ-003_SYSTEM_ADMIN_MENU.md) | — | — |
 
 ## 3. 相关文档
 - 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（§5.2/§5.3）

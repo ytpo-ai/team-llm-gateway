@@ -27,7 +27,7 @@ export function listMembers(teamId: string): Promise<Member[]> {
 export function updateMember(
   teamId: string,
   userId: string,
-  patch: { role?: Role; status?: MemberStatus },
+  patch: { role?: Role; status?: MemberStatus; roleTemplateId?: string | null },
 ): Promise<Member> {
   return request<Member>(`/teams/${teamId}/members/${userId}`, {
     method: 'PATCH',

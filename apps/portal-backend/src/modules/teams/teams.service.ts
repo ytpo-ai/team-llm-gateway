@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import * as bcrypt from 'bcryptjs';
 import { createHash, randomBytes } from 'node:crypto';
 import { Model, Types } from 'mongoose';
 import { Role } from '../../common/enums/role.enum.js';
@@ -13,6 +14,7 @@ import {
   UserStatus,
 } from '../users/schemas/user.schema.js';
 import { UsersService } from '../users/users.service.js';
+import { CreateMemberDto } from './dto/create-member.dto.js';
 import {
   Invitation,
   InvitationDocument,
@@ -23,6 +25,12 @@ import { Team, TeamDocument, TeamStatus } from './schemas/team.schema.js';
 export const DEFAULT_TEAM_NAME = '默认团队';
 
 const INVITATION_TTL_DAYS = 7;
+
+export interface UpdateMemberPatch {
+  role?: Role;
+  status?: UserStatus;
+  roleTemplateId?: string | null;
+}
 
 export interface InvitationContext {
   invitation: InvitationDocument;
@@ -99,11 +107,45 @@ export class TeamsService {
     return users.map((user) => this.toMemberView(user));
   }
 
+  async createMember(
+    tenantId: string,
+    teamId: string,
+    dto: CreateMemberDto,
+  ): Promise<ReturnType<TeamsService['toMemberView']>> {
+    await this.findTeamInTenant(tenantId, teamId);
+
+    const normalized = dto.email?.toLowerCase();
+    if (normalized) {
+      const existing = await this.usersService.findByEmail(
+        new Types.ObjectId(tenantId),
+        normalized,
+      );
+      if (existing) {
+        throw new ConflictException('该邮箱已存在');
+      }
+    }
+
+    const passwordHash = dto.password ? await bcrypt.hash(dto.password, 10) : null;
+    const user = await this.usersService.create({
+      tenantId: new Types.ObjectId(tenantId),
+      teamId: new Types.ObjectId(teamId),
+      email: normalized ?? null,
+      name: dto.name,
+      passwordHash,
+      role: dto.role ?? Role.MEMBER,
+      roleTemplateId: dto.roleTemplateId
+        ? new Types.ObjectId(dto.roleTemplateId)
+        : null,
+    });
+
+    return this.toMemberView(user);
+  }
+
   async updateMember(
     tenantId: string,
     teamId: string,
     userId: string,
-    patch: { role?: Role; status?: UserStatus },
+    patch: UpdateMemberPatch,
   ) {
     await this.findTeamInTenant(tenantId, teamId);
     const user = await this.usersService.findById(userId);
@@ -114,7 +156,19 @@ export class TeamsService {
     ) {
       throw new NotFoundException('成员不存在');
     }
-    const updated = await this.usersService.updateById(userId, patch);
+    const update: {
+      role?: Role;
+      status?: UserStatus;
+      roleTemplateId?: Types.ObjectId | null;
+    } = {};
+    if (patch.role !== undefined) update.role = patch.role;
+    if (patch.status !== undefined) update.status = patch.status;
+    if (patch.roleTemplateId !== undefined) {
+      update.roleTemplateId = patch.roleTemplateId
+        ? new Types.ObjectId(patch.roleTemplateId)
+        : null;
+    }
+    const updated = await this.usersService.updateById(userId, update);
     return updated ? this.toMemberView(updated) : null;
   }
 
@@ -257,12 +311,13 @@ export class TeamsService {
   private toMemberView(user: UserDocument) {
     return {
       id: String(user._id),
-      email: user.email,
+      email: user.email ?? null,
       name: user.name,
       role: user.role,
       status: user.status,
       tenantId: String(user.tenantId),
       teamId: user.teamId ? String(user.teamId) : null,
+      roleTemplateId: user.roleTemplateId ? String(user.roleTemplateId) : null,
     };
   }
 

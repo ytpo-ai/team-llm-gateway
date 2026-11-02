@@ -345,7 +345,7 @@ export class BillingService {
       .select('name email')
       .exec();
     return new Map(
-      users.map((u) => [String(u._id), u.name || u.email]),
+      users.map((u) => [String(u._id), u.name || u.email || '']),
     );
   }
 

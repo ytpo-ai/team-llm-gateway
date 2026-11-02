@@ -25,6 +25,7 @@ export enum AuditResourceType {
   TEAM = 'team',
   MEMBER = 'member',
   INVITATION = 'invitation',
+  ROLE_TEMPLATE = 'role_template',
 }
 
 @Schema({ timestamps: true })

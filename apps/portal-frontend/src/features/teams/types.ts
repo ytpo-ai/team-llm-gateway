@@ -13,12 +13,13 @@ export type MemberStatus = 'active' | 'disabled'
 
 export interface Member {
   id: string
-  email: string
+  email: string | null
   name: string
   role: Role
   status: MemberStatus
   tenantId: string
   teamId: string | null
+  roleTemplateId: string | null
 }
 
 export type InvitationStatus = 'pending' | 'accepted' | 'revoked'
@@ -38,17 +39,9 @@ export interface InvitationResult {
 }
 
 export const ROLE_LABELS: Record<Role, string> = {
+  system: '系统管理员',
   team_admin: '团队管理员',
   member: '成员',
-  finance: '财务',
-  viewer: '只读',
-  provider: '服务商',
-  system: '系统',
 }
 
-export const ASSIGNABLE_ROLES: Role[] = [
-  'team_admin',
-  'member',
-  'finance',
-  'viewer',
-]
+export const ASSIGNABLE_ROLES: Role[] = ['team_admin', 'member']

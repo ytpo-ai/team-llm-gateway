@@ -23,6 +23,7 @@ import {
   AuditResourceType,
 } from '../system/schemas/audit-log.schema.js';
 import { CreateInvitationDto } from './dto/create-invitation.dto.js';
+import { CreateMemberDto } from './dto/create-member.dto.js';
 import { CreateTeamDto } from './dto/create-team.dto.js';
 import { UpdateMemberDto } from './dto/update-member.dto.js';
 import { UpdateTeamDto } from './dto/update-team.dto.js';
@@ -74,6 +75,36 @@ export class TeamsController {
     @Param('teamId') teamId: string,
   ) {
     return this.teamsService.listMembers(tenantId, teamId);
+  }
+
+  @Post(':teamId/members')
+  @UseGuards(RolesGuard)
+  @Roles(Role.TEAM_ADMIN, Role.SYSTEM)
+  @ApiOperation({ summary: '直接添加成员（无需登录，密码可选）' })
+  async createMember(
+    @CurrentUser() user: AuthUser,
+    @Param('teamId') teamId: string,
+    @Body() dto: CreateMemberDto,
+    @Req() req: Request,
+  ) {
+    const result = await this.teamsService.createMember(
+      user.tenantId,
+      teamId,
+      dto,
+    );
+    await this.auditService.log({
+      tenantId: user.tenantId,
+      teamId: user.teamId,
+      actorUserId: user.id,
+      action: AuditAction.CREATE,
+      resourceType: AuditResourceType.MEMBER,
+      resourceId: result.id,
+      summary: `添加成员（${result.name}）`,
+      after: { id: result.id, name: result.name, role: result.role },
+      ip: req.ip ?? null,
+      userAgent: req.headers['user-agent'] ?? null,
+    });
+    return result;
   }
 
   @Patch(':teamId/members/:userId')

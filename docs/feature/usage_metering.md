@@ -25,6 +25,7 @@
 | [USAGE_METERING](../plan/USAGE_METERING_PLAN.md) | [REQ-001 后端计量](../requirement/USAGE_METERING_REQ-001_BACKEND_METERING.md) | [开发记录](../development/USAGE_METERING_REQ-001_DEVELOPMENT.md) | — |
 | 同上 | [REQ-002 后端转发层](../requirement/USAGE_METERING_REQ-002_BACKEND_PROXY.md) | [开发记录](../development/USAGE_METERING_REQ-002_DEVELOPMENT.md) | — |
 | 同上 | [REQ-003 前端用量看板](../requirement/USAGE_METERING_REQ-003_FRONTEND_DASHBOARD.md) | [开发记录](../development/USAGE_METERING_REQ-003_DEVELOPMENT.md) | — |
+| [TEAM_MANAGEMENT_OPTIMIZATION](../plan/TEAM_MANAGEMENT_OPTIMIZATION_PLAN.md) | [REQ-003 系统管理员+菜单](../requirement/TEAM_MANAGEMENT_REQ-003_SYSTEM_ADMIN_MENU.md) | — | — |
 
 ## 3. 相关文档
 - 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-06、§7.1、D-05）、`docs/technical/db_schema/USAGE_METERING_SCHEMA.MD`
