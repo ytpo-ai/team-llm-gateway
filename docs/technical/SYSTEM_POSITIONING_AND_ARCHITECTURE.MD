@@ -194,6 +194,19 @@ Portal 核心（TS/Nest）＝ 团队 → 成员(角色) → 多Key → 细粒度
 - **理由**：New API 开箱即可用，Gateway 改造的投入产出比低；Portal 是差异化价值所在（选型建议/团队细粒度计量/Token 优化），是产品护城河。
 - **影响**：D-01 清单作为后续 Gateway 优化的参考存档，暂不执行；后续待决事项（D-02~D-05）全部聚焦 Portal。
 
+### ADR-13：Gateway↔Proxy 关系——proxy 是首选上游，非必经
+
+- **背景**：命名与历史措辞（`team-llm-proxy` 原 Gateway、`team-llm-gateway` 原 Portal）使「gateway 接入 proxy」产生歧义，仿佛 proxy 是 gateway 的唯一/必经上游。而原始需求讨论中明确：proxy 只是 gateway 的一个主流上游，gateway 可接入任何 LLM 官方或第三方服务。
+- **决策**：
+  - `team-llm-proxy` 是 `team-llm-gateway` 的**首选上游（默认走 proxy）**，但**可旁路**：gateway 可直连任意 OpenAI 兼容的 LLM 官方（OpenAI/Anthropic/DeepSeek…）或第三方中转。
+  - 三者（直连官方 / 第三方中转 / 自有 proxy）对 gateway 而言**长得完全一样**（OpenAI 兼容接口 + 一个 key），proxy 无特殊地位、无专属定制接口。
+  - proxy 因提供「账号流量池 + 路由 + 客户级计量」的增值能力而作为推荐默认上游；当团队自有上游账号或采用第三方中转时，可旁路 proxy。
+- **理由**：原始需求讨论即表达「proxy 只是 gateway 的一个主流上游」；proxy 作为首选是因为其流量池/路由/计量的增值能力，但不应形成硬耦合，需保证 gateway 独立交付能力（ADR-02/08）。
+- **影响**：
+  - 与 ADR-03 一致并进一步明确：proxy 不构成 SaaS 的必需组件，是「首选但可旁路」的上游之一。
+  - Portal 上游抽象仅需支持「OpenAI 兼容」一种（§3 核心解耦原则），proxy 无需为 Portal 做任何特殊定制。
+  - 命名（`team-llm-gateway`/`team-llm-proxy`）保持不变，仅在文档层面明确关系、消除歧义。
+
 ---
 
 ## 5. 组件边界
@@ -207,6 +220,8 @@ Portal 核心（TS/Nest）＝ 团队 → 成员(角色) → 多Key → 细粒度
 ### 5.2 Portal（团队接入平台）
 
 **负责**：团队 → 成员（角色）→ 多 key 的层级管理、每个 key 的细粒度 LLM 使用限制、**团队级细粒度计量**、用量可视化、模型选型建议、计费定价（团队级）。
+
+**上游**：统一「OpenAI 兼容」抽象，支持直连 LLM 官方 / 第三方中转 / 自有 `team-llm-proxy` 三类上游，三者无特殊地位。`team-llm-proxy` 作为**首选上游（默认走 proxy）**，但**可旁路**（见 ADR-13）。
 
 **不负责**：上游账号流量池的配置与调度（直连时由团队自行配置；连 Gateway/第三方中转时由上游方负责）。
 

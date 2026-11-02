@@ -6,8 +6,8 @@
 
 | 组件 | 仓库 | 定位 |
 |---|---|---|
-| **team-llm-gateway**（团队接入网关，原 Portal） | 本仓库 `apps/portal-backend` + `apps/portal-frontend` | 团队/成员/APIKey + 细粒度计量 + 选型建议 |
-| **team-llm-proxy**（LLM 中转代理，原 Gateway） | 独立仓库（后续，基于 new-api 内核） | 模型接入 + 流量池 + 路由 + 客户级计量 |
+| **team-llm-gateway**（团队接入网关） | 本仓库 `apps/portal-backend` + `apps/portal-frontend` | 团队/成员/APIKey + 细粒度计量 + 选型建议；上游统一 OpenAI 兼容抽象，可直连官方 / 第三方中转 / 自有 proxy |
+| **team-llm-proxy**（LLM 中转代理） | 独立仓库（后续，基于 new-api 内核） | 模型接入 + 流量池 + 路由 + 客户级计量；**gateway 的首选上游（默认走 proxy，可旁路）** |
 | 超级 Portal（SaaS） | 同一套代码的多租户形态 | 服务商全局视角 + 计费 |
 
 > 架构决策见 `docs/technical/SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-01~12）。
