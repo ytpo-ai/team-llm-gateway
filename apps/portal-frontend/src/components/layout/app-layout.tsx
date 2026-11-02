@@ -24,6 +24,9 @@ export function AppLayout() {
         : 'text-muted-foreground hover:text-foreground',
     )
 
+  const isTeamManager =
+    user?.role === 'team_admin' || user?.role === 'system'
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border px-6">
@@ -53,17 +56,22 @@ export function AppLayout() {
             <NavLink to="/recommendation" className={navLinkClass}>
               选型建议
             </NavLink>
-            {user?.role === 'team_admin' && (
+            {isTeamManager && (
+              <NavLink to="/usage-logs" className={navLinkClass}>
+                使用日志
+              </NavLink>
+            )}
+            {isTeamManager && (
               <NavLink to="/providers" className={navLinkClass}>
                 上游
               </NavLink>
             )}
-            {user?.role === 'team_admin' && (
+            {isTeamManager && (
               <NavLink to="/settings" className={navLinkClass}>
                 设置
               </NavLink>
             )}
-            {user?.role === 'team_admin' && (
+            {isTeamManager && (
               <NavLink to="/audit-logs" className={navLinkClass}>
                 审计
               </NavLink>

@@ -18,6 +18,8 @@ describe('UsageService', () => {
   const usageLogModel = {
     create: vi.fn(),
     aggregate: vi.fn(),
+    find: vi.fn(),
+    countDocuments: vi.fn(),
   };
   const userModel = {
     find: vi.fn(),
@@ -161,6 +163,61 @@ describe('UsageService', () => {
 
       expect(result[0].label).toBe('Alice');
       expect(result[1].label).toBe('Bob');
+    });
+  });
+
+  describe('listLogs', () => {
+    const makeDoc = () => ({
+      _id: new Types.ObjectId(),
+      userId: new Types.ObjectId(memberId),
+      apiKeyId,
+      providerId,
+      modelId: 'gpt-4o-mini',
+      requestId: 'req-1',
+      status: UsageStatus.SUCCESS,
+      promptTokens: 10,
+      completionTokens: 5,
+      totalTokens: 15,
+      multiplier: 1.5,
+      cost: 22.5,
+      latencyMs: 120,
+      createdAt: new Date(),
+    });
+
+    it('should paginate and scope to team for admin', async () => {
+      usageLogModel.find.mockReturnValue({
+        sort: vi.fn().mockReturnThis(),
+        skip: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        exec: vi.fn().mockResolvedValue([makeDoc()]),
+      });
+      usageLogModel.countDocuments.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(1),
+      });
+
+      const result = await service.listLogs(adminUser, {});
+
+      expect(result.total).toBe(1);
+      expect(result.items[0].modelId).toBe('gpt-4o-mini');
+      const filter = usageLogModel.find.mock.calls[0][0];
+      expect(filter.teamId).toBeInstanceOf(Types.ObjectId);
+    });
+
+    it('should restrict to self for member', async () => {
+      usageLogModel.find.mockReturnValue({
+        sort: vi.fn().mockReturnThis(),
+        skip: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        exec: vi.fn().mockResolvedValue([]),
+      });
+      usageLogModel.countDocuments.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(0),
+      });
+
+      await service.listLogs(memberUser, {});
+
+      const filter = usageLogModel.find.mock.calls[0][0];
+      expect(String(filter.userId)).toBe(memberId);
     });
   });
 });

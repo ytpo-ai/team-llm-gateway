@@ -5,6 +5,12 @@ import { Role } from '../../../common/enums/role.enum.js';
 import type { AuthUser } from '../decorators/current-user.decorator.js';
 import { ROLES_KEY } from '../decorators/roles.decorator.js';
 
+const ROLE_RANK: Record<Role, number> = {
+  [Role.SYSTEM]: 3,
+  [Role.TEAM_ADMIN]: 2,
+  [Role.MEMBER]: 1,
+};
+
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
@@ -21,6 +27,10 @@ export class RolesGuard implements CanActivate {
       .switchToHttp()
       .getRequest<Request & { user?: AuthUser }>();
     const user = request.user;
-    return !!user && requiredRoles.includes(user.role);
+    if (!user) {
+      return false;
+    }
+    const userRank = ROLE_RANK[user.role] ?? 0;
+    return requiredRoles.some((role) => userRank >= (ROLE_RANK[role] ?? 0));
   }
 }

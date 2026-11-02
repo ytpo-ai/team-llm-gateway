@@ -125,7 +125,7 @@ describe('AuthService', () => {
         '默认团队',
       );
       expect(usersService.create).toHaveBeenCalledWith(
-        expect.objectContaining({ role: Role.TEAM_ADMIN, teamId }),
+        expect.objectContaining({ role: Role.SYSTEM, teamId }),
       );
       const createdHash = usersService.create.mock.calls[0][0].passwordHash;
       expect(createdHash).not.toBe(password);
@@ -136,7 +136,7 @@ describe('AuthService', () => {
           id: String(userId),
           email: 'admin@example.com',
           name: '张三',
-          role: Role.TEAM_ADMIN,
+          role: Role.SYSTEM,
           tenantId: String(tenantId),
           teamId: String(teamId),
         },

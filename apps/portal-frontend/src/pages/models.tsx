@@ -58,7 +58,7 @@ function toForm(model: Model): FormState {
 export function ModelsPage() {
   const queryClient = useQueryClient()
   const user = useAuthStore((s) => s.user)
-  const isAdmin = user?.role === 'team_admin'
+  const isAdmin = user?.role === 'team_admin' || user?.role === 'system'
 
   const [form, setForm] = useState<FormState>(emptyForm)
   const [editing, setEditing] = useState<Model | null>(null)

@@ -9,6 +9,7 @@ import {
   UsageGranularity,
   UsageQueryDto,
 } from './dto/usage-query.dto.js';
+import { UsageLogQueryDto } from './dto/usage-log-query.dto.js';
 import {
   UsageLog,
   UsageLogDocument,
@@ -56,6 +57,30 @@ export interface UsageBreakdownItem {
   requestCount: number;
   totalTokens: number;
   totalCost: number;
+}
+
+export interface UsageLogView {
+  id: string;
+  userId: string;
+  apiKeyId: string;
+  providerId: string;
+  modelId: string;
+  requestId: string;
+  status: UsageStatus;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  multiplier: number;
+  cost: number;
+  latencyMs: number | null;
+  createdAt?: Date;
+}
+
+export interface UsageLogPage {
+  items: UsageLogView[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 const DEFAULT_RANGE_DAYS = 30;
@@ -261,6 +286,70 @@ export class UsageService {
       totalTokens: row.totalTokens,
       totalCost: row.totalCost,
     }));
+  }
+
+  async listLogs(
+    user: AuthUser,
+    query: UsageLogQueryDto,
+  ): Promise<UsageLogPage> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
+
+    const match: Record<string, unknown> = {
+      tenantId: new Types.ObjectId(user.tenantId),
+    };
+    if (user.teamId) {
+      match.teamId = new Types.ObjectId(user.teamId);
+    }
+    if (user.role === Role.MEMBER) {
+      match.userId = new Types.ObjectId(user.id);
+    }
+
+    const createdAt: Record<string, unknown> = {};
+    if (query.from) createdAt.$gte = new Date(query.from);
+    if (query.to) createdAt.$lte = new Date(query.to);
+    if (Object.keys(createdAt).length > 0) match.createdAt = createdAt;
+
+    if (query.userId) match.userId = new Types.ObjectId(query.userId);
+    if (query.apiKeyId) match.apiKeyId = new Types.ObjectId(query.apiKeyId);
+    if (query.modelId) match.modelId = query.modelId;
+    if (query.status) match.status = query.status;
+
+    const [docs, total] = await Promise.all([
+      this.usageLogModel
+        .find(match)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * pageSize)
+        .limit(pageSize)
+        .exec(),
+      this.usageLogModel.countDocuments(match).exec(),
+    ]);
+
+    return {
+      items: docs.map((doc) => this.toLogView(doc)),
+      total,
+      page,
+      pageSize,
+    };
+  }
+
+  private toLogView(doc: UsageLogDocument): UsageLogView {
+    return {
+      id: String(doc._id),
+      userId: String(doc.userId),
+      apiKeyId: String(doc.apiKeyId),
+      providerId: String(doc.providerId),
+      modelId: doc.modelId,
+      requestId: doc.requestId,
+      status: doc.status,
+      promptTokens: doc.promptTokens,
+      completionTokens: doc.completionTokens,
+      totalTokens: doc.totalTokens,
+      multiplier: doc.multiplier,
+      cost: doc.cost,
+      latencyMs: doc.latencyMs,
+      createdAt: doc.createdAt,
+    };
   }
 
   private async breakdown(

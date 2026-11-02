@@ -4,6 +4,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import type { AuthUser } from '../auth/decorators/current-user.decorator.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { UsageQueryDto } from './dto/usage-query.dto.js';
+import { UsageLogQueryDto } from './dto/usage-log-query.dto.js';
 import { UsageService } from './usage.service.js';
 
 @ApiTags('usage')
@@ -56,5 +57,14 @@ export class UsageController {
     @Query() query: UsageQueryDto,
   ) {
     return this.usageService.byKey(user, query);
+  }
+
+  @Get('logs')
+  @ApiOperation({ summary: '使用日志（请求级分页明细）' })
+  logs(
+    @CurrentUser() user: AuthUser,
+    @Query() query: UsageLogQueryDto,
+  ) {
+    return this.usageService.listLogs(user, query);
   }
 }

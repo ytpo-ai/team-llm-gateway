@@ -54,7 +54,7 @@ export class AuthService {
       email: dto.email,
       name: dto.name,
       passwordHash,
-      role: Role.TEAM_ADMIN,
+      role: Role.SYSTEM,
     });
 
     const tokens = await this.issueTokens(user, team._id);
@@ -158,7 +158,7 @@ export class AuthService {
     user: UserDocument,
   ): Promise<Types.ObjectId | null> {
     if (user.role === Role.SYSTEM) {
-      return null;
+      return user.teamId ?? null;
     }
     if (user.teamId) {
       return user.teamId;

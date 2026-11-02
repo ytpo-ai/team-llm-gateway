@@ -47,8 +47,8 @@ export class TeamsController {
 
   @Post()
   @UseGuards(RolesGuard)
-  @Roles(Role.TEAM_ADMIN)
-  @ApiOperation({ summary: '创建团队' })
+  @Roles(Role.SYSTEM)
+  @ApiOperation({ summary: '创建团队（仅系统管理员）' })
   create(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: CreateTeamDto,

@@ -15,6 +15,7 @@ import { RecommendationPage } from '@/pages/recommendation'
 import { RolesPage } from '@/pages/roles'
 import { SettingsPage } from '@/pages/settings'
 import { TeamPage } from '@/pages/team'
+import { UsageLogsPage } from '@/pages/usage-logs'
 
 export const router = createBrowserRouter([
   {
@@ -40,6 +41,7 @@ export const router = createBrowserRouter([
           { path: 'providers', element: <ProvidersPage /> },
           { path: 'models', element: <ModelsPage /> },
           { path: 'recommendation', element: <RecommendationPage /> },
+          { path: 'usage-logs', element: <UsageLogsPage /> },
           { path: 'settings', element: <SettingsPage /> },
           { path: 'audit-logs', element: <AuditLogsPage /> },
           { path: 'admin/tenants', element: <AdminTenantsPage /> },

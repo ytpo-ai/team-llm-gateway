@@ -45,7 +45,7 @@ const emptyForm: FormState = {
 export function ProvidersPage() {
   const queryClient = useQueryClient()
   const user = useAuthStore((s) => s.user)
-  const isAdmin = user?.role === 'team_admin'
+  const isAdmin = user?.role === 'team_admin' || user?.role === 'system'
 
   const [form, setForm] = useState<FormState>(emptyForm)
   const [editing, setEditing] = useState<Provider | null>(null)
