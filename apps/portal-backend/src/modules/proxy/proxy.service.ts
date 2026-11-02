@@ -239,12 +239,13 @@ export class ProxyService {
       provider.apiKeyCiphertext,
     );
     const stream = body.stream === true;
-    const request = adapter.buildRequest({
+    const request = await adapter.buildRequest({
       baseUrl: provider.baseUrl,
       apiKey: upstreamKey,
       modelId: model.modelId,
       body,
       stream,
+      authType: provider.authType,
     });
 
     return {

@@ -9,6 +9,11 @@ export enum ProviderType {
   GEMINI = 'gemini',
 }
 
+export enum ProviderAuthType {
+  API_KEY = 'api-key',
+  OAUTH = 'oauth',
+}
+
 export enum ProviderStatus {
   ACTIVE = 'active',
   DISABLED = 'disabled',
@@ -41,6 +46,13 @@ export class Provider {
     default: ProviderType.OPENAI_COMPATIBLE,
   })
   type: ProviderType;
+
+  @Prop({
+    type: String,
+    enum: Object.values(ProviderAuthType),
+    default: ProviderAuthType.API_KEY,
+  })
+  authType: ProviderAuthType;
 
   @Prop({ required: true, trim: true })
   baseUrl: string;

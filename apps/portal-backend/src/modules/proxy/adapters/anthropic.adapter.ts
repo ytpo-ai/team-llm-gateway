@@ -13,24 +13,12 @@ import {
 
 const DEFAULT_MAX_TOKENS = 4096;
 
-interface AnthropicTextBlock {
+interface AnthropicContentBlock {
   type: string;
   text?: string;
-}
-
-function toTextParts(content: unknown): Array<{ type: 'text'; text: string }> {
-  if (typeof content === 'string') {
-    return [{ type: 'text', text: content }];
-  }
-  if (Array.isArray(content)) {
-    return content
-      .filter(
-        (part): part is Record<string, unknown> =>
-          typeof part === 'object' && part !== null && part.type === 'text',
-      )
-      .map((part) => ({ type: 'text' as const, text: asString(part.text) }));
-  }
-  return [{ type: 'text', text: asString(content) }];
+  id?: string;
+  name?: string;
+  input?: unknown;
 }
 
 function mapRole(role: string): 'user' | 'assistant' {
@@ -51,6 +39,85 @@ function mapStopReason(reason: string | null | undefined): string {
   }
 }
 
+function safeParseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+}
+
+function mapToolChoice(choice: unknown): Record<string, unknown> {
+  if (typeof choice === 'string') {
+    switch (choice) {
+      case 'none':
+        return { type: 'none' };
+      case 'required':
+        return { type: 'any' };
+      default:
+        return { type: 'auto' };
+    }
+  }
+  if (typeof choice === 'object' && choice !== null) {
+    const c = choice as Record<string, unknown>;
+    if (c.type === 'function') {
+      const fn = c.function as Record<string, unknown> | undefined;
+      return { type: 'tool', name: asString(fn?.name) };
+    }
+  }
+  return { type: 'auto' };
+}
+
+const MEDIA_TYPE_BY_EXT: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+};
+
+function inferMediaType(url: string): string | undefined {
+  const ext = url.split('?')[0].split('.').pop()?.toLowerCase();
+  return ext ? MEDIA_TYPE_BY_EXT[ext] : undefined;
+}
+
+async function convertImageUrl(
+  url: string,
+): Promise<Record<string, unknown> | undefined> {
+  const dataMatch = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]+)$/.exec(url);
+  if (dataMatch) {
+    return {
+      type: 'image',
+      source: { type: 'base64', media_type: dataMatch[1], data: dataMatch[2] },
+    };
+  }
+  if (/^https?:\/\//.test(url)) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return undefined;
+      const buf = await res.arrayBuffer();
+      const data = Buffer.from(buf).toString('base64');
+      const contentType =
+        res.headers.get('content-type')?.split(';')[0].trim() ??
+        inferMediaType(url) ??
+        'image/png';
+      return { type: 'image', source: { type: 'base64', media_type: contentType, data } };
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+interface ActiveBlock {
+  kind: 'text' | 'tool_use';
+  toolIndex: number;
+  id: string;
+  name: string;
+  text: string;
+  args: string;
+}
+
 class AnthropicStreamTransformer implements StreamTransformer {
   private buffer = '';
   private id = '';
@@ -59,6 +126,9 @@ class AnthropicStreamTransformer implements StreamTransformer {
   private inputTokens = 0;
   private outputTokens = 0;
   private usage: UpstreamUsage | undefined;
+  private stopReason: string | null = null;
+  private nextToolIndex = 0;
+  private blocks = new Map<number, ActiveBlock>();
 
   push(chunk: string): string {
     this.buffer += chunk;
@@ -103,31 +173,89 @@ class AnthropicStreamTransformer implements StreamTransformer {
         this.id = asString(message?.id);
         this.model = asString(message?.model);
         this.inputTokens = Number(usage?.input_tokens ?? 0);
-        return this.chunk({ role: 'assistant', content: '' }, null);
+        return this.emit({ role: 'assistant', content: '' }, null);
+      }
+      case 'content_block_start': {
+        const index = Number(obj.index);
+        const block = obj.content_block as Record<string, unknown> | undefined;
+        if (block?.type === 'tool_use') {
+          const id = asString(block.id);
+          const name = asString(block.name);
+          const toolIndex = this.nextToolIndex++;
+          this.blocks.set(index, {
+            kind: 'tool_use',
+            toolIndex,
+            id,
+            name,
+            text: '',
+            args: '',
+          });
+          return this.emit(
+            {
+              tool_calls: [
+                {
+                  index: toolIndex,
+                  id,
+                  type: 'function',
+                  function: { name, arguments: '' },
+                },
+              ],
+            },
+            null,
+          );
+        }
+        this.blocks.set(index, {
+          kind: 'text',
+          toolIndex: -1,
+          id: '',
+          name: '',
+          text: '',
+          args: '',
+        });
+        return '';
       }
       case 'content_block_delta': {
+        const index = Number(obj.index);
         const delta = obj.delta as Record<string, unknown> | undefined;
-        const text = asString(delta?.text);
-        return this.chunk({ content: text }, null);
+        const block = this.blocks.get(index);
+        if (!block) return '';
+        if (delta?.type === 'text_delta') {
+          const text = asString(delta.text);
+          block.text += text;
+          return this.emit({ content: text }, null);
+        }
+        if (delta?.type === 'input_json_delta') {
+          const partial = asString(delta.partial_json);
+          block.args += partial;
+          return this.emit(
+            {
+              tool_calls: [
+                { index: block.toolIndex, function: { arguments: partial } },
+              ],
+            },
+            null,
+          );
+        }
+        return '';
       }
       case 'message_delta': {
         const usage = obj.usage as Record<string, unknown> | undefined;
         const delta = obj.delta as Record<string, unknown> | undefined;
         this.outputTokens = Number(usage?.output_tokens ?? this.outputTokens);
+        this.stopReason = asString(delta?.stop_reason);
         this.usage = {
           prompt_tokens: this.inputTokens,
           completion_tokens: this.outputTokens,
           total_tokens: this.inputTokens + this.outputTokens,
         };
-        const finishReason = mapStopReason(asString(delta?.stop_reason));
-        return this.chunk({}, finishReason);
+        return this.emit({}, mapStopReason(this.stopReason));
       }
       default:
         return '';
     }
   }
 
-  private chunk(
+  private emit(
     delta: Record<string, unknown>,
     finishReason: string | null,
   ): string {
@@ -136,9 +264,7 @@ class AnthropicStreamTransformer implements StreamTransformer {
       object: 'chat.completion.chunk',
       created: this.created,
       model: this.model,
-      choices: [
-        { index: 0, delta, finish_reason: finishReason },
-      ],
+      choices: [{ index: 0, delta, finish_reason: finishReason }],
     };
     if (this.usage) payload.usage = this.usage;
     return `data: ${JSON.stringify(payload)}\n\n`;
@@ -148,24 +274,66 @@ class AnthropicStreamTransformer implements StreamTransformer {
 export class AnthropicAdapter implements UpstreamAdapter {
   readonly type = ProviderType.ANTHROPIC;
 
-  buildRequest(input: BuildRequestInput): AdapterRequest {
+  async buildRequest(input: BuildRequestInput): Promise<AdapterRequest> {
     const body = input.body;
     const rawMessages = Array.isArray(body.messages) ? body.messages : [];
     const systemTexts: string[] = [];
     const messages: Array<{
       role: 'user' | 'assistant';
-      content: Array<{ type: 'text'; text: string }>;
+      content: Array<Record<string, unknown>>;
     }> = [];
 
     for (const raw of rawMessages) {
-      const msg = raw as { role?: unknown; content?: unknown };
+      const msg = raw as Record<string, unknown>;
       const role = typeof msg.role === 'string' ? msg.role : '';
-      const parts = toTextParts(msg.content);
+
       if (role === 'system') {
-        for (const part of parts) systemTexts.push(part.text);
-      } else {
-        messages.push({ role: mapRole(role), content: parts });
+        for (const part of await this.toContentBlocks(msg.content)) {
+          if (part.type === 'text') systemTexts.push(asString(part.text));
+        }
+        continue;
       }
+
+      if (role === 'tool') {
+        messages.push({
+          role: 'user',
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: asString(msg.tool_call_id),
+              content:
+                typeof msg.content === 'string'
+                  ? msg.content
+                  : JSON.stringify(msg.content ?? ''),
+            },
+          ],
+        });
+        continue;
+      }
+
+      if (
+        role === 'assistant' &&
+        Array.isArray(msg.tool_calls) &&
+        msg.tool_calls.length > 0
+      ) {
+        const blocks = await this.toContentBlocks(msg.content);
+        for (const tc of msg.tool_calls as Array<Record<string, unknown>>) {
+          const fn = tc.function as Record<string, unknown> | undefined;
+          blocks.push({
+            type: 'tool_use',
+            id: asString(tc.id),
+            name: asString(fn?.name),
+            input: safeParseJson(asString(fn?.arguments)),
+          });
+        }
+        messages.push({ role: 'assistant', content: blocks });
+        continue;
+      }
+
+      messages.push({
+        role: mapRole(role),
+        content: await this.toContentBlocks(msg.content),
+      });
     }
 
     const maxTokens =
@@ -188,6 +356,26 @@ export class AnthropicAdapter implements UpstreamAdapter {
     if (Array.isArray(body.stop)) anthropicBody.stop_sequences = body.stop;
     if (input.stream) anthropicBody.stream = true;
 
+    if (Array.isArray(body.tools) && body.tools.length > 0) {
+      anthropicBody.tools = (body.tools as Array<Record<string, unknown>>).map(
+        (tool) => {
+          const fn = tool.function as Record<string, unknown>;
+          return {
+            name: asString(fn?.name),
+            description: asString(fn?.description),
+            input_schema:
+              (fn?.parameters as Record<string, unknown>) ?? {
+                type: 'object',
+                properties: {},
+              },
+          };
+        },
+      );
+      if (body.tool_choice !== undefined) {
+        anthropicBody.tool_choice = mapToolChoice(body.tool_choice);
+      }
+    }
+
     return {
       url: `${trimTrailingSlash(input.baseUrl)}/v1/messages`,
       headers: {
@@ -203,15 +391,33 @@ export class AnthropicAdapter implements UpstreamAdapter {
     const data = parseJsonObject(text);
     if (!data) return { message: text };
 
-    const content = (data.content as AnthropicTextBlock[] | undefined) ?? [];
-    const contentText = content
-      .filter((block) => block.type === 'text')
-      .map((block) => block.text ?? '')
-      .join('');
+    const content = (data.content as AnthropicContentBlock[] | undefined) ?? [];
+    let contentText = '';
+    const toolCalls: Array<Record<string, unknown>> = [];
+    for (const block of content) {
+      if (block.type === 'text') {
+        contentText += block.text ?? '';
+      } else if (block.type === 'tool_use') {
+        toolCalls.push({
+          id: block.id,
+          type: 'function',
+          function: {
+            name: block.name,
+            arguments: JSON.stringify(block.input ?? {}),
+          },
+        });
+      }
+    }
 
     const usage = data.usage as Record<string, unknown> | undefined;
     const promptTokens = Number(usage?.input_tokens ?? 0);
     const completionTokens = Number(usage?.output_tokens ?? 0);
+
+    const message: Record<string, unknown> = {
+      role: 'assistant',
+      content: contentText,
+    };
+    if (toolCalls.length > 0) message.tool_calls = toolCalls;
 
     return {
       id: asString(data.id, `chatcmpl-${Date.now()}`),
@@ -221,7 +427,7 @@ export class AnthropicAdapter implements UpstreamAdapter {
       choices: [
         {
           index: 0,
-          message: { role: 'assistant', content: contentText },
+          message,
           finish_reason: mapStopReason(asString(data.stop_reason)),
         },
       ],
@@ -235,5 +441,29 @@ export class AnthropicAdapter implements UpstreamAdapter {
 
   createStreamTransformer(): StreamTransformer {
     return new AnthropicStreamTransformer();
+  }
+
+  private async toContentBlocks(
+    content: unknown,
+  ): Promise<Array<Record<string, unknown>>> {
+    const blocks: Array<Record<string, unknown>> = [];
+    if (typeof content === 'string') {
+      blocks.push({ type: 'text', text: content });
+    } else if (Array.isArray(content)) {
+      for (const part of content) {
+        if (typeof part !== 'object' || part === null) continue;
+        const p = part as Record<string, unknown>;
+        if (p.type === 'text') {
+          blocks.push({ type: 'text', text: asString(p.text) });
+        } else if (p.type === 'image_url') {
+          const url = asString(
+            (p.image_url as Record<string, unknown> | undefined)?.url,
+          );
+          const imageBlock = await convertImageUrl(url);
+          if (imageBlock) blocks.push(imageBlock);
+        }
+      }
+    }
+    return blocks;
   }
 }

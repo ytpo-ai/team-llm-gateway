@@ -1,4 +1,7 @@
-import { ProviderType } from '../../providers/schemas/provider.schema.js';
+import {
+  ProviderAuthType,
+  ProviderType,
+} from '../../providers/schemas/provider.schema.js';
 import {
   asString,
   parseJsonObject,
@@ -10,6 +13,7 @@ import {
   type UpstreamAdapter,
   type UpstreamUsage,
 } from './upstream-adapter.js';
+import { getAccessToken } from './gemini-oauth.js';
 
 function toText(content: unknown): string {
   if (typeof content === 'string') return content;
@@ -124,7 +128,7 @@ class GeminiStreamTransformer implements StreamTransformer {
 export class GeminiAdapter implements UpstreamAdapter {
   readonly type = ProviderType.GEMINI;
 
-  buildRequest(input: BuildRequestInput): AdapterRequest {
+  async buildRequest(input: BuildRequestInput): Promise<AdapterRequest> {
     const body = input.body;
     const rawMessages = Array.isArray(body.messages) ? body.messages : [];
     const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
@@ -166,12 +170,19 @@ export class GeminiAdapter implements UpstreamAdapter {
     const query = input.stream ? '?alt=sse' : '';
     const url = `${trimTrailingSlash(input.baseUrl)}/v1beta/models/${encodeURIComponent(input.modelId)}:${endpoint}${query}`;
 
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+    };
+    if (input.authType === ProviderAuthType.OAUTH) {
+      const token = await getAccessToken(input.apiKey);
+      headers.authorization = `Bearer ${token}`;
+    } else {
+      headers['x-goog-api-key'] = input.apiKey;
+    }
+
     return {
       url,
-      headers: {
-        'content-type': 'application/json',
-        'x-goog-api-key': input.apiKey,
-      },
+      headers,
       body: JSON.stringify(geminiBody),
     };
   }

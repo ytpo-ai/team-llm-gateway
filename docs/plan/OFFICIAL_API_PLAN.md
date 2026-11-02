@@ -72,8 +72,8 @@
 
 | 编号 | 事项 | 状态 |
 |---|---|---|
-| O-01 | Anthropic 工具调用（`tool_use`/`tool_result`）与 vision 内容块翻译 | 首期支持纯文本消息；工具/多模态内容块翻译后置 |
-| O-02 | Gemini 认证 OAuth（服务账号） | 首期仅 `x-goog-api-key`；OAuth 后置 |
+| O-01 | Anthropic 工具调用（`tool_use`/`tool_result`）与 vision 内容块翻译 | ✅ 已交付（`docs/plan/OFFICIAL_API_ADVANCED_PLAN.md` REQ-005） |
+| O-02 | Gemini 认证 OAuth（服务账号） | ✅ 已交付（`docs/plan/OFFICIAL_API_ADVANCED_PLAN.md` REQ-006） |
 | O-03 | 官方流式格式兼容性（各家 SSE 边界差异） | 以官方文档为准，适配器单测用固定 fixture 覆盖 |
 | O-04 | `max_tokens` 缺省默认值策略 | Anthropic 必填；按模型设默认值，可后续做成配置项 |
 

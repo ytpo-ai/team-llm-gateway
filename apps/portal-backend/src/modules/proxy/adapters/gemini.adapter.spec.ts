@@ -1,16 +1,26 @@
-import { ProviderType } from '../../providers/schemas/provider.schema.js';
+import { generateKeyPairSync } from 'node:crypto';
+import { ProviderAuthType, ProviderType } from '../../providers/schemas/provider.schema.js';
 import { GeminiAdapter } from './gemini.adapter.js';
+import { clearTokenCache } from './gemini-oauth.js';
 
 describe('GeminiAdapter', () => {
   const adapter = new GeminiAdapter();
+
+  const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' });
+
+  afterEach(() => {
+    clearTokenCache();
+    vi.unstubAllGlobals();
+  });
 
   it('exposes gemini type', () => {
     expect(adapter.type).toBe(ProviderType.GEMINI);
   });
 
   describe('buildRequest', () => {
-    it('translates OpenAI body to Gemini generateContent', () => {
-      const request = adapter.buildRequest({
+    it('translates OpenAI body to Gemini generateContent', async () => {
+      const request = await adapter.buildRequest({
         baseUrl: 'https://generativelanguage.googleapis.com',
         apiKey: 'AIza-test',
         modelId: 'gemini-1.5-pro',
@@ -40,8 +50,8 @@ describe('GeminiAdapter', () => {
       expect(body.generationConfig).toEqual({ temperature: 0.7 });
     });
 
-    it('uses streamGenerateContent endpoint with alt=sse for stream', () => {
-      const request = adapter.buildRequest({
+    it('uses streamGenerateContent endpoint with alt=sse for stream', async () => {
+      const request = await adapter.buildRequest({
         baseUrl: 'https://generativelanguage.googleapis.com',
         apiKey: 'AIza-test',
         modelId: 'gemini-1.5-pro',
@@ -51,6 +61,34 @@ describe('GeminiAdapter', () => {
 
       expect(request.url).toContain(':streamGenerateContent');
       expect(request.url).toContain('alt=sse');
+    });
+
+    it('exchanges service account for bearer token in oauth mode', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          new Response(
+            JSON.stringify({ access_token: 'ya29.token', expires_in: 3600 }),
+            { status: 200 },
+          ),
+        ),
+      );
+
+      const request = await adapter.buildRequest({
+        baseUrl: 'https://generativelanguage.googleapis.com',
+        apiKey: JSON.stringify({
+          client_email: 'svc@project.iam.gserviceaccount.com',
+          private_key: privateKeyPem,
+          token_uri: 'https://oauth2.googleapis.com/token',
+        }),
+        modelId: 'gemini-1.5-pro',
+        body: { messages: [{ role: 'user', content: 'hi' }] },
+        stream: false,
+        authType: ProviderAuthType.OAUTH,
+      });
+
+      expect(request.headers.authorization).toBe('Bearer ya29.token');
+      expect(request.headers['x-goog-api-key']).toBeUndefined();
     });
   });
 

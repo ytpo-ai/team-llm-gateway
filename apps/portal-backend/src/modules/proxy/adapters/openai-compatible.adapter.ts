@@ -43,7 +43,7 @@ class OpenAICompatibleStreamTransformer implements StreamTransformer {
 export class OpenAICompatibleAdapter implements UpstreamAdapter {
   readonly type = ProviderType.OPENAI_COMPATIBLE;
 
-  buildRequest(input: BuildRequestInput): AdapterRequest {
+  async buildRequest(input: BuildRequestInput): Promise<AdapterRequest> {
     const upstreamBody: Record<string, unknown> = {
       ...input.body,
       model: input.modelId,

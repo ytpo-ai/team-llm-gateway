@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString, IsUrl, MaxLength, MinLength } from 'class-validator';
-import { ProviderType } from '../schemas/provider.schema.js';
+import { ProviderAuthType, ProviderType } from '../schemas/provider.schema.js';
 
 export class CreateProviderDto {
   @ApiProperty({ example: 'OpenAI 直连' })
@@ -14,6 +14,11 @@ export class CreateProviderDto {
   @IsEnum(ProviderType)
   type?: ProviderType;
 
+  @ApiPropertyOptional({ enum: ProviderAuthType, example: ProviderAuthType.API_KEY })
+  @IsOptional()
+  @IsEnum(ProviderAuthType)
+  authType?: ProviderAuthType;
+
   @ApiProperty({ example: 'https://api.openai.com/v1' })
   @IsString()
   @IsUrl({ require_tld: false })
@@ -23,6 +28,6 @@ export class CreateProviderDto {
   @ApiProperty({ example: 'sk-xxx' })
   @IsString()
   @MinLength(1)
-  @MaxLength(1000)
+  @MaxLength(10000)
   apiKey: string;
 }

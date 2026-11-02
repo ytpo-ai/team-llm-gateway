@@ -16,6 +16,7 @@ import { CreateProviderDto } from './dto/create-provider.dto.js';
 import { UpdateProviderDto } from './dto/update-provider.dto.js';
 import {
   Provider,
+  ProviderAuthType,
   ProviderDocument,
   ProviderStatus,
   ProviderType,
@@ -25,6 +26,7 @@ export interface ProviderView {
   id: string;
   name: string;
   type: ProviderType;
+  authType: ProviderAuthType;
   baseUrl: string;
   apiKeyHint: string;
   status: ProviderStatus;
@@ -76,6 +78,7 @@ export class ProvidersService {
       teamId,
       name: dto.name,
       type: dto.type ?? ProviderType.OPENAI_COMPATIBLE,
+      authType: dto.authType ?? ProviderAuthType.API_KEY,
       baseUrl: dto.baseUrl,
       apiKeyCiphertext: encrypt(secret, dto.apiKey),
       apiKeyHint: buildApiKeyHint(dto.apiKey),
@@ -98,6 +101,7 @@ export class ProvidersService {
       provider.name = dto.name;
     }
     if (dto.type !== undefined) provider.type = dto.type;
+    if (dto.authType !== undefined) provider.authType = dto.authType;
     if (dto.baseUrl !== undefined) provider.baseUrl = dto.baseUrl;
     if (dto.apiKey !== undefined) {
       const secret = this.encryptionSecret();
@@ -136,7 +140,7 @@ export class ProvidersService {
     const startedAt = Date.now();
 
     try {
-      const request = adapter.buildRequest({
+      const request = await adapter.buildRequest({
         baseUrl: provider.baseUrl,
         apiKey: upstreamKey,
         modelId: PROBE_MODEL[provider.type] ?? 'gpt-4o-mini',
@@ -145,6 +149,7 @@ export class ProvidersService {
           max_tokens: 1,
         },
         stream: false,
+        authType: provider.authType,
       });
 
       const response = await fetch(request.url, {
@@ -210,6 +215,7 @@ export class ProvidersService {
       id: String(provider._id),
       name: provider.name,
       type: provider.type,
+      authType: provider.authType,
       baseUrl: provider.baseUrl,
       apiKeyHint: provider.apiKeyHint,
       status: provider.status,

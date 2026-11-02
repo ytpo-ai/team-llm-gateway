@@ -1,4 +1,4 @@
-import type { ProviderType } from '../../providers/schemas/provider.schema.js';
+import type { ProviderAuthType, ProviderType } from '../../providers/schemas/provider.schema.js';
 
 export interface UpstreamUsage {
   prompt_tokens?: number;
@@ -18,6 +18,7 @@ export interface BuildRequestInput {
   modelId: string;
   body: Record<string, unknown>;
   stream: boolean;
+  authType?: ProviderAuthType;
 }
 
 export interface StreamTransformer {
@@ -28,7 +29,7 @@ export interface StreamTransformer {
 
 export interface UpstreamAdapter {
   readonly type: ProviderType;
-  buildRequest(input: BuildRequestInput): AdapterRequest;
+  buildRequest(input: BuildRequestInput): Promise<AdapterRequest>;
   parseResponse(text: string, modelId: string): Record<string, unknown>;
   createStreamTransformer(): StreamTransformer;
 }

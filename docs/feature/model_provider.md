@@ -27,6 +27,8 @@
 | 同上 | [REQ-002 Anthropic 翻译](../requirement/OFFICIAL_API_REQ-002_ANTHROPIC.md) | [开发记录](../development/OFFICIAL_API_REQ-002_DEVELOPMENT.md) | — |
 | 同上 | [REQ-003 Gemini 翻译](../requirement/OFFICIAL_API_REQ-003_GEMINI.md) | [开发记录](../development/OFFICIAL_API_REQ-003_DEVELOPMENT.md) | — |
 | [OFFICIAL_API_PRESET](../plan/OFFICIAL_API_PRESET_PLAN.md) | [REQ-004 前端类型+预置+探活](../requirement/OFFICIAL_API_REQ-004_FRONTEND_PRESET_PROBE.md) | [开发记录](../development/OFFICIAL_API_REQ-004_DEVELOPMENT.md) | — |
+| [OFFICIAL_API_ADVANCED](../plan/OFFICIAL_API_ADVANCED_PLAN.md) | [REQ-005 Anthropic 工具调用+vision](../requirement/OFFICIAL_API_REQ-005_ANTHROPIC_TOOL_VISION.md) | [开发记录](../development/OFFICIAL_API_REQ-005_DEVELOPMENT.md) | — |
+| 同上 | [REQ-006 Gemini OAuth](../requirement/OFFICIAL_API_REQ-006_GEMINI_OAUTH.md) | [开发记录](../development/OFFICIAL_API_REQ-006_DEVELOPMENT.md) | — |
 
 ## 3. 相关文档
 - 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（§3、ADR-09/10、D-05）、`docs/technical/db_schema/MODEL_PROVIDER_SCHEMA.MD`

@@ -18,9 +18,11 @@ import {
   updateProvider,
 } from '@/features/providers/api'
 import {
+  PROVIDER_AUTH_TYPE_LABELS,
   PROVIDER_TYPE_BASE_URL_HINTS,
   PROVIDER_TYPE_LABELS,
   type Provider,
+  type ProviderAuthType,
   type ProviderInput,
   type ProviderPatch,
   type ProviderProbeResult,
@@ -34,6 +36,7 @@ const selectClass =
 interface FormState {
   name: string
   type: ProviderType
+  authType: ProviderAuthType
   baseUrl: string
   apiKey: string
 }
@@ -41,6 +44,7 @@ interface FormState {
 const emptyForm: FormState = {
   name: '',
   type: 'openai-compatible',
+  authType: 'api-key',
   baseUrl: '',
   apiKey: '',
 }
@@ -87,6 +91,7 @@ export function ProvidersPage() {
         const patch: ProviderPatch = {
           name: form.name.trim(),
           type: form.type,
+          authType: form.authType,
           baseUrl: form.baseUrl.trim(),
         }
         if (form.apiKey.trim()) patch.apiKey = form.apiKey.trim()
@@ -95,6 +100,7 @@ export function ProvidersPage() {
       const input: ProviderInput = {
         name: form.name.trim(),
         type: form.type,
+        authType: form.authType,
         baseUrl: form.baseUrl.trim(),
         apiKey: form.apiKey.trim(),
       }
@@ -125,6 +131,7 @@ export function ProvidersPage() {
     setForm({
       name: provider.name,
       type: provider.type,
+      authType: provider.authType ?? 'api-key',
       baseUrl: provider.baseUrl,
       apiKey: '',
     })
@@ -179,9 +186,14 @@ export function ProvidersPage() {
               <select
                 className={`${selectClass} w-full`}
                 value={form.type}
-                onChange={(e) =>
-                  setForm({ ...form, type: e.target.value as ProviderType })
-                }
+                onChange={(e) => {
+                  const type = e.target.value as ProviderType
+                  setForm({
+                    ...form,
+                    type,
+                    authType: type === 'gemini' ? form.authType : 'api-key',
+                  })
+                }}
               >
                 {(Object.keys(PROVIDER_TYPE_LABELS) as ProviderType[]).map(
                   (type) => (
@@ -192,6 +204,31 @@ export function ProvidersPage() {
                 )}
               </select>
             </div>
+            {form.type === 'gemini' && (
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground">
+                  认证方式
+                </label>
+                <select
+                  className={`${selectClass} w-full`}
+                  value={form.authType}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      authType: e.target.value as ProviderAuthType,
+                    })
+                  }
+                >
+                  {(
+                    Object.keys(PROVIDER_AUTH_TYPE_LABELS) as ProviderAuthType[]
+                  ).map((authType) => (
+                    <option key={authType} value={authType}>
+                      {PROVIDER_AUTH_TYPE_LABELS[authType]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="sm:col-span-2">
               <label className="mb-1 block text-sm text-muted-foreground">
                 Base URL
@@ -205,15 +242,25 @@ export function ProvidersPage() {
             </div>
             <div className="sm:col-span-2">
               <label className="mb-1 block text-sm text-muted-foreground">
-                上游 API Key
+                {form.authType === 'oauth' ? '服务账号 JSON' : '上游 API Key'}
               </label>
-              <Input
-                type="password"
-                placeholder={editing ? '留空表示不修改' : 'sk-…'}
-                value={form.apiKey}
-                onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
-                required={!editing}
-              />
+              {form.authType === 'oauth' ? (
+                <textarea
+                  className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder={editing ? '留空表示不修改' : '粘贴服务账号 JSON（含 client_email / private_key）'}
+                  value={form.apiKey}
+                  onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
+                  required={!editing}
+                />
+              ) : (
+                <Input
+                  type="password"
+                  placeholder={editing ? '留空表示不修改' : 'sk-…'}
+                  value={form.apiKey}
+                  onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
+                  required={!editing}
+                />
+              )}
             </div>
 
             {error && <p className="text-sm text-red-500 sm:col-span-2">{error}</p>}
