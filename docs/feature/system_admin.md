@@ -14,8 +14,9 @@
 
 ### 核心逻辑
 - `SystemSettingsService`：`GET/PUT /system/settings`（批量 upsert，`team_admin`）。
+- `CurrencyService`：`GET/PUT /system/currency`（点数↔货币汇率配置，`member` 可读、`team_admin` 可写），未配置回退纯点数展示。
 - `AuditService`：`log()` 进程内埋点 + `GET /system/audit-logs`（分页 + 筛选，`team_admin`）。
-- 审计埋点：billing（recharge/adjust）、api-keys（create/revoke/rotate）、models（create/disable）、providers（create/disable）、teams（角色变更/移除/邀请）。
+- 审计埋点：billing（recharge/adjust）、api-keys（create/revoke/rotate）、models（create/disable）、providers（create/disable）、teams（角色变更/移除/邀请）、system（currency_update）。
 - 通知：本期不实现，`SystemSetting` 预留 `notification.*` 配置键。
 
 ## 2. 需求追溯
@@ -24,6 +25,8 @@
 |------|------------|-------------|-----|
 | [SYSTEM_ADMIN](../plan/SYSTEM_ADMIN_PLAN.md) | [REQ-001](../requirement/SYSTEM_ADMIN_REQ-001_BACKEND_SYSTEM.md)、[REQ-002](../requirement/SYSTEM_ADMIN_REQ-002_FRONTEND_SYSTEM.md) | — | — |
 | [TEAM_MANAGEMENT_OPTIMIZATION](../plan/TEAM_MANAGEMENT_OPTIMIZATION_PLAN.md) | [REQ-003 系统管理员+菜单](../requirement/TEAM_MANAGEMENT_REQ-003_SYSTEM_ADMIN_MENU.md) | [开发记录](../development/TEAM_MANAGEMENT_REQ-003_DEVELOPMENT.md) | — |
+| [BILLING_QUOTA_CURRENCY_RATE](../plan/BILLING_QUOTA_CURRENCY_RATE_PLAN.md) | [REQ-004 后端货币汇率](../requirement/BILLING_QUOTA_REQ-004_BACKEND_CURRENCY.md) | [开发记录](../development/BILLING_QUOTA_REQ-004_DEVELOPMENT.md) | — |
+| 同上 | [REQ-005 前端货币设置与展示](../requirement/BILLING_QUOTA_REQ-005_FRONTEND_CURRENCY.md) | [开发记录](../development/BILLING_QUOTA_REQ-005_DEVELOPMENT.md) | — |
 
 ## 3. 相关文档
 - 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（§5.2/§5.3）

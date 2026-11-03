@@ -36,6 +36,7 @@
 | `notification.lowBalanceEmail` | string | 余额告警通知邮箱 |
 | `audit.retentionDays` | number | 审计日志保留天数（预留，当前未强制执行） |
 | `gateway.defaultModel` | string | 默认模型 |
+| `billing.currency` | object | 点数↔货币汇率配置（`{ displayCurrency: string, rates: { code, name, pointsPerUnit }[] }`），见 `docs/plan/BILLING_QUOTA_CURRENCY_RATE_PLAN.md` |
 
 ## 3. AuditLog（审计流水）
 
@@ -45,8 +46,8 @@
 | `tenantId` | ObjectId | 必填、ref `Tenant`、索引 | 所属租户 |
 | `teamId` | ObjectId | 必填、ref `Team`、索引 | 所属团队 |
 | `userId` | ObjectId | 必填、ref `User`、索引 | 操作人（actor） |
-| `action` | enum | 必填、索引 | 动作：`create`/`update`/`disable`/`revoke`/`rotate`/`recharge`/`adjust`/`invite`/`invite_revoke`/`member_update`/`member_remove` |
-| `resourceType` | enum | 必填、索引 | 资源：`billing`/`api_key`/`model`/`provider`/`team`/`member`/`invitation` |
+| `action` | enum | 必填、索引 | 动作：`create`/`update`/`disable`/`revoke`/`rotate`/`recharge`/`adjust`/`invite`/`invite_revoke`/`member_update`/`member_remove`/`currency_update` |
+| `resourceType` | enum | 必填、索引 | 资源：`billing`/`api_key`/`model`/`provider`/`team`/`member`/`invitation`/`currency` |
 | `resourceId` | string | 可选、默认 `null` | 资源标识（业务 id） |
 | `summary` | string | 可选、默认 `null` | 人类可读摘要 |
 | `before` | Mixed | 可选、默认 `null` | 变更前快照 |
@@ -88,6 +89,7 @@ interface AuditEntryInput {
 | models | 创建 / 禁用 | `model` | `create` / `disable` |
 | providers | 创建 / 禁用 | `provider` | `create` / `disable` |
 | teams | 成员角色变更 / 移除 / 邀请 / 撤销邀请 | `member` / `invitation` | `member_update` / `member_remove` / `invite` / `invite_revoke` |
+| system | 货币汇率配置更新 | `currency` | `currency_update` |
 
 **容错**：`log()` 内部捕获写入异常，审计失败不阻断业务主流程（仅告警日志）。
 

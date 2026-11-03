@@ -3,6 +3,7 @@ import type {
   AuditAction,
   AuditLogPage,
   AuditResourceType,
+  CurrencyConfig,
   SystemSetting,
 } from './types'
 
@@ -16,6 +17,19 @@ export function updateSettings(
   return request<SystemSetting[]>('/system/settings', {
     method: 'PUT',
     body: { settings },
+  })
+}
+
+export function getCurrency(): Promise<CurrencyConfig | null> {
+  return request<CurrencyConfig | null>('/system/currency')
+}
+
+export function updateCurrency(
+  config: CurrencyConfig,
+): Promise<CurrencyConfig> {
+  return request<CurrencyConfig>('/system/currency', {
+    method: 'PUT',
+    body: config,
   })
 }
 

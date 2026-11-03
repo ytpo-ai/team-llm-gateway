@@ -15,6 +15,7 @@ export enum AuditAction {
   INVITE_REVOKE = 'invite_revoke',
   MEMBER_UPDATE = 'member_update',
   MEMBER_REMOVE = 'member_remove',
+  CURRENCY_UPDATE = 'currency_update',
 }
 
 export enum AuditResourceType {
@@ -26,6 +27,7 @@ export enum AuditResourceType {
   MEMBER = 'member',
   INVITATION = 'invitation',
   ROLE_TEMPLATE = 'role_template',
+  CURRENCY = 'currency',
 }
 
 @Schema({ timestamps: true })

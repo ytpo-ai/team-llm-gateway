@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { CurrencySettingsCard } from '@/features/system/components/currency-settings-card'
 import { listSettings, updateSettings } from '@/features/system/api'
 import type { SystemSetting } from '@/features/system/types'
 
@@ -64,7 +65,10 @@ export function SettingsPage() {
   })
 
   const settings: SystemSetting[] = settingsQuery.data ?? []
-  const knownKeys = new Set(FIELD_DEFINITIONS.map((f) => f.key))
+  const knownKeys = new Set([
+    ...FIELD_DEFINITIONS.map((f) => f.key),
+    'billing.currency',
+  ])
   const otherSettings = settings.filter((s) => !knownKeys.has(s.key))
 
   const currentValue = (key: string): string => {
@@ -149,6 +153,8 @@ export function SettingsPage() {
           </form>
         </CardContent>
       </Card>
+
+      <CurrencySettingsCard />
 
       <Card>
         <CardHeader>

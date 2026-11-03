@@ -33,6 +33,7 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   invite_revoke: '撤销邀请',
   member_update: '成员变更',
   member_remove: '移除成员',
+  currency_update: '货币汇率',
 }
 
 const RESOURCE_LABELS: Record<AuditResourceType, string> = {
@@ -43,6 +44,7 @@ const RESOURCE_LABELS: Record<AuditResourceType, string> = {
   team: '团队',
   member: '成员',
   invitation: '邀请',
+  currency: '货币汇率',
 }
 
 const ACTION_OPTIONS = Object.keys(ACTION_LABELS) as AuditAction[]

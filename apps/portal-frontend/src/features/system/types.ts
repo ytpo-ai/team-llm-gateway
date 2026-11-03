@@ -10,6 +10,7 @@ export type AuditAction =
   | 'invite_revoke'
   | 'member_update'
   | 'member_remove'
+  | 'currency_update'
 
 export type AuditResourceType =
   | 'billing'
@@ -19,12 +20,24 @@ export type AuditResourceType =
   | 'team'
   | 'member'
   | 'invitation'
+  | 'currency'
 
 export interface SystemSetting {
   key: string
   value: unknown
   updatedBy: string | null
   updatedAt?: string
+}
+
+export interface CurrencyRate {
+  code: string
+  name: string
+  pointsPerUnit: number
+}
+
+export interface CurrencyConfig {
+  displayCurrency: string
+  rates: CurrencyRate[]
 }
 
 export interface AuditLog {

@@ -35,6 +35,8 @@ import type {
   QuotaTransaction,
   QuotaTransactionType,
 } from '@/features/billing/types'
+import { getCurrency } from '@/features/system/api'
+import type { CurrencyConfig } from '@/features/system/types'
 import { useAuthStore } from '@/features/auth/store'
 
 const fmtNum = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 })
@@ -48,13 +50,38 @@ function fmtDate(value?: string): string {
   return new Date(value).toLocaleString()
 }
 
+function formatCurrencyAmount(
+  points: number,
+  config: CurrencyConfig | null | undefined,
+): string | null {
+  if (!config) return null
+  const rate = config.rates.find((r) => r.code === config.displayCurrency)
+  if (!rate || !(rate.pointsPerUnit > 0)) return null
+  const amount = points / rate.pointsPerUnit
+  try {
+    return new Intl.NumberFormat('zh-CN', {
+      style: 'currency',
+      currency: config.displayCurrency,
+      maximumFractionDigits: 2,
+    }).format(amount)
+  } catch {
+    return `${fmtNum.format(amount)} ${config.displayCurrency}`
+  }
+}
+
 const TYPE_LABEL: Record<QuotaTransactionType, string> = {
   recharge: '充值',
   adjustment: '调整',
   deduction: '扣减',
 }
 
-function TransactionTable({ items }: { items: QuotaTransaction[] }) {
+function TransactionTable({
+  items,
+  config,
+}: {
+  items: QuotaTransaction[]
+  config?: CurrencyConfig | null
+}) {
   if (items.length === 0) {
     return <div className="py-6 text-sm text-muted-foreground">暂无流水</div>
   }
@@ -71,24 +98,41 @@ function TransactionTable({ items }: { items: QuotaTransaction[] }) {
         </tr>
       </thead>
       <tbody>
-        {items.map((item) => (
-          <tr key={item.id} className="border-b last:border-0">
-            <td className="py-2 pr-4">{TYPE_LABEL[item.type]}</td>
-            <td className="py-2 pr-4">{item.source}</td>
-            <td
-              className={`py-2 pr-4 text-right ${
-                item.amount < 0 ? 'text-destructive' : 'text-green-600'
-              }`}
-            >
-              {fmtAmount(item.amount)}
-            </td>
-            <td className="py-2 pr-4 text-right">{fmtNum.format(item.balanceAfter)}</td>
-            <td className="py-2 pr-4">
-              {item.description ?? (item.shortfall ? '余额不足（截断）' : '—')}
-            </td>
-            <td className="py-2 text-right">{fmtDate(item.createdAt)}</td>
-          </tr>
-        ))}
+        {items.map((item) => {
+          const amountCurrency = formatCurrencyAmount(item.amount, config)
+          const balanceCurrency = formatCurrencyAmount(item.balanceAfter, config)
+          return (
+            <tr key={item.id} className="border-b last:border-0">
+              <td className="py-2 pr-4">{TYPE_LABEL[item.type]}</td>
+              <td className="py-2 pr-4">{item.source}</td>
+              <td
+                className={`py-2 pr-4 text-right ${
+                  item.amount < 0 ? 'text-destructive' : 'text-green-600'
+                }`}
+              >
+                {fmtAmount(item.amount)}
+                {amountCurrency && (
+                  <span className="block text-xs text-muted-foreground">
+                    {amountCurrency}
+                  </span>
+                )}
+              </td>
+              <td className="py-2 pr-4 text-right">
+                {fmtNum.format(item.balanceAfter)}
+                {balanceCurrency && (
+                  <span className="block text-xs text-muted-foreground">
+                    {balanceCurrency}
+                  </span>
+                )}
+              </td>
+              <td className="py-2 pr-4">
+                {item.description ??
+                  (item.shortfall ? '余额不足（截断）' : '—')}
+              </td>
+              <td className="py-2 text-right">{fmtDate(item.createdAt)}</td>
+            </tr>
+          )
+        })}
       </tbody>
     </table>
   )
@@ -125,6 +169,10 @@ export function BillingPage() {
     queryKey: ['billing', 'transactions'],
     queryFn: () => listQuotaTransactions(),
   })
+  const currencyQuery = useQuery({
+    queryKey: ['system', 'currency'],
+    queryFn: getCurrency,
+  })
 
   const canManage = user?.role === 'team_admin' || user?.role === 'system'
 
@@ -155,6 +203,7 @@ export function BillingPage() {
   const accounts: QuotaAccount[] = accountsQuery.data ?? []
   const teamAccount = accounts.find((a) => a.type === 'team')
   const memberAccounts = accounts.filter((a) => a.type === 'member')
+  const currencyConfig = currencyQuery.data ?? null
 
   const openTopup = () => {
     setForm(emptyForm)
@@ -210,6 +259,12 @@ export function BillingPage() {
                 ? '…'
                 : fmtNum.format(teamAccount?.balance ?? 0)}
             </CardTitle>
+            {teamAccount &&
+              formatCurrencyAmount(teamAccount.balance, currencyConfig) && (
+                <p className="text-sm text-muted-foreground">
+                  ≈ {formatCurrencyAmount(teamAccount.balance, currencyConfig)}
+                </p>
+              )}
           </CardHeader>
         </Card>
         {memberAccounts.map((account) => (
@@ -217,6 +272,11 @@ export function BillingPage() {
             <CardHeader>
               <CardDescription>成员额度 · {account.label ?? account.userId}</CardDescription>
               <CardTitle className="text-2xl">{fmtNum.format(account.balance)}</CardTitle>
+              {formatCurrencyAmount(account.balance, currencyConfig) && (
+                <p className="text-sm text-muted-foreground">
+                  ≈ {formatCurrencyAmount(account.balance, currencyConfig)}
+                </p>
+              )}
             </CardHeader>
           </Card>
         ))}
@@ -231,7 +291,10 @@ export function BillingPage() {
           {transactionsQuery.isLoading ? (
             <div className="py-6 text-sm text-muted-foreground">加载中…</div>
           ) : (
-            <TransactionTable items={transactionsQuery.data ?? []} />
+            <TransactionTable
+              items={transactionsQuery.data ?? []}
+              config={currencyConfig}
+            />
           )}
         </CardContent>
       </Card>
