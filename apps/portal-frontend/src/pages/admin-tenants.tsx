@@ -1,5 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -8,6 +18,14 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
   createTenant,
@@ -34,7 +52,9 @@ interface CreateFormState {
 export function AdminTenantsPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
+  const [createOpen, setCreateOpen] = useState(false)
   const [form, setForm] = useState<CreateFormState>({ code: '', name: '' })
+  const [statusTarget, setStatusTarget] = useState<Tenant | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -50,6 +70,7 @@ export function AdminTenantsPage() {
       setMessage('租户已创建')
       setError(null)
       setForm({ code: '', name: '' })
+      setCreateOpen(false)
     },
     onError: (err: Error) => setError(err.message),
   })
@@ -61,11 +82,18 @@ export function AdminTenantsPage() {
       queryClient.invalidateQueries({ queryKey: ['admin'] })
       setMessage('状态已更新')
       setError(null)
+      setStatusTarget(null)
     },
     onError: (err: Error) => setError(err.message),
   })
 
   const tenants: Tenant[] = tenantsQuery.data?.items ?? []
+
+  const openCreate = () => {
+    setForm({ code: '', name: '' })
+    setError(null)
+    setCreateOpen(true)
+  }
 
   const handleCreate = (e: FormEvent) => {
     e.preventDefault()
@@ -78,44 +106,27 @@ export function AdminTenantsPage() {
     createMutation.mutate({ code: form.code.trim(), name: form.name.trim() })
   }
 
+  const confirmStatus = () => {
+    if (!statusTarget) return
+    statusMutation.mutate({
+      id: statusTarget.id,
+      status: statusTarget.status === 'active' ? 'suspended' : 'active',
+    })
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">租户管理</h1>
-        <p className="text-sm text-muted-foreground">
-          多租户管理（仅 system 服务商角色可见）
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">租户管理</h1>
+          <p className="text-sm text-muted-foreground">
+            多租户管理（仅 system 服务商角色可见）
+          </p>
+        </div>
+        <Button onClick={openCreate}>新建租户</Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>新建租户</CardTitle>
-          <CardDescription>创建租户并自动初始化默认团队</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleCreate} className="space-y-4">
-            <div className="flex flex-wrap gap-3">
-              <Input
-                placeholder="租户编码（唯一，如 acme）"
-                value={form.code}
-                onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                className="w-48"
-              />
-              <Input
-                placeholder="租户名称"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                className="w-64"
-              />
-              <Button type="submit" disabled={createMutation.isPending}>
-                创建
-              </Button>
-            </div>
-            {message && <p className="text-sm text-green-600">{message}</p>}
-            {error && <p className="text-sm text-destructive">{error}</p>}
-          </form>
-        </CardContent>
-      </Card>
+      {message && <p className="text-sm text-green-600">{message}</p>}
 
       <Card>
         <CardHeader>
@@ -176,13 +187,7 @@ export function AdminTenantsPage() {
                         variant="outline"
                         size="sm"
                         disabled={statusMutation.isPending}
-                        onClick={() =>
-                          statusMutation.mutate({
-                            id: tenant.id,
-                            status:
-                              tenant.status === 'active' ? 'suspended' : 'active',
-                          })
-                        }
+                        onClick={() => setStatusTarget(tenant)}
                       >
                         {tenant.status === 'active' ? '停用' : '启用'}
                       </Button>
@@ -194,6 +199,72 @@ export function AdminTenantsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>新建租户</DialogTitle>
+            <DialogDescription>创建租户并自动初始化默认团队</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreate} className="space-y-4">
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                租户编码（唯一）
+              </label>
+              <Input
+                placeholder="如 acme"
+                value={form.code}
+                onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                租户名称
+              </label>
+              <Input
+                placeholder="租户名称"
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              />
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+                取消
+              </Button>
+              <Button type="submit" disabled={createMutation.isPending}>
+                创建
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={statusTarget !== null}
+        onOpenChange={(open) => !open && setStatusTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {statusTarget?.status === 'active' ? '停用租户' : '启用租户'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要{statusTarget?.status === 'active' ? '停用' : '启用'}「
+              {statusTarget?.name}」吗？停用后该租户下的成员将无法使用服务。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmStatus}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              确认
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

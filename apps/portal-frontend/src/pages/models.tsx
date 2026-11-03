@@ -1,14 +1,38 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import { useAuthStore } from '@/features/auth/store'
 import {
   bulkCreateModels,
@@ -22,9 +46,6 @@ import type { Model, ModelInput, ModelPatch } from '@/features/models/types'
 import { listProviders } from '@/features/providers/api'
 import type { Provider, ProviderType } from '@/features/providers/types'
 import { ApiError } from '@/lib/http'
-
-const selectClass =
-  'h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
 interface FormState {
   providerId: string
@@ -67,9 +88,11 @@ export function ModelsPage() {
   const user = useAuthStore((s) => s.user)
   const isAdmin = user?.role === 'team_admin' || user?.role === 'system'
 
+  const [formOpen, setFormOpen] = useState(false)
   const [form, setForm] = useState<FormState>(emptyForm)
   const [editing, setEditing] = useState<Model | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<Model | null>(null)
 
   const [importOpen, setImportOpen] = useState(false)
   const [presetType, setPresetType] = useState<ProviderType>('openai-compatible')
@@ -102,6 +125,14 @@ export function ModelsPage() {
         ? prev.filter((id) => id !== modelId)
         : [...prev, modelId],
     )
+  }
+
+  const openImport = () => {
+    setPresetType('openai-compatible')
+    setImportProviderId('')
+    setSelectedModels([])
+    setImportResult(null)
+    setImportOpen(true)
   }
 
   const importMutation = useMutation({
@@ -138,6 +169,11 @@ export function ModelsPage() {
     setError(null)
   }
 
+  const openCreate = () => {
+    resetForm()
+    setFormOpen(true)
+  }
+
   const submitMutation = useMutation({
     mutationFn: () => {
       const capabilities = parseList(form.capabilities)
@@ -165,6 +201,7 @@ export function ModelsPage() {
     },
     onSuccess: () => {
       resetForm()
+      setFormOpen(false)
       invalidate()
     },
     onError: (err) => {
@@ -174,7 +211,10 @@ export function ModelsPage() {
 
   const removeMutation = useMutation({
     mutationFn: (id: string) => removeModel(id),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate()
+      setRemoveTarget(null)
+    },
   })
 
   const handleSubmit = (e: FormEvent) => {
@@ -187,252 +227,31 @@ export function ModelsPage() {
     setEditing(model)
     setForm(toForm(model))
     setError(null)
+    setFormOpen(true)
   }
 
   const models: Model[] = modelsQuery.data ?? []
   const providers: Provider[] = providersQuery.data ?? []
+  const activeProviders = providers.filter((p) => p.status === 'active')
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">模型目录</h1>
-        <p className="text-sm text-muted-foreground">
-          维护可用模型、计费倍率与能力标签，供计量、计费与选型建议使用
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">模型目录</h1>
+          <p className="text-sm text-muted-foreground">
+            维护可用模型、计费倍率与能力标签，供计量、计费与选型建议使用
+          </p>
+        </div>
+        {isAdmin && (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={openImport}>
+              官方预设导入
+            </Button>
+            <Button onClick={openCreate}>添加模型</Button>
+          </div>
+        )}
       </div>
-
-      {isAdmin && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{editing ? '编辑模型' : '添加模型'}</CardTitle>
-            <CardDescription>
-              模型标识在团队内唯一；倍率用于计费（倍率 × token）
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <form className="grid gap-3 sm:grid-cols-2" onSubmit={handleSubmit}>
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  归属渠道
-                </label>
-                <select
-                  className={`${selectClass} w-full`}
-                  value={form.providerId}
-                  onChange={(e) =>
-                    setForm({ ...form, providerId: e.target.value })
-                  }
-                  required
-                >
-                  <option value="" disabled>
-                    请选择渠道
-                  </option>
-                  {providers
-                    .filter((p) => p.status === 'active')
-                    .map((provider) => (
-                      <option key={provider.id} value={provider.id}>
-                        {provider.name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  模型标识
-                </label>
-                <Input
-                  placeholder="gpt-4o-mini"
-                  value={form.modelId}
-                  onChange={(e) => setForm({ ...form, modelId: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  展示名（可选）
-                </label>
-                <Input
-                  placeholder="GPT-4o mini"
-                  value={form.displayName}
-                  onChange={(e) =>
-                    setForm({ ...form, displayName: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  计费倍率
-                </label>
-                <Input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  placeholder="1"
-                  value={form.multiplier}
-                  onChange={(e) =>
-                    setForm({ ...form, multiplier: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  能力标签（逗号分隔）
-                </label>
-                <Input
-                  placeholder="chat, code, vision"
-                  value={form.capabilities}
-                  onChange={(e) =>
-                    setForm({ ...form, capabilities: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  别名（逗号分隔，可选）
-                </label>
-                <Input
-                  placeholder="gpt-4o"
-                  value={form.aliases}
-                  onChange={(e) => setForm({ ...form, aliases: e.target.value })}
-                />
-              </div>
-
-              {error && <p className="text-sm text-red-500 sm:col-span-2">{error}</p>}
-
-              <div className="flex gap-2 sm:col-span-2">
-                <Button type="submit" disabled={submitMutation.isPending}>
-                  {editing ? '保存修改' : '添加'}
-                </Button>
-                {editing && (
-                  <Button type="button" variant="outline" onClick={resetForm}>
-                    取消
-                  </Button>
-                )}
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      {isAdmin && (
-        <Card>
-          <CardHeader>
-            <CardTitle>官方预设导入</CardTitle>
-            <CardDescription>
-              从官方预置目录一键导入模型（能力标签与默认倍率自动填充），需先有对应协议类型的上游渠道
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {!importOpen ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setImportOpen(true)}
-              >
-                打开官方预设导入
-              </Button>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-sm text-muted-foreground">
-                      官方协议类型
-                    </label>
-                    <select
-                      className={`${selectClass} w-full`}
-                      value={presetType}
-                      onChange={(e) => {
-                        setPresetType(e.target.value as ProviderType)
-                        setSelectedModels([])
-                      }}
-                    >
-                      {officialPresets.map((preset) => (
-                        <option key={preset.type} value={preset.type}>
-                          {preset.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm text-muted-foreground">
-                      目标渠道
-                    </label>
-                    <select
-                      className={`${selectClass} w-full`}
-                      value={importProviderId}
-                      onChange={(e) => setImportProviderId(e.target.value)}
-                      required
-                    >
-                      <option value="" disabled>
-                        请选择渠道
-                      </option>
-                      {providers
-                        .filter((p) => p.status === 'active')
-                        .map((provider) => (
-                          <option key={provider.id} value={provider.id}>
-                            {provider.name}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {(activePreset?.models ?? []).map((model) => (
-                    <label
-                      key={model.modelId}
-                      className="flex items-start gap-2 rounded-md border border-border p-2 text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        className="mt-0.5"
-                        checked={selectedModels.includes(model.modelId)}
-                        onChange={() => toggleModel(model.modelId)}
-                      />
-                      <span>
-                        <code className="text-xs">{model.modelId}</code>
-                        <span className="ml-2 text-muted-foreground">
-                          {model.displayName} · ×{model.multiplier}
-                        </span>
-                        <span className="block text-xs text-muted-foreground">
-                          {model.capabilities.join(', ')}
-                        </span>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-
-                {importResult && (
-                  <p className="text-sm text-muted-foreground">{importResult}</p>
-                )}
-
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    disabled={
-                      importMutation.isPending ||
-                      !importProviderId ||
-                      selectedModels.length === 0
-                    }
-                    onClick={() => importMutation.mutate()}
-                  >
-                    {importMutation.isPending ? '导入中…' : '导入所选模型'}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setImportOpen(false)
-                      setImportResult(null)
-                    }}
-                  >
-                    收起
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       <Card>
         <CardHeader>
@@ -443,7 +262,7 @@ export function ModelsPage() {
             <div className="text-sm text-muted-foreground">加载中…</div>
           ) : models.length === 0 ? (
             <div className="text-sm text-muted-foreground">
-              暂无模型，点击上方添加。
+              暂无模型，点击右上角添加。
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -496,8 +315,7 @@ export function ModelsPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                disabled={removeMutation.isPending}
-                                onClick={() => removeMutation.mutate(model.id)}
+                                onClick={() => setRemoveTarget(model)}
                               >
                                 删除
                               </Button>
@@ -513,6 +331,248 @@ export function ModelsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Sheet open={formOpen} onOpenChange={setFormOpen}>
+        <SheetContent className="sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>{editing ? '编辑模型' : '添加模型'}</SheetTitle>
+            <SheetDescription>
+              模型标识在团队内唯一；倍率用于计费（倍率 × token）
+            </SheetDescription>
+          </SheetHeader>
+          <form
+            className="flex flex-1 flex-col gap-4 overflow-y-auto"
+            onSubmit={handleSubmit}
+          >
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                归属渠道
+              </label>
+              <Select
+                value={form.providerId}
+                onValueChange={(v) => setForm({ ...form, providerId: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="请选择渠道" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeProviders.map((provider) => (
+                    <SelectItem key={provider.id} value={provider.id}>
+                      {provider.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                模型标识
+              </label>
+              <Input
+                placeholder="gpt-4o-mini"
+                value={form.modelId}
+                onChange={(e) => setForm({ ...form, modelId: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                展示名（可选）
+              </label>
+              <Input
+                placeholder="GPT-4o mini"
+                value={form.displayName}
+                onChange={(e) =>
+                  setForm({ ...form, displayName: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                计费倍率
+              </label>
+              <Input
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder="1"
+                value={form.multiplier}
+                onChange={(e) =>
+                  setForm({ ...form, multiplier: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                能力标签（逗号分隔）
+              </label>
+              <Input
+                placeholder="chat, code, vision"
+                value={form.capabilities}
+                onChange={(e) =>
+                  setForm({ ...form, capabilities: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                别名（逗号分隔，可选）
+              </label>
+              <Input
+                placeholder="gpt-4o"
+                value={form.aliases}
+                onChange={(e) => setForm({ ...form, aliases: e.target.value })}
+              />
+            </div>
+
+            {error && <p className="text-sm text-red-500">{error}</p>}
+
+            <SheetFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setFormOpen(false)}
+              >
+                取消
+              </Button>
+              <Button type="submit" disabled={submitMutation.isPending}>
+                {editing ? '保存修改' : '添加'}
+              </Button>
+            </SheetFooter>
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={importOpen} onOpenChange={setImportOpen}>
+        <SheetContent className="sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>官方预设导入</SheetTitle>
+            <SheetDescription>
+              从官方预置目录一键导入模型（能力标签与默认倍率自动填充），需先有对应协议类型的上游渠道
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex flex-1 flex-col gap-4 overflow-y-auto">
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                官方协议类型
+              </label>
+              <Select
+                value={presetType}
+                onValueChange={(v) => {
+                  setPresetType(v as ProviderType)
+                  setSelectedModels([])
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {officialPresets.map((preset) => (
+                    <SelectItem key={preset.type} value={preset.type}>
+                      {preset.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                目标渠道
+              </label>
+              <Select
+                value={importProviderId}
+                onValueChange={(v) => setImportProviderId(v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="请选择渠道" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeProviders.map((provider) => (
+                    <SelectItem key={provider.id} value={provider.id}>
+                      {provider.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              {(activePreset?.models ?? []).map((model) => (
+                <label
+                  key={model.modelId}
+                  className="flex items-start gap-2 rounded-md border border-border p-2 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={selectedModels.includes(model.modelId)}
+                    onChange={() => toggleModel(model.modelId)}
+                  />
+                  <span>
+                    <code className="text-xs">{model.modelId}</code>
+                    <span className="ml-2 text-muted-foreground">
+                      {model.displayName} · ×{model.multiplier}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {model.capabilities.join(', ')}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            {importResult && (
+              <p className="text-sm text-muted-foreground">{importResult}</p>
+            )}
+
+            <SheetFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setImportOpen(false)}
+              >
+                取消
+              </Button>
+              <Button
+                disabled={
+                  importMutation.isPending ||
+                  !importProviderId ||
+                  selectedModels.length === 0
+                }
+                onClick={() => importMutation.mutate()}
+              >
+                {importMutation.isPending ? '导入中…' : '导入所选模型'}
+              </Button>
+            </SheetFooter>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <AlertDialog
+        open={removeTarget !== null}
+        onOpenChange={(open) => !open && setRemoveTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除模型</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除模型「{removeTarget?.modelId}」吗？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={removeMutation.isPending}
+              onClick={() =>
+                removeTarget && removeMutation.mutate(removeTarget.id)
+              }
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

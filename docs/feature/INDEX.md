@@ -18,6 +18,7 @@
 | 模型选型建议 | [model_recommendation](model_recommendation.md) | 单团队/SaaS 共用 | 差异化能力 |
 | 服务商全局视角 | [admin_overview](admin_overview.md) | 仅 SaaS | 多租户管理 + 全局看板 |
 | 系统管理 | [system_admin](system_admin.md) | 单团队/SaaS 共用 | 配置/审计/通知 |
+| 前端 UI 工程 | [portal_ui](portal_ui.md) | 单团队/SaaS 共用 | UI 基础原语与交互规范落地 |
 
 ## 说明
 

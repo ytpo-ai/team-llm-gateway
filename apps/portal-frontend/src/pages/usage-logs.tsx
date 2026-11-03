@@ -9,6 +9,13 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { getUsageLogs } from '@/features/usage/api'
 import type { UsageLogStatus } from '@/features/usage/types'
 
@@ -82,15 +89,19 @@ export function UsageLogsPage() {
               onChange={(e) => setFilter({ modelId: e.target.value })}
               className="w-56"
             />
-            <select
+            <Select
               value={filters.status}
-              onChange={(e) => setFilter({ status: e.target.value })}
-              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+              onValueChange={(v) => setFilter({ status: v })}
             >
-              <option value="">全部状态</option>
-              <option value="success">成功</option>
-              <option value="error">失败</option>
-            </select>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">全部状态</SelectItem>
+                <SelectItem value="success">成功</SelectItem>
+                <SelectItem value="error">失败</SelectItem>
+              </SelectContent>
+            </Select>
             <Input
               type="datetime-local"
               value={filters.from}

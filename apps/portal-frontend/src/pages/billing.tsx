@@ -8,7 +8,22 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   adjustQuota,
   listQuotaAccounts,
@@ -97,6 +112,7 @@ export function BillingPage() {
   const queryClient = useQueryClient()
   const user = useAuthStore((s) => s.user)
 
+  const [topupOpen, setTopupOpen] = useState(false)
   const [form, setForm] = useState<TopupFormState>(emptyForm)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -119,6 +135,7 @@ export function BillingPage() {
       setMessage('充值成功')
       setError(null)
       setForm(emptyForm)
+      setTopupOpen(false)
     },
     onError: (err: Error) => setError(err.message),
   })
@@ -130,6 +147,7 @@ export function BillingPage() {
       setMessage('调整成功')
       setError(null)
       setForm(emptyForm)
+      setTopupOpen(false)
     },
     onError: (err: Error) => setError(err.message),
   })
@@ -137,6 +155,12 @@ export function BillingPage() {
   const accounts: QuotaAccount[] = accountsQuery.data ?? []
   const teamAccount = accounts.find((a) => a.type === 'team')
   const memberAccounts = accounts.filter((a) => a.type === 'member')
+
+  const openTopup = () => {
+    setForm(emptyForm)
+    setError(null)
+    setTopupOpen(true)
+  }
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -165,12 +189,17 @@ export function BillingPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">额度与计费</h1>
-        <p className="text-sm text-muted-foreground">
-          统一扣费引擎（成本 = 模型倍率 × Token），团队 / 成员两级额度账户
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">额度与计费</h1>
+          <p className="text-sm text-muted-foreground">
+            统一扣费引擎（成本 = 模型倍率 × Token），团队 / 成员两级额度账户
+          </p>
+        </div>
+        {canManage && <Button onClick={openTopup}>充值 / 调整额度</Button>}
       </div>
+
+      {message && <p className="text-sm text-green-600">{message}</p>}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card>
@@ -193,70 +222,6 @@ export function BillingPage() {
         ))}
       </div>
 
-      {canManage && (
-        <Card>
-          <CardHeader>
-            <CardTitle>充值 / 调整额度</CardTitle>
-            <CardDescription>缺省目标为团队账户，可指定成员账户</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="flex flex-wrap gap-3">
-                <select
-                  value={form.mode}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      mode: e.target.value as TopupFormState['mode'],
-                    }))
-                  }
-                  className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  <option value="recharge">充值</option>
-                  <option value="adjust">调整（正加负减）</option>
-                </select>
-                <select
-                  value={form.target}
-                  onChange={(e) => setForm((f) => ({ ...f, target: e.target.value }))}
-                  className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  <option value="">团队账户</option>
-                  {memberAccounts.map((a) => (
-                    <option key={a.id} value={a.userId ?? ''}>
-                      {a.label ?? a.userId}
-                    </option>
-                  ))}
-                </select>
-                <Input
-                  type="number"
-                  step="any"
-                  placeholder="金额"
-                  value={form.amount}
-                  onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-                  className="w-40"
-                />
-                <Input
-                  placeholder="备注（可选）"
-                  value={form.description}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, description: e.target.value }))
-                  }
-                  className="w-64"
-                />
-                <Button
-                  type="submit"
-                  disabled={rechargeMutation.isPending || adjustMutation.isPending}
-                >
-                  提交
-                </Button>
-              </div>
-              {message && <p className="text-sm text-green-600">{message}</p>}
-              {error && <p className="text-sm text-destructive">{error}</p>}
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
       <Card>
         <CardHeader>
           <CardTitle>额度流水</CardTitle>
@@ -270,6 +235,100 @@ export function BillingPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={topupOpen} onOpenChange={setTopupOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>充值 / 调整额度</DialogTitle>
+            <DialogDescription>
+              缺省目标为团队账户，可指定成员账户
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground">
+                  类型
+                </label>
+                <Select
+                  value={form.mode}
+                  onValueChange={(v) =>
+                    setForm((f) => ({
+                      ...f,
+                      mode: v as TopupFormState['mode'],
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="recharge">充值</SelectItem>
+                    <SelectItem value="adjust">调整（正加负减）</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground">
+                  目标账户
+                </label>
+                <Select
+                  value={form.target}
+                  onValueChange={(v) => setForm((f) => ({ ...f, target: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">团队账户</SelectItem>
+                    {memberAccounts.map((a) => (
+                      <SelectItem key={a.id} value={a.userId ?? ''}>
+                        {a.label ?? a.userId}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground">
+                  金额
+                </label>
+                <Input
+                  type="number"
+                  step="any"
+                  placeholder="金额"
+                  value={form.amount}
+                  onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground">
+                  备注（可选）
+                </label>
+                <Input
+                  placeholder="备注（可选）"
+                  value={form.description}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, description: e.target.value }))
+                  }
+                />
+              </div>
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setTopupOpen(false)}>
+                取消
+              </Button>
+              <Button
+                type="submit"
+                disabled={rechargeMutation.isPending || adjustMutation.isPending}
+              >
+                提交
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

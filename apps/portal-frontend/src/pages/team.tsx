@@ -1,14 +1,38 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type FormEvent } from 'react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useAuthStore } from '@/features/auth/store'
 import type { Role } from '@/features/auth/types'
 import { listRoleTemplates } from '@/features/role-templates/api'
@@ -31,9 +55,6 @@ import {
 } from '@/features/teams/types'
 import { ApiError } from '@/lib/http'
 
-const selectClass =
-  'h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
-
 function RoleSelect({
   value,
   disabled,
@@ -44,18 +65,22 @@ function RoleSelect({
   onChange: (role: Role) => void
 }) {
   return (
-    <select
-      className={selectClass}
+    <Select
       value={value}
       disabled={disabled}
-      onChange={(e) => onChange(e.target.value as Role)}
+      onValueChange={(v) => onChange(v as Role)}
     >
-      {ASSIGNABLE_ROLES.map((role) => (
-        <option key={role} value={role}>
-          {ROLE_LABELS[role]}
-        </option>
-      ))}
-    </select>
+      <SelectTrigger className="w-32">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {ASSIGNABLE_ROLES.map((role) => (
+          <SelectItem key={role} value={role}>
+            {ROLE_LABELS[role]}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   )
 }
 
@@ -64,11 +89,14 @@ export function TeamPage() {
   const user = useAuthStore((s) => s.user)
   const isAdmin = user?.role === 'team_admin' || user?.role === 'system'
 
+  const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<Role>('member')
   const [inviteLink, setInviteLink] = useState<string | null>(null)
   const [inviteError, setInviteError] = useState<string | null>(null)
-  const [inviting, setInviting] = useState(false)
+
+  const [limitsOpen, setLimitsOpen] = useState(false)
+  const [removeTarget, setRemoveTarget] = useState<Member | null>(null)
 
   const teamsQuery = useQuery({ queryKey: ['teams'], queryFn: listTeams })
   const team = teamsQuery.data?.[0]
@@ -122,6 +150,7 @@ export function TeamPage() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teams'] })
+      setLimitsOpen(false)
     },
   })
 
@@ -138,7 +167,10 @@ export function TeamPage() {
 
   const removeMemberMutation = useMutation({
     mutationFn: (userId: string) => removeMember(team!.id, userId),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate()
+      setRemoveTarget(null)
+    },
   })
 
   const revokeInvitationMutation = useMutation({
@@ -162,11 +194,18 @@ export function TeamPage() {
     },
   })
 
+  const openInvite = () => {
+    setInviteEmail('')
+    setInviteRole('member')
+    setInviteLink(null)
+    setInviteError(null)
+    setInviteOpen(true)
+  }
+
   const handleInvite = (e: FormEvent) => {
     e.preventDefault()
     setInviteLink(null)
-    setInviting(true)
-    inviteMutation.mutate(undefined, { onSettled: () => setInviting(false) })
+    inviteMutation.mutate()
   }
 
   const copyLink = async () => {
@@ -200,37 +239,183 @@ export function TeamPage() {
             共 {members.length} 名成员
           </p>
         </div>
+        {isAdmin && (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setLimitsOpen(true)}>
+              团队使用限额
+            </Button>
+            <Button onClick={openInvite}>邀请成员</Button>
+          </div>
+        )}
       </div>
 
-      {isAdmin && (
-        <Card>
-          <CardHeader>
-            <CardTitle>邀请成员</CardTitle>
-            <CardDescription>
+      <Card>
+        <CardHeader>
+          <CardTitle>成员</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isAdmin && invitations.length > 0 && (
+            <div className="mb-4 space-y-2">
+              <p className="text-sm font-medium">已发出的邀请</p>
+              <ul className="space-y-1">
+                {invitations.map((invitation) => (
+                  <li
+                    key={invitation.id}
+                    className="flex items-center justify-between rounded-md border border-input px-3 py-2 text-sm"
+                  >
+                    <span>
+                      {invitation.email}
+                      <span className="ml-2 text-muted-foreground">
+                        {ROLE_LABELS[invitation.role]} ·{' '}
+                        {invitation.status === 'pending'
+                          ? '待接受'
+                          : invitation.status === 'accepted'
+                            ? '已加入'
+                            : '已撤销'}
+                      </span>
+                    </span>
+                    {invitation.status === 'pending' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          revokeInvitationMutation.mutate(invitation.id)
+                        }
+                      >
+                        撤销
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-muted-foreground">
+                  <th className="py-2 pr-4 font-medium">姓名</th>
+                  <th className="py-2 pr-4 font-medium">邮箱</th>
+                  <th className="py-2 pr-4 font-medium">管理角色</th>
+                  <th className="py-2 pr-4 font-medium">使用角色</th>
+                  <th className="py-2 pr-4 font-medium">状态</th>
+                  {isAdmin && <th className="py-2 font-medium">操作</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {members.map((member) => (
+                  <tr key={member.id} className="border-b last:border-0">
+                    <td className="py-2 pr-4">{member.name}</td>
+                    <td className="py-2 pr-4 text-muted-foreground">
+                      {member.email ?? '—'}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {isAdmin && member.id !== user?.id ? (
+                        <RoleSelect
+                          value={member.role}
+                          onChange={(role) =>
+                            updateMemberMutation.mutate({
+                              userId: member.id,
+                              patch: { role },
+                            })
+                          }
+                        />
+                      ) : (
+                        <span>{ROLE_LABELS[member.role]}</span>
+                      )}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {isAdmin ? (
+                        <Select
+                          value={member.roleTemplateId ?? ''}
+                          onValueChange={(v) =>
+                            updateMemberMutation.mutate({
+                              userId: member.id,
+                              patch: {
+                                roleTemplateId: v || null,
+                              },
+                            })
+                          }
+                        >
+                          <SelectTrigger className="w-36">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">未分配</SelectItem>
+                            {roleTemplates.map((template) => (
+                              <SelectItem key={template.id} value={template.id}>
+                                {template.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span>
+                          {roleTemplates.find(
+                            (t) => t.id === member.roleTemplateId,
+                          )?.name ?? '未分配'}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {member.status === 'active' ? '正常' : '已禁用'}
+                    </td>
+                    {isAdmin && (
+                      <td className="py-2">
+                        {member.id !== user?.id && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setRemoveTarget(member)}
+                          >
+                            移除
+                          </Button>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>邀请成员</DialogTitle>
+            <DialogDescription>
               生成邀请链接并发送给成员，对方凭链接注册后即加入团队
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <form className="flex flex-wrap items-end gap-3" onSubmit={handleInvite}>
-              <div className="flex-1 min-w-56">
-                <Input
-                  type="email"
-                  placeholder="成员邮箱"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  required
-                />
-              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={handleInvite}>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                成员邮箱
+              </label>
+              <Input
+                type="email"
+                placeholder="成员邮箱"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                成员角色
+              </label>
               <RoleSelect
                 value={inviteRole}
                 onChange={(role) => setInviteRole(role)}
               />
-              <Button type="submit" disabled={inviting || inviteMutation.isPending}>
-                {inviting || inviteMutation.isPending ? '生成中…' : '生成邀请链接'}
-              </Button>
-            </form>
+            </div>
 
-            {inviteError && <p className="text-sm text-red-500">{inviteError}</p>}
+            {inviteError && (
+              <p className="text-sm text-red-500">{inviteError}</p>
+            )}
 
             {inviteLink && (
               <div className="flex items-center gap-2 rounded-md border border-input bg-muted/50 p-2">
@@ -243,55 +428,31 @@ export function TeamPage() {
               </div>
             )}
 
-            {invitations.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">已发出的邀请</p>
-                <ul className="space-y-1">
-                  {invitations.map((invitation) => (
-                    <li
-                      key={invitation.id}
-                      className="flex items-center justify-between rounded-md border border-input px-3 py-2 text-sm"
-                    >
-                      <span>
-                        {invitation.email}
-                        <span className="ml-2 text-muted-foreground">
-                          {ROLE_LABELS[invitation.role]} ·{' '}
-                          {invitation.status === 'pending'
-                            ? '待接受'
-                            : invitation.status === 'accepted'
-                              ? '已加入'
-                              : '已撤销'}
-                        </span>
-                      </span>
-                      {invitation.status === 'pending' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            revokeInvitationMutation.mutate(invitation.id)
-                          }
-                        >
-                          撤销
-                        </Button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setInviteOpen(false)}
+              >
+                取消
+              </Button>
+              <Button type="submit" disabled={inviteMutation.isPending}>
+                {inviteMutation.isPending ? '生成中…' : '生成邀请链接'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-      {isAdmin && (
-        <Card>
-          <CardHeader>
-            <CardTitle>团队使用限额</CardTitle>
-            <CardDescription>
+      <Dialog open={limitsOpen} onOpenChange={setLimitsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>团队使用限额</DialogTitle>
+            <DialogDescription>
               设置团队级日/周/月 token 上限，与成员角色、API Key 限额取最严格生效
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-3">
               <div>
                 <label className="mb-1 block text-sm text-muted-foreground">
@@ -333,107 +494,50 @@ export function TeamPage() {
                 />
               </div>
             </div>
-            <Button
-              onClick={() => updateTeamMutation.mutate()}
-              disabled={updateTeamMutation.isPending}
-            >
-              {updateTeamMutation.isPending ? '保存中…' : '保存限额'}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>成员</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="py-2 pr-4 font-medium">姓名</th>
-                  <th className="py-2 pr-4 font-medium">邮箱</th>
-                  <th className="py-2 pr-4 font-medium">管理角色</th>
-                  <th className="py-2 pr-4 font-medium">使用角色</th>
-                  <th className="py-2 pr-4 font-medium">状态</th>
-                  {isAdmin && <th className="py-2 font-medium">操作</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {members.map((member) => (
-                  <tr key={member.id} className="border-b last:border-0">
-                    <td className="py-2 pr-4">{member.name}</td>
-                    <td className="py-2 pr-4 text-muted-foreground">
-                      {member.email ?? '—'}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {isAdmin && member.id !== user?.id ? (
-                        <RoleSelect
-                          value={member.role}
-                          onChange={(role) =>
-                            updateMemberMutation.mutate({
-                              userId: member.id,
-                              patch: { role },
-                            })
-                          }
-                        />
-                      ) : (
-                        <span>{ROLE_LABELS[member.role]}</span>
-                      )}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {isAdmin ? (
-                        <select
-                          className={selectClass}
-                          value={member.roleTemplateId ?? ''}
-                          onChange={(e) =>
-                            updateMemberMutation.mutate({
-                              userId: member.id,
-                              patch: {
-                                roleTemplateId: e.target.value || null,
-                              },
-                            })
-                          }
-                        >
-                          <option value="">未分配</option>
-                          {roleTemplates.map((template) => (
-                            <option key={template.id} value={template.id}>
-                              {template.name}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span>
-                          {roleTemplates.find(
-                            (t) => t.id === member.roleTemplateId,
-                          )?.name ?? '未分配'}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {member.status === 'active' ? '正常' : '已禁用'}
-                    </td>
-                    {isAdmin && (
-                      <td className="py-2">
-                        {member.id !== user?.id && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeMemberMutation.mutate(member.id)}
-                          >
-                            移除
-                          </Button>
-                        )}
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setLimitsOpen(false)}
+              >
+                取消
+              </Button>
+              <Button
+                onClick={() => updateTeamMutation.mutate()}
+                disabled={updateTeamMutation.isPending}
+              >
+                {updateTeamMutation.isPending ? '保存中…' : '保存限额'}
+              </Button>
+            </DialogFooter>
           </div>
-        </CardContent>
-      </Card>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={removeTarget !== null}
+        onOpenChange={(open) => !open && setRemoveTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>移除成员</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要将「{removeTarget?.name}」移出团队吗？移除后该成员将失去团队访问权限。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={removeMemberMutation.isPending}
+              onClick={() =>
+                removeTarget && removeMemberMutation.mutate(removeTarget.id)
+              }
+            >
+              移除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

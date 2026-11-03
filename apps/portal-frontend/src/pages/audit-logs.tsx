@@ -9,6 +9,13 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { listAuditLogs } from '@/features/system/api'
 import type { AuditAction, AuditResourceType } from '@/features/system/types'
 
@@ -108,30 +115,38 @@ export function AuditLogsPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3">
-            <select
+            <Select
               value={filters.action}
-              onChange={(e) => setFilter({ action: e.target.value })}
-              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+              onValueChange={(v) => setFilter({ action: v })}
             >
-              <option value="">全部动作</option>
-              {ACTION_OPTIONS.map((action) => (
-                <option key={action} value={action}>
-                  {ACTION_LABELS[action]}
-                </option>
-              ))}
-            </select>
-            <select
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">全部动作</SelectItem>
+                {ACTION_OPTIONS.map((action) => (
+                  <SelectItem key={action} value={action}>
+                    {ACTION_LABELS[action]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
               value={filters.resourceType}
-              onChange={(e) => setFilter({ resourceType: e.target.value })}
-              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+              onValueChange={(v) => setFilter({ resourceType: v })}
             >
-              <option value="">全部资源</option>
-              {RESOURCE_OPTIONS.map((type) => (
-                <option key={type} value={type}>
-                  {RESOURCE_LABELS[type]}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">全部资源</SelectItem>
+                {RESOURCE_OPTIONS.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {RESOURCE_LABELS[type]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Input
               placeholder="操作人 ID"
               value={filters.userId}

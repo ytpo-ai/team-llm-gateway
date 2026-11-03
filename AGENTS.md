@@ -28,6 +28,9 @@ export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 ## 问题分析规范
 对系统问题分析，必须遵循 `docs/rules/ANALYSIS_GUIDELINE.MD` 中的规范中的核心要求。
 
+## UI 前端设计规范
+具体规范及约束请阅读 `docs/rules/UI.md` 中的说明。
+
 ## OpenCode Endpoint 优先级提示
 
 请优先阅读 `docs/TIP.MD`。
@@ -270,7 +273,7 @@ feature → plan → requirement → development + fix
   - 文件：kebab-case
 
 ### 前端设计规范
-遇到前端开发任务时，请先阅读 `docs/FRONTEND_GUIDELINE.md` 中的前端设计建议规范。
+遇到前端开发任务时，请先阅读 `docs/rules/UI.md` 中的前端设计建议规范。
 
 ### 测试要求
 - 新功能必须包含测试

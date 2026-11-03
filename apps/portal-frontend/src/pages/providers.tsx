@@ -1,5 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -8,7 +18,30 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import { useAuthStore } from '@/features/auth/store'
 import { listOfficialPresets } from '@/features/models/api'
 import type { OfficialProviderPreset } from '@/features/models/types'
@@ -33,9 +66,6 @@ import {
 } from '@/features/providers/types'
 import { ApiError } from '@/lib/http'
 
-const selectClass =
-  'h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
-
 interface FormState {
   name: string
   type: ProviderType
@@ -57,9 +87,11 @@ export function ProvidersPage() {
   const user = useAuthStore((s) => s.user)
   const isAdmin = user?.role === 'team_admin' || user?.role === 'system'
 
+  const [formOpen, setFormOpen] = useState(false)
   const [form, setForm] = useState<FormState>(emptyForm)
   const [editing, setEditing] = useState<Provider | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<Provider | null>(null)
   const [probeResults, setProbeResults] = useState<
     Record<string, ProviderProbeResult>
   >({})
@@ -138,6 +170,11 @@ export function ProvidersPage() {
     setError(null)
   }
 
+  const openCreate = () => {
+    resetForm()
+    setFormOpen(true)
+  }
+
   const submitMutation = useMutation({
     mutationFn: () => {
       if (editing) {
@@ -161,6 +198,7 @@ export function ProvidersPage() {
     },
     onSuccess: () => {
       resetForm()
+      setFormOpen(false)
       invalidate()
     },
     onError: (err) => {
@@ -170,7 +208,10 @@ export function ProvidersPage() {
 
   const removeMutation = useMutation({
     mutationFn: (id: string) => removeProvider(id),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate()
+      setRemoveTarget(null)
+    },
   })
 
   const handleSubmit = (e: FormEvent) => {
@@ -189,6 +230,7 @@ export function ProvidersPage() {
       apiKey: '',
     })
     setError(null)
+    setFormOpen(true)
   }
 
   if (!isAdmin) {
@@ -212,11 +254,14 @@ export function ProvidersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">上游渠道</h1>
-        <p className="text-sm text-muted-foreground">
-          配置团队上游（OpenAI 兼容 / 直连），上游 key 加密存储、仅展示脱敏信息
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">上游渠道</h1>
+          <p className="text-sm text-muted-foreground">
+            配置团队上游（OpenAI 兼容 / 直连），上游 key 加密存储、仅展示脱敏信息
+          </p>
+        </div>
+        <Button onClick={openCreate}>添加上游渠道</Button>
       </div>
 
       <Card>
@@ -233,7 +278,6 @@ export function ProvidersPage() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {officialPresets.map((preset) => {
               const enabled = providersByPreset[preset.key] ?? []
-              const open = enablePreset?.key === preset.key
               return (
                 <div
                   key={preset.key}
@@ -263,177 +307,18 @@ export function ProvidersPage() {
                       {enabled.map((p) => p.name).join('、')}
                     </div>
                   )}
-                  {open ? (
-                    <div className="mt-3 space-y-2">
-                      <Input
-                        type="password"
-                        placeholder="sk-…"
-                        value={enableKey}
-                        onChange={(e) => setEnableKey(e.target.value)}
-                      />
-                      <Input
-                        placeholder={`渠道名称（默认 ${preset.label}）`}
-                        value={enableName}
-                        onChange={(e) => setEnableName(e.target.value)}
-                      />
-                      {enableError && (
-                        <p className="text-xs text-red-500">{enableError}</p>
-                      )}
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          disabled={
-                            enableMutation.isPending || !enableKey.trim()
-                          }
-                          onClick={() => enableMutation.mutate()}
-                        >
-                          {enableMutation.isPending ? '开启中…' : '确认开启'}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setEnablePreset(null)}
-                        >
-                          取消
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <Button
-                      className="mt-3"
-                      size="sm"
-                      variant={enabled.length ? 'outline' : 'default'}
-                      onClick={() => openEnable(preset)}
-                    >
-                      {enabled.length ? '再添加一个' : '开启使用'}
-                    </Button>
-                  )}
+                  <Button
+                    className="mt-3"
+                    size="sm"
+                    variant={enabled.length ? 'outline' : 'default'}
+                    onClick={() => openEnable(preset)}
+                  >
+                    {enabled.length ? '再添加一个' : '开启使用'}
+                  </Button>
                 </div>
               )
             })}
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{editing ? '编辑渠道' : '添加上游渠道'}</CardTitle>
-          <CardDescription>
-            {editing
-              ? `正在编辑 ${editing.name}（留空 key 表示保持不变）`
-              : '上游 key 提交后不可再次查看，仅显示脱敏信息'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <form className="grid gap-3 sm:grid-cols-2" onSubmit={handleSubmit}>
-            <div>
-              <label className="mb-1 block text-sm text-muted-foreground">
-                渠道名称
-              </label>
-              <Input
-                placeholder="如：OpenAI 直连"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                required
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm text-muted-foreground">
-                协议类型
-              </label>
-              <select
-                className={`${selectClass} w-full`}
-                value={form.type}
-                onChange={(e) => {
-                  const type = e.target.value as ProviderType
-                  setForm({
-                    ...form,
-                    type,
-                    authType: type === 'gemini' ? form.authType : 'api-key',
-                  })
-                }}
-              >
-                {(Object.keys(PROVIDER_TYPE_LABELS) as ProviderType[]).map(
-                  (type) => (
-                    <option key={type} value={type}>
-                      {PROVIDER_TYPE_LABELS[type]}
-                    </option>
-                  ),
-                )}
-              </select>
-            </div>
-            {form.type === 'gemini' && (
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  认证方式
-                </label>
-                <select
-                  className={`${selectClass} w-full`}
-                  value={form.authType}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      authType: e.target.value as ProviderAuthType,
-                    })
-                  }
-                >
-                  {(
-                    Object.keys(PROVIDER_AUTH_TYPE_LABELS) as ProviderAuthType[]
-                  ).map((authType) => (
-                    <option key={authType} value={authType}>
-                      {PROVIDER_AUTH_TYPE_LABELS[authType]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-sm text-muted-foreground">
-                Base URL
-              </label>
-              <Input
-                placeholder={PROVIDER_TYPE_BASE_URL_HINTS[form.type]}
-                value={form.baseUrl}
-                onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
-                required
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-sm text-muted-foreground">
-                {form.authType === 'oauth' ? '服务账号 JSON' : '上游 API Key'}
-              </label>
-              {form.authType === 'oauth' ? (
-                <textarea
-                  className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder={editing ? '留空表示不修改' : '粘贴服务账号 JSON（含 client_email / private_key）'}
-                  value={form.apiKey}
-                  onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
-                  required={!editing}
-                />
-              ) : (
-                <Input
-                  type="password"
-                  placeholder={editing ? '留空表示不修改' : 'sk-…'}
-                  value={form.apiKey}
-                  onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
-                  required={!editing}
-                />
-              )}
-            </div>
-
-            {error && <p className="text-sm text-red-500 sm:col-span-2">{error}</p>}
-
-            <div className="flex gap-2 sm:col-span-2">
-              <Button type="submit" disabled={submitMutation.isPending}>
-                {editing ? '保存修改' : '添加'}
-              </Button>
-              {editing && (
-                <Button type="button" variant="outline" onClick={resetForm}>
-                  取消
-                </Button>
-              )}
-            </div>
-          </form>
         </CardContent>
       </Card>
 
@@ -446,7 +331,7 @@ export function ProvidersPage() {
             <div className="text-sm text-muted-foreground">加载中…</div>
           ) : providers.length === 0 ? (
             <div className="text-sm text-muted-foreground">
-              暂无上游渠道，点击上方添加。
+              暂无上游渠道，点击右上角添加。
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -517,8 +402,7 @@ export function ProvidersPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              disabled={removeMutation.isPending}
-                              onClick={() => removeMutation.mutate(provider.id)}
+                              onClick={() => setRemoveTarget(provider)}
                             >
                               删除
                             </Button>
@@ -533,6 +417,221 @@ export function ProvidersPage() {
           )}
         </CardContent>
       </Card>
+
+      <Sheet open={formOpen} onOpenChange={setFormOpen}>
+        <SheetContent className="sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>{editing ? '编辑渠道' : '添加上游渠道'}</SheetTitle>
+            <SheetDescription>
+              {editing
+                ? `正在编辑 ${editing.name}（留空 key 表示保持不变）`
+                : '上游 key 提交后不可再次查看，仅显示脱敏信息'}
+            </SheetDescription>
+          </SheetHeader>
+          <form
+            className="flex flex-1 flex-col gap-4 overflow-y-auto"
+            onSubmit={handleSubmit}
+          >
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                渠道名称
+              </label>
+              <Input
+                placeholder="如：OpenAI 直连"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                协议类型
+              </label>
+              <Select
+                value={form.type}
+                onValueChange={(v) => {
+                  const type = v as ProviderType
+                  setForm({
+                    ...form,
+                    type,
+                    authType: type === 'gemini' ? form.authType : 'api-key',
+                  })
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(PROVIDER_TYPE_LABELS) as ProviderType[]).map(
+                    (type) => (
+                      <SelectItem key={type} value={type}>
+                        {PROVIDER_TYPE_LABELS[type]}
+                      </SelectItem>
+                    ),
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            {form.type === 'gemini' && (
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground">
+                  认证方式
+                </label>
+                <Select
+                  value={form.authType}
+                  onValueChange={(v) =>
+                    setForm({ ...form, authType: v as ProviderAuthType })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(
+                      Object.keys(
+                        PROVIDER_AUTH_TYPE_LABELS,
+                      ) as ProviderAuthType[]
+                    ).map((authType) => (
+                      <SelectItem key={authType} value={authType}>
+                        {PROVIDER_AUTH_TYPE_LABELS[authType]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                Base URL
+              </label>
+              <Input
+                placeholder={PROVIDER_TYPE_BASE_URL_HINTS[form.type]}
+                value={form.baseUrl}
+                onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                {form.authType === 'oauth' ? '服务账号 JSON' : '上游 API Key'}
+              </label>
+              {form.authType === 'oauth' ? (
+                <textarea
+                  className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder={editing ? '留空表示不修改' : '粘贴服务账号 JSON（含 client_email / private_key）'}
+                  value={form.apiKey}
+                  onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
+                  required={!editing}
+                />
+              ) : (
+                <Input
+                  type="password"
+                  placeholder={editing ? '留空表示不修改' : 'sk-…'}
+                  value={form.apiKey}
+                  onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
+                  required={!editing}
+                />
+              )}
+            </div>
+
+            {error && <p className="text-sm text-red-500">{error}</p>}
+
+            <SheetFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setFormOpen(false)}
+              >
+                取消
+              </Button>
+              <Button type="submit" disabled={submitMutation.isPending}>
+                {editing ? '保存修改' : '添加'}
+              </Button>
+            </SheetFooter>
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      <Dialog
+        open={enablePreset !== null}
+        onOpenChange={(open) => !open && setEnablePreset(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>开启「{enablePreset?.label}」</DialogTitle>
+            <DialogDescription>
+              填 Key 即可一键开启并自动导入官方模型
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                API Key
+              </label>
+              <Input
+                type="password"
+                placeholder="sk-…"
+                value={enableKey}
+                onChange={(e) => setEnableKey(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                渠道名称（可选）
+              </label>
+              <Input
+                placeholder={`渠道名称（默认 ${enablePreset?.label}）`}
+                value={enableName}
+                onChange={(e) => setEnableName(e.target.value)}
+              />
+            </div>
+            {enableError && (
+              <p className="text-sm text-red-500">{enableError}</p>
+            )}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEnablePreset(null)}
+              >
+                取消
+              </Button>
+              <Button
+                disabled={enableMutation.isPending || !enableKey.trim()}
+                onClick={() => enableMutation.mutate()}
+              >
+                {enableMutation.isPending ? '开启中…' : '确认开启'}
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={removeTarget !== null}
+        onOpenChange={(open) => !open && setRemoveTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除渠道</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除上游渠道「{removeTarget?.name}」吗？删除后该渠道下关联的模型将不可用。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={removeMutation.isPending}
+              onClick={() =>
+                removeTarget && removeMutation.mutate(removeTarget.id)
+              }
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

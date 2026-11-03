@@ -1,14 +1,39 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import {
   createApiKey,
   listApiKeys,
@@ -84,12 +109,19 @@ function toForm(key: ApiKey): FormState {
   }
 }
 
+type KeyAction = { type: 'revoke' | 'rotate'; key: ApiKey } | null
+
 export function ApiKeysPage() {
   const queryClient = useQueryClient()
 
+  const [formOpen, setFormOpen] = useState(false)
   const [form, setForm] = useState<FormState>(emptyForm)
   const [editing, setEditing] = useState<ApiKey | null>(null)
-  const [revealed, setRevealed] = useState<{ key: string; name: string | null } | null>(null)
+  const [revealed, setRevealed] = useState<{
+    key: string
+    name: string | null
+  } | null>(null)
+  const [action, setAction] = useState<KeyAction>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
@@ -102,6 +134,11 @@ export function ApiKeysPage() {
     setForm(emptyForm)
     setEditing(null)
     setError(null)
+  }
+
+  const openCreate = () => {
+    resetForm()
+    setFormOpen(true)
   }
 
   const submitMutation = useMutation({
@@ -138,6 +175,7 @@ export function ApiKeysPage() {
     },
     onSuccess: () => {
       resetForm()
+      setFormOpen(false)
       invalidate()
     },
     onError: (err) => {
@@ -147,13 +185,17 @@ export function ApiKeysPage() {
 
   const revokeMutation = useMutation({
     mutationFn: (id: string) => revokeApiKey(id),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate()
+      setAction(null)
+    },
   })
 
   const rotateMutation = useMutation({
     mutationFn: (id: string) => rotateApiKey(id),
     onSuccess: (result) => {
       setRevealed({ key: result.key, name: result.apiKey.name })
+      setAction(null)
       invalidate()
     },
   })
@@ -168,6 +210,16 @@ export function ApiKeysPage() {
     setEditing(key)
     setForm(toForm(key))
     setError(null)
+    setFormOpen(true)
+  }
+
+  const confirmAction = () => {
+    if (!action) return
+    if (action.type === 'revoke') {
+      revokeMutation.mutate(action.key.id)
+    } else {
+      rotateMutation.mutate(action.key.id)
+    }
   }
 
   const copyKey = async () => {
@@ -186,156 +238,15 @@ export function ApiKeysPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">API Key</h1>
-        <p className="text-sm text-muted-foreground">
-          为成员签发 API Key，并按 key 设置模型白名单、速率、预算与过期时间
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">API Key</h1>
+          <p className="text-sm text-muted-foreground">
+            为成员签发 API Key，并按 key 设置模型白名单、速率、预算与过期时间
+          </p>
+        </div>
+        <Button onClick={openCreate}>创建 API Key</Button>
       </div>
-
-      {revealed && (
-        <Card className="border-primary">
-          <CardHeader>
-            <CardTitle>请立即保存 API Key</CardTitle>
-            <CardDescription>
-              完整 key 仅此一次可见，关闭后将无法再次查看
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center gap-2 rounded-md border border-input bg-muted/50 p-2">
-              <code className="flex-1 break-all text-sm">{revealed.key}</code>
-              <Button variant="outline" size="sm" onClick={copyKey}>
-                {copied ? '已复制' : '复制'}
-              </Button>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => setRevealed(null)}>
-              我已保存，关闭
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{editing ? '编辑 API Key' : '创建 API Key'}</CardTitle>
-          <CardDescription>
-            {editing
-              ? `正在编辑 ${editing.keyPrefix}…`
-              : '创建后完整 key 仅展示一次，请及时保存'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <form className="grid gap-3 sm:grid-cols-2" onSubmit={handleSubmit}>
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-sm text-muted-foreground">
-                名称
-              </label>
-              <Input
-                placeholder="如：我的开发密钥（可选）"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm text-muted-foreground">
-                模型白名单（逗号分隔，留空不限）
-              </label>
-              <Input
-                placeholder="gpt-4o-mini, claude-sonnet"
-                value={form.allowedModels}
-                onChange={(e) =>
-                  setForm({ ...form, allowedModels: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm text-muted-foreground">
-                过期时间（留空永久）
-              </label>
-              <Input
-                type="date"
-                value={form.expiresAt}
-                onChange={(e) => setForm({ ...form, expiresAt: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm text-muted-foreground">
-                速率限制（次/分钟，留空不限）
-              </label>
-              <Input
-                type="number"
-                min={1}
-                placeholder="60"
-                value={form.rateLimitPerMinute}
-                onChange={(e) =>
-                  setForm({ ...form, rateLimitPerMinute: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm text-muted-foreground">
-                预算上限（tokens，留空不限）
-              </label>
-              <Input
-                type="number"
-                min={1}
-                placeholder="1000000"
-                value={form.maxTokens}
-                onChange={(e) => setForm({ ...form, maxTokens: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm text-muted-foreground">
-                日 token 上限（留空不限）
-              </label>
-              <Input
-                type="number"
-                min={1}
-                placeholder="100000"
-                value={form.limitDaily}
-                onChange={(e) => setForm({ ...form, limitDaily: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm text-muted-foreground">
-                周 token 上限（留空不限）
-              </label>
-              <Input
-                type="number"
-                min={1}
-                placeholder="500000"
-                value={form.limitWeekly}
-                onChange={(e) => setForm({ ...form, limitWeekly: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm text-muted-foreground">
-                月 token 上限（留空不限）
-              </label>
-              <Input
-                type="number"
-                min={1}
-                placeholder="2000000"
-                value={form.limitMonthly}
-                onChange={(e) => setForm({ ...form, limitMonthly: e.target.value })}
-              />
-            </div>
-
-            {error && <p className="text-sm text-red-500 sm:col-span-2">{error}</p>}
-
-            <div className="flex gap-2 sm:col-span-2">
-              <Button type="submit" disabled={pending}>
-                {editing ? '保存修改' : '创建'}
-              </Button>
-              {editing && (
-                <Button type="button" variant="outline" onClick={resetForm}>
-                  取消
-                </Button>
-              )}
-            </div>
-          </form>
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>
@@ -346,7 +257,7 @@ export function ApiKeysPage() {
             <div className="text-sm text-muted-foreground">加载中…</div>
           ) : keys.length === 0 ? (
             <div className="text-sm text-muted-foreground">
-              暂无 API Key，点击上方创建。
+              暂无 API Key，点击右上角创建。
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -402,7 +313,7 @@ export function ApiKeysPage() {
                               variant="ghost"
                               size="sm"
                               disabled={pending}
-                              onClick={() => rotateMutation.mutate(key.id)}
+                              onClick={() => setAction({ type: 'rotate', key })}
                             >
                               轮换
                             </Button>
@@ -410,7 +321,7 @@ export function ApiKeysPage() {
                               variant="ghost"
                               size="sm"
                               disabled={pending}
-                              onClick={() => revokeMutation.mutate(key.id)}
+                              onClick={() => setAction({ type: 'revoke', key })}
                             >
                               吊销
                             </Button>
@@ -425,6 +336,194 @@ export function ApiKeysPage() {
           )}
         </CardContent>
       </Card>
+
+      <Sheet open={formOpen} onOpenChange={setFormOpen}>
+        <SheetContent className="sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>{editing ? '编辑 API Key' : '创建 API Key'}</SheetTitle>
+            <SheetDescription>
+              {editing
+                ? `正在编辑 ${editing.keyPrefix}…`
+                : '创建后完整 key 仅展示一次，请及时保存'}
+            </SheetDescription>
+          </SheetHeader>
+          <form
+            className="flex flex-1 flex-col gap-4 overflow-y-auto"
+            onSubmit={handleSubmit}
+          >
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                名称
+              </label>
+              <Input
+                placeholder="如：我的开发密钥（可选）"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground">
+                  模型白名单（逗号分隔，留空不限）
+                </label>
+                <Input
+                  placeholder="gpt-4o-mini, claude-sonnet"
+                  value={form.allowedModels}
+                  onChange={(e) =>
+                    setForm({ ...form, allowedModels: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground">
+                  过期时间（留空永久）
+                </label>
+                <Input
+                  type="date"
+                  value={form.expiresAt}
+                  onChange={(e) =>
+                    setForm({ ...form, expiresAt: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground">
+                  速率限制（次/分钟，留空不限）
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="60"
+                  value={form.rateLimitPerMinute}
+                  onChange={(e) =>
+                    setForm({ ...form, rateLimitPerMinute: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground">
+                  预算上限（tokens，留空不限）
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="1000000"
+                  value={form.maxTokens}
+                  onChange={(e) => setForm({ ...form, maxTokens: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground">
+                  日 token 上限（留空不限）
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="100000"
+                  value={form.limitDaily}
+                  onChange={(e) =>
+                    setForm({ ...form, limitDaily: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground">
+                  周 token 上限（留空不限）
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="500000"
+                  value={form.limitWeekly}
+                  onChange={(e) =>
+                    setForm({ ...form, limitWeekly: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground">
+                  月 token 上限（留空不限）
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="2000000"
+                  value={form.limitMonthly}
+                  onChange={(e) =>
+                    setForm({ ...form, limitMonthly: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+
+            {error && <p className="text-sm text-red-500">{error}</p>}
+
+            <SheetFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setFormOpen(false)}
+              >
+                取消
+              </Button>
+              <Button type="submit" disabled={pending}>
+                {editing ? '保存修改' : '创建'}
+              </Button>
+            </SheetFooter>
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      <Dialog
+        open={revealed !== null}
+        onOpenChange={(open) => !open && setRevealed(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>请立即保存 API Key</DialogTitle>
+            <DialogDescription>
+              完整 key 仅此一次可见，关闭后将无法再次查看
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center gap-2 rounded-md border border-input bg-muted/50 p-2">
+            <code className="flex-1 break-all text-sm">{revealed?.key}</code>
+            <Button variant="outline" size="sm" onClick={copyKey}>
+              {copied ? '已复制' : '复制'}
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setRevealed(null)}>我已保存，关闭</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={action !== null}
+        onOpenChange={(open) => !open && setAction(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {action?.type === 'revoke' ? '吊销 API Key' : '轮换 API Key'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {action?.type === 'revoke'
+                ? `确定要吊销「${action?.key.name ?? action?.key.keyPrefix}」吗？吊销后该 key 立即失效，无法恢复。`
+                : `确定要轮换「${action?.key.name ?? action?.key.keyPrefix}」吗？轮换会新建一把 key 并吊销旧 key，新 key 仅展示一次。`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={pending}
+              onClick={confirmAction}
+            >
+              确认
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
