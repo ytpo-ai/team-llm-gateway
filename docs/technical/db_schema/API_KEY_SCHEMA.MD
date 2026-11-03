@@ -9,7 +9,7 @@
 ## 1. 设计原则
 
 - **多租户内建（ADR-03）**：`ApiKey` 携带 `tenantId` 引用 `Tenant`，查询一律按 `tenantId` 过滤。
-- **key 归属成员（ADR-06）**：`tenantId → teamId → userId` 三级归属，用量归到成员/团队。
+- **key 归属成员（ADR-06）**：`tenantId → teamId → userId` 三级归属，用量归到成员/团队。`team_admin`/`system` 可为本团队任意成员签发/改绑 key，`member` 仅能绑定自己。
 - **哈希存储**：只落 `keyHash`（sha256）与 `keyPrefix`（展示前缀），明文 key 绝不落库；完整值仅在创建/轮换时返回一次。
 - **细粒度限制（ADR-06/09）**：每 key 独立 `allowedModels` / `rateLimitPerMinute` / `maxTokens` / `limitDaily` / `limitWeekly` / `limitMonthly` / `providerIds` / `expiresAt`。
 - **三级限额（团队管理优化 REQ-002）**：apikey 只设限额、不持余额；转发层对团队/成员/key 三级日/周/月限额逐级校验，任一超标即拦截。
@@ -21,7 +21,7 @@
 | `_id` | ObjectId | 主键 | 自动生成 |
 | `tenantId` | ObjectId | 必填、ref `Tenant`、索引 | 所属租户 |
 | `teamId` | ObjectId | 必填、ref `Team`、索引 | 所属团队 |
-| `userId` | ObjectId | 必填、ref `User`、索引 | 归属成员 |
+| `userId` | ObjectId | 必填、ref `User`、索引 | 归属成员；`team_admin`/`system` 可指定绑定，`member` 缺省为本人 |
 | `name` | string | 可选、trim | key 标签（如「我的开发密钥」） |
 | `keyHash` | string | 必填、唯一索引 | 完整 key 的 sha256 哈希 |
 | `keyPrefix` | string | 必填 | 展示前缀（如 `pk_ab12cd34ef`，12 字符） |
@@ -73,6 +73,8 @@ interface ApiKeyView {
   providerIds: string[];
   lastUsedAt: Date | null;
   userId: string;
+  userName: string | null;      // 绑定成员姓名（脱敏视图填充）
+  userEmail: string | null;     // 绑定成员邮箱
   createdAt?: Date;
 }
 ```

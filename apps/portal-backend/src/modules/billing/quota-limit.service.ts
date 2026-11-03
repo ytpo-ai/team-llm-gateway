@@ -10,15 +10,10 @@ import { Team, TeamDocument } from '../teams/schemas/team.schema.js';
 import { User } from '../users/schemas/user.schema.js';
 
 export interface ResolvedQuotaLimits {
-  rateLimitPerMinute: number | null;
+  memberRateLimitPerMinute: number | null;
+  keyRateLimitPerMinute: number | null;
   team: TeamDocument | null;
   memberTemplate: RoleTemplateDocument | null;
-}
-
-function minOrNull(...values: Array<number | null | undefined>): number | null {
-  const positives = values.filter((v): v is number => v != null && v > 0);
-  if (positives.length === 0) return null;
-  return Math.min(...positives);
 }
 
 @Injectable()
@@ -39,10 +34,8 @@ export class QuotaLimitService {
     const memberTemplate = await this.resolveMemberTemplate(context.userId);
 
     return {
-      rateLimitPerMinute: minOrNull(
-        memberTemplate?.rateLimitPerMinute,
-        context.apiKey.rateLimitPerMinute,
-      ),
+      memberRateLimitPerMinute: memberTemplate?.rateLimitPerMinute ?? null,
+      keyRateLimitPerMinute: context.apiKey.rateLimitPerMinute ?? null,
       team,
       memberTemplate,
     };

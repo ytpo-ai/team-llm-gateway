@@ -8,6 +8,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Model, Types } from 'mongoose';
 import { Role } from '../../common/enums/role.enum.js';
 import type { AuthUser } from '../auth/decorators/current-user.decorator.js';
+import { UsersService } from '../users/users.service.js';
 import { CreateApiKeyDto } from './dto/create-api-key.dto.js';
 import { UpdateApiKeyDto } from './dto/update-api-key.dto.js';
 import {
@@ -31,7 +32,14 @@ export interface ApiKeyView {
   providerIds: string[];
   lastUsedAt: Date | null;
   userId: string;
+  userName: string | null;
+  userEmail: string | null;
   createdAt?: Date;
+}
+
+interface UserBrief {
+  name: string | null;
+  email: string | null;
 }
 
 const KEY_PREFIX = 'pk_';
@@ -40,13 +48,15 @@ const KEY_PREFIX = 'pk_';
 export class ApiKeysService {
   constructor(
     @InjectModel(ApiKey.name) private readonly apiKeyModel: Model<ApiKey>,
+    private readonly usersService: UsersService,
   ) {}
 
   async create(
     user: AuthUser,
     dto: CreateApiKeyDto,
   ): Promise<{ apiKey: ApiKeyView; key: string }> {
-    return this.persistKey(user, dto);
+    const targetUserId = await this.resolveTargetUserId(user, dto.userId);
+    return this.persistKey(user, dto, targetUserId);
   }
 
   async list(user: AuthUser, userIdFilter?: string): Promise<ApiKeyView[]> {
@@ -63,12 +73,18 @@ export class ApiKeysService {
       .find(filter)
       .sort({ createdAt: -1 })
       .exec();
-    return keys.map((key) => this.toView(key));
+
+    const briefMap = await this.buildUserBriefMap(
+      keys.map((key) => String(key.userId)),
+    );
+
+    return keys.map((key) => this.toView(key, briefMap.get(String(key.userId))));
   }
 
   async get(user: AuthUser, id: string): Promise<ApiKeyView> {
     const key = await this.findAccessibleKey(user, id);
-    return this.toView(key);
+    const brief = await this.resolveUserBrief(String(key.userId));
+    return this.toView(key, brief);
   }
 
   async update(
@@ -78,6 +94,10 @@ export class ApiKeysService {
   ): Promise<ApiKeyView> {
     const key = await this.findAccessibleKey(user, id);
 
+    if (dto.userId !== undefined) {
+      const targetUserId = await this.resolveTargetUserId(user, dto.userId);
+      key.userId = new Types.ObjectId(targetUserId);
+    }
     if (dto.name !== undefined) key.name = dto.name ?? null;
     if (dto.expiresAt !== undefined) {
       key.expiresAt = dto.expiresAt ? new Date(dto.expiresAt) : null;
@@ -107,14 +127,16 @@ export class ApiKeysService {
     }
 
     await key.save();
-    return this.toView(key);
+    const brief = await this.resolveUserBrief(String(key.userId));
+    return this.toView(key, brief);
   }
 
   async revoke(user: AuthUser, id: string): Promise<ApiKeyView> {
     const key = await this.findAccessibleKey(user, id);
     key.status = ApiKeyStatus.REVOKED;
     await key.save();
-    return this.toView(key);
+    const brief = await this.resolveUserBrief(String(key.userId));
+    return this.toView(key, brief);
   }
 
   async rotate(
@@ -125,22 +147,27 @@ export class ApiKeysService {
     old.status = ApiKeyStatus.REVOKED;
     await old.save();
 
-    return this.persistKey(user, {
-      name: old.name ?? undefined,
-      expiresAt: old.expiresAt?.toISOString(),
-      allowedModels: old.allowedModels,
-      rateLimitPerMinute: old.rateLimitPerMinute ?? undefined,
-      maxTokens: old.maxTokens ?? undefined,
-      limitDaily: old.limitDaily ?? undefined,
-      limitWeekly: old.limitWeekly ?? undefined,
-      limitMonthly: old.limitMonthly ?? undefined,
-      providerIds: old.providerIds.map((id) => String(id)),
-    });
+    return this.persistKey(
+      user,
+      {
+        name: old.name ?? undefined,
+        expiresAt: old.expiresAt?.toISOString(),
+        allowedModels: old.allowedModels,
+        rateLimitPerMinute: old.rateLimitPerMinute ?? undefined,
+        maxTokens: old.maxTokens ?? undefined,
+        limitDaily: old.limitDaily ?? undefined,
+        limitWeekly: old.limitWeekly ?? undefined,
+        limitMonthly: old.limitMonthly ?? undefined,
+        providerIds: old.providerIds.map((id) => String(id)),
+      },
+      String(old.userId),
+    );
   }
 
   private async persistKey(
     user: AuthUser,
     dto: CreateApiKeyDto,
+    targetUserId: string,
   ): Promise<{ apiKey: ApiKeyView; key: string }> {
     const key = `${KEY_PREFIX}${randomBytes(24).toString('base64url')}`;
     const keyHash = createHash('sha256').update(key).digest('hex');
@@ -148,7 +175,7 @@ export class ApiKeysService {
     const doc = await this.apiKeyModel.create({
       tenantId: user.tenantId,
       teamId: user.teamId,
-      userId: user.id,
+      userId: targetUserId,
       name: dto.name ?? null,
       keyHash,
       keyPrefix: key.slice(0, 12),
@@ -163,7 +190,32 @@ export class ApiKeysService {
       providerIds: (dto.providerIds ?? []).map((id) => new Types.ObjectId(id)),
     });
 
-    return { apiKey: this.toView(doc), key };
+    const brief = await this.resolveUserBrief(targetUserId);
+    return { apiKey: this.toView(doc, brief), key };
+  }
+
+  private async resolveTargetUserId(
+    user: AuthUser,
+    userId?: string,
+  ): Promise<string> {
+    if (!userId) {
+      return user.id;
+    }
+    if (user.role === Role.MEMBER && userId !== user.id) {
+      throw new ForbiddenException('普通成员仅能绑定自己的 API Key');
+    }
+
+    const target = await this.usersService.findById(userId);
+    if (!target || String(target.tenantId) !== user.tenantId) {
+      throw new NotFoundException('目标成员不存在');
+    }
+    if (
+      user.teamId != null &&
+      (!target.teamId || String(target.teamId) !== user.teamId)
+    ) {
+      throw new NotFoundException('目标成员不属于当前团队');
+    }
+    return String(target._id);
   }
 
   private async findAccessibleKey(
@@ -187,7 +239,25 @@ export class ApiKeysService {
     return key;
   }
 
-  private toView(key: ApiKeyDocument): ApiKeyView {
+  private async buildUserBriefMap(
+    userIds: string[],
+  ): Promise<Map<string, UserBrief>> {
+    const uniqueIds = [...new Set(userIds)];
+    const users = await this.usersService.findByIds(uniqueIds);
+    return new Map(
+      users.map((u) => [
+        String(u._id),
+        { name: u.name ?? null, email: u.email ?? null },
+      ]),
+    );
+  }
+
+  private async resolveUserBrief(userId: string): Promise<UserBrief> {
+    const user = await this.usersService.findById(userId);
+    return { name: user?.name ?? null, email: user?.email ?? null };
+  }
+
+  private toView(key: ApiKeyDocument, brief?: UserBrief): ApiKeyView {
     return {
       id: String(key._id),
       name: key.name,
@@ -203,6 +273,8 @@ export class ApiKeysService {
       providerIds: key.providerIds?.map((id) => String(id)) ?? [],
       lastUsedAt: key.lastUsedAt,
       userId: String(key.userId),
+      userName: brief?.name ?? null,
+      userEmail: brief?.email ?? null,
       createdAt: key.createdAt,
     };
   }

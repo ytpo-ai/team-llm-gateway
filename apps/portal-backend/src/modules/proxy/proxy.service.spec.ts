@@ -125,7 +125,8 @@ describe('ProxyService', () => {
     billingService.getSpendableBalance.mockResolvedValue(100);
     billingService.deduct.mockResolvedValue(undefined);
     quotaLimitService.resolve.mockResolvedValue({
-      rateLimitPerMinute: null,
+      memberRateLimitPerMinute: null,
+      keyRateLimitPerMinute: null,
       team: null,
       memberTemplate: null,
     });
@@ -251,6 +252,48 @@ describe('ProxyService', () => {
           makeRes() as never,
         ),
       ).rejects.toThrow(HttpException);
+    });
+
+    it('should enforce member rate limit by userId and key rate limit by apiKeyId', async () => {
+      quotaLimitService.resolve.mockResolvedValue({
+        memberRateLimitPerMinute: 30,
+        keyRateLimitPerMinute: 60,
+        team: null,
+        memberTemplate: null,
+      });
+      modelModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(makeModel()),
+      });
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(makeProvider()),
+      });
+      usageService.record.mockResolvedValue(undefined);
+      apiKeyModel.updateOne.mockResolvedValue(undefined);
+
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              choices: [{ message: { content: 'hi' } }],
+              usage: { total_tokens: 0 },
+            }),
+            { status: 200 },
+          ),
+        ),
+      );
+
+      await service.chatCompletions(
+        makeContext(),
+        { model: 'gpt-4o-mini' },
+        makeRes() as never,
+      );
+
+      expect(rateLimitService.assertAllowed).toHaveBeenCalledWith(userId, 30);
+      expect(rateLimitService.assertAllowed).toHaveBeenCalledWith(
+        String(apiKeyId),
+        60,
+      );
     });
   });
 

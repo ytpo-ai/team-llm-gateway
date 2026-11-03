@@ -269,8 +269,12 @@ export class ProxyService {
     });
 
     this.rateLimitService.assertAllowed(
+      ctx.userId,
+      limits.memberRateLimitPerMinute,
+    );
+    this.rateLimitService.assertAllowed(
       ctx.apiKeyId,
-      limits.rateLimitPerMinute,
+      limits.keyRateLimitPerMinute,
     );
 
     if (ctx.apiKey.maxTokens != null) {

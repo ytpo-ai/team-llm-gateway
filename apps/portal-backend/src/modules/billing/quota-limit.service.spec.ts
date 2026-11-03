@@ -87,12 +87,13 @@ describe('QuotaLimitService', () => {
         apiKey: makeApiKey(),
       });
 
-      expect(result.rateLimitPerMinute).toBeNull();
+      expect(result.memberRateLimitPerMinute).toBeNull();
+      expect(result.keyRateLimitPerMinute).toBeNull();
       expect(result.team).not.toBeNull();
       expect(result.memberTemplate).toBeNull();
     });
 
-    it('should take min rate limit between template and key', async () => {
+    it('should split member and key rate limits', async () => {
       teamModel.findById.mockReturnValue({ exec: vi.fn().mockResolvedValue({}) });
       userModel.findById.mockReturnValue({
         exec: vi.fn().mockResolvedValue({ roleTemplateId: templateId }),
@@ -107,7 +108,8 @@ describe('QuotaLimitService', () => {
         apiKey: makeApiKey({ rateLimitPerMinute: 60 }),
       });
 
-      expect(result.rateLimitPerMinute).toBe(30);
+      expect(result.memberRateLimitPerMinute).toBe(30);
+      expect(result.keyRateLimitPerMinute).toBe(60);
     });
   });
 

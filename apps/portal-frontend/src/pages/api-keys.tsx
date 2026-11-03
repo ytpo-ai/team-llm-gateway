@@ -27,6 +27,13 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -46,6 +53,9 @@ import type {
   ApiKeyInput,
   ApiKeyPatch,
 } from '@/features/api-keys/types'
+import { useAuthStore } from '@/features/auth/store'
+import { listMembers } from '@/features/teams/api'
+import type { Member } from '@/features/teams/types'
 import { ApiError } from '@/lib/http'
 
 function formatDate(value: string | null): string {
@@ -66,6 +76,7 @@ function formatLimits(key: ApiKey): string {
 }
 
 interface FormState {
+  userId: string
   name: string
   allowedModels: string
   rateLimitPerMinute: string
@@ -77,6 +88,7 @@ interface FormState {
 }
 
 const emptyForm: FormState = {
+  userId: '',
   name: '',
   allowedModels: '',
   rateLimitPerMinute: '',
@@ -96,6 +108,7 @@ function parseModels(raw: string): string[] {
 
 function toForm(key: ApiKey): FormState {
   return {
+    userId: key.userId,
     name: key.name ?? '',
     allowedModels: key.allowedModels.join(', '),
     rateLimitPerMinute: key.rateLimitPerMinute
@@ -113,6 +126,8 @@ type KeyAction = { type: 'revoke' | 'rotate'; key: ApiKey } | null
 
 export function ApiKeysPage() {
   const queryClient = useQueryClient()
+  const user = useAuthStore((s) => s.user)
+  const isTeamAdmin = user?.role === 'team_admin' || user?.role === 'system'
 
   const [formOpen, setFormOpen] = useState(false)
   const [form, setForm] = useState<FormState>(emptyForm)
@@ -126,6 +141,13 @@ export function ApiKeysPage() {
   const [copied, setCopied] = useState(false)
 
   const keysQuery = useQuery({ queryKey: ['api-keys'], queryFn: () => listApiKeys() })
+
+  const membersQuery = useQuery({
+    queryKey: ['team-members', user?.teamId],
+    queryFn: () => listMembers(user!.teamId!),
+    enabled: isTeamAdmin && Boolean(user?.teamId),
+  })
+  const members: Member[] = membersQuery.data ?? []
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['api-keys'] })
@@ -146,6 +168,7 @@ export function ApiKeysPage() {
       const models = parseModels(form.allowedModels)
       if (editing) {
         const patch: ApiKeyPatch = {
+          userId: form.userId || undefined,
           name: form.name.trim() || null,
           expiresAt: form.expiresAt || null,
           allowedModels: models,
@@ -160,6 +183,7 @@ export function ApiKeysPage() {
         return updateApiKey(editing.id, patch)
       }
       const input: ApiKeyInput = {
+        userId: form.userId || undefined,
         name: form.name.trim() || undefined,
         expiresAt: form.expiresAt || undefined,
         allowedModels: models,
@@ -265,6 +289,7 @@ export function ApiKeysPage() {
                 <thead>
                   <tr className="border-b text-left text-muted-foreground">
                     <th className="py-2 pr-4 font-medium">名称</th>
+                    <th className="py-2 pr-4 font-medium">成员</th>
                     <th className="py-2 pr-4 font-medium">Key</th>
                     <th className="py-2 pr-4 font-medium">状态</th>
                     <th className="py-2 pr-4 font-medium">限制</th>
@@ -278,6 +303,9 @@ export function ApiKeysPage() {
                     <tr key={key.id} className="border-b last:border-0">
                       <td className="py-2 pr-4">
                         {key.name ?? <span className="text-muted-foreground">—</span>}
+                      </td>
+                      <td className="py-2 pr-4 text-muted-foreground">
+                        {key.userName ?? key.userEmail ?? '—'}
                       </td>
                       <td className="py-2 pr-4">
                         <code className="text-xs">{key.keyPrefix}…</code>
@@ -361,6 +389,32 @@ export function ApiKeysPage() {
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
             </div>
+            {isTeamAdmin && (
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground">
+                  绑定成员
+                </label>
+                <Select
+                  value={form.userId || 'self'}
+                  onValueChange={(value) =>
+                    setForm({ ...form, userId: value === 'self' ? '' : value })
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="选择成员" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="self">（默认：我自己）</SelectItem>
+                    {members.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.name}
+                        {m.email ? `（${m.email}）` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm text-muted-foreground">

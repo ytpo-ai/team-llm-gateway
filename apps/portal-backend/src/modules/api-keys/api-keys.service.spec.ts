@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { Types } from 'mongoose';
 import { Role } from '../../common/enums/role.enum.js';
 import type { AuthUser } from '../auth/decorators/current-user.decorator.js';
+import { UsersService } from '../users/users.service.js';
 import { ApiKeysService } from './api-keys.service.js';
 import { ApiKeyStatus } from './schemas/api-key.schema.js';
 
@@ -20,6 +21,11 @@ describe('ApiKeysService', () => {
     create: vi.fn(),
     find: vi.fn(),
     findOne: vi.fn(),
+  };
+
+  const usersService = {
+    findById: vi.fn(),
+    findByIds: vi.fn(),
   };
 
   const makeUser = (overrides: Partial<AuthUser> = {}): AuthUser => ({
@@ -63,8 +69,12 @@ describe('ApiKeysService', () => {
       providers: [
         ApiKeysService,
         { provide: 'ApiKeyModel', useValue: apiKeyModel },
+        { provide: UsersService, useValue: usersService },
       ],
     }).compile();
+
+    usersService.findById.mockResolvedValue(null);
+    usersService.findByIds.mockResolvedValue([]);
 
     service = module.get(ApiKeysService);
   });
@@ -172,6 +182,56 @@ describe('ApiKeysService', () => {
       expect(oldKey.status).toBe(ApiKeyStatus.REVOKED);
       expect(result.key).toMatch(/^pk_/);
       expect(result.apiKey.status).toBe(ApiKeyStatus.ACTIVE);
+    });
+  });
+
+  describe('member binding', () => {
+    it('should let team_admin bind a key to another member', async () => {
+      const target = {
+        _id: otherUserId,
+        tenantId,
+        teamId,
+        name: 'Bob',
+        email: 'bob@example.com',
+      };
+      usersService.findById.mockResolvedValue(target);
+      apiKeyModel.create.mockImplementation(async (input: any) => ({
+        ...makeKey(),
+        ...input,
+        _id: keyId,
+      }));
+
+      const result = await service.create(
+        makeUser({ role: Role.TEAM_ADMIN }),
+        { name: 'for-bob', userId: String(otherUserId) },
+      );
+
+      const createArg = apiKeyModel.create.mock.calls[0][0];
+      expect(createArg.userId).toBe(String(otherUserId));
+      expect(result.apiKey.userName).toBe('Bob');
+      expect(result.apiKey.userEmail).toBe('bob@example.com');
+    });
+
+    it('should forbid a member binding to another member', async () => {
+      await expect(
+        service.create(makeUser(), { userId: String(otherUserId) }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should reject binding to a member of another team', async () => {
+      usersService.findById.mockResolvedValue({
+        _id: otherUserId,
+        tenantId,
+        teamId: new Types.ObjectId(),
+        name: 'Mallory',
+        email: null,
+      });
+
+      await expect(
+        service.create(makeUser({ role: Role.TEAM_ADMIN }), {
+          userId: String(otherUserId),
+        }),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

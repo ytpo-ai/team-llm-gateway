@@ -46,6 +46,12 @@ export class UsersService {
     return this.userModel.findById(id).exec();
   }
 
+  findByIds(ids: string[]): Promise<UserDocument[]> {
+    return this.userModel
+      .find({ _id: { $in: ids.map((id) => new Types.ObjectId(id)) } })
+      .exec();
+  }
+
   listByTeam(tenantId: string, teamId: string): Promise<UserDocument[]> {
     return this.userModel.find({ tenantId, teamId }).sort({ createdAt: 1 }).exec();
   }

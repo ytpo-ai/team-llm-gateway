@@ -11,6 +11,11 @@ import {
 } from 'class-validator';
 
 export class CreateApiKeyDto {
+  @ApiPropertyOptional({ description: '绑定成员 ID（team_admin 可指定，缺省为当前用户）' })
+  @IsOptional()
+  @IsMongoId()
+  userId?: string;
+
   @ApiPropertyOptional({ example: '我的开发密钥' })
   @IsOptional()
   @IsString()

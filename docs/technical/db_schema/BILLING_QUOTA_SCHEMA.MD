@@ -120,6 +120,7 @@ interface AdjustInput {
 
 **限额生效规则**（转发层 `QuotaLimitService` + `ProxyService`）：
 - 团队 / 成员（角色B 模板）/ key 三级**逐级独立校验**，任一级在对应窗口内累计 token 超过限额即拦截。
+- 速率限制（`rateLimitPerMinute`）分两档独立校验：成员级（角色B 模板）以 `userId` 聚合计数（成员多 key 共享同一上限），key 级以 `apiKeyId` 计数。
 - 渠道白名单：团队 / 成员 / key 三级 `providerIds` 逐级检查（非空白名单须包含目标渠道）。
 - apikey **只设限额、不持余额**，扣费仍走成员优先、团队兜底的余额账户。
 - 成员限额默认继承角色B 模板（本期不支持单成员覆盖，预留 override 扩展点）。

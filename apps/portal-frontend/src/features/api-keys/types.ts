@@ -15,6 +15,8 @@ export interface ApiKey {
   providerIds: string[]
   lastUsedAt: string | null
   userId: string
+  userName: string | null
+  userEmail: string | null
   createdAt?: string
 }
 
@@ -24,6 +26,7 @@ export interface ApiKeyResult {
 }
 
 export interface ApiKeyInput {
+  userId?: string
   name?: string
   expiresAt?: string
   allowedModels?: string[]
@@ -36,6 +39,7 @@ export interface ApiKeyInput {
 }
 
 export interface ApiKeyPatch {
+  userId?: string
   name?: string | null
   expiresAt?: string | null
   allowedModels?: string[]
