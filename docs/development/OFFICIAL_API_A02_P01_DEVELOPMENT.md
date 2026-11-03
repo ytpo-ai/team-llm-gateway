@@ -49,4 +49,4 @@
 ## 5. 关联
 
 - 计划：`docs/plan/OFFICIAL_API_ADVANCED_PLAN.md`、`docs/plan/OFFICIAL_API_PRESET_PLAN.md`
-- 待决：A-01（远程图片 SSRF 白名单）仍未实现。
+- 后续：A-01（远程图片 SSRF 防护）见 `docs/development/OFFICIAL_API_A01_DEVELOPMENT.md`。

@@ -10,6 +10,7 @@ import {
   type UpstreamAdapter,
   type UpstreamUsage,
 } from './upstream-adapter.js';
+import { isSafeImageUrl } from './ssrf-guard.js';
 
 const DEFAULT_MAX_TOKENS = 4096;
 
@@ -91,22 +92,23 @@ async function convertImageUrl(
       source: { type: 'base64', media_type: dataMatch[1], data: dataMatch[2] },
     };
   }
-  if (/^https?:\/\//.test(url)) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) return undefined;
-      const buf = await res.arrayBuffer();
-      const data = Buffer.from(buf).toString('base64');
-      const contentType =
-        res.headers.get('content-type')?.split(';')[0].trim() ??
-        inferMediaType(url) ??
-        'image/png';
-      return { type: 'image', source: { type: 'base64', media_type: contentType, data } };
-    } catch {
-      return undefined;
-    }
+
+  // SSRF 防护：仅允许公网 http(s) 地址，拦截内网/回环/链路本地/云元数据
+  if (!(await isSafeImageUrl(url))) return undefined;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return undefined;
+    const buf = await res.arrayBuffer();
+    const data = Buffer.from(buf).toString('base64');
+    const contentType =
+      res.headers.get('content-type')?.split(';')[0].trim() ??
+      inferMediaType(url) ??
+      'image/png';
+    return { type: 'image', source: { type: 'base64', media_type: contentType, data } };
+  } catch {
+    return undefined;
   }
-  return undefined;
 }
 
 interface ActiveBlock {
