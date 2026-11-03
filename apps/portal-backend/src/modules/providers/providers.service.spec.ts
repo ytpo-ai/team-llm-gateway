@@ -28,6 +28,7 @@ describe('ProvidersService', () => {
   const modelsService = {
     getOfficialPresets: vi.fn(),
     bulkCreate: vi.fn(),
+    list: vi.fn(),
   };
 
   const makeProvider = (overrides: Record<string, unknown> = {}) => ({
@@ -50,6 +51,7 @@ describe('ProvidersService', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     configService.getOrThrow.mockReturnValue(secret);
+    modelsService.list.mockResolvedValue([]);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -299,6 +301,28 @@ describe('ProvidersService', () => {
       const result = await service.test(tenantId, teamId, String(providerId));
 
       expect(result.ok).toBe(false);
+    });
+
+    it('probes with the provider own model when available', async () => {
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(makeTestProvider()),
+      });
+      modelsService.list.mockResolvedValue([
+        { providerId: String(providerId), modelId: 'qwen-plus', status: 'active' },
+      ]);
+      let capturedBody = '';
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockImplementation((_url: string, opts: { body: string }) => {
+          capturedBody = opts.body;
+          return Promise.resolve(new Response('{}', { status: 200 }));
+        }),
+      );
+
+      const result = await service.test(tenantId, teamId, String(providerId));
+
+      expect(result.ok).toBe(true);
+      expect(capturedBody).toContain('qwen-plus');
     });
   });
 

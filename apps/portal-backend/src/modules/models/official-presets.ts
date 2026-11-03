@@ -150,7 +150,7 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
     key: 'qwen',
     type: ProviderType.OPENAI_COMPATIBLE,
     label: '通义千问 Qwen',
-    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    baseUrl: 'https://maas.qianwenaiapi.com/compatible-mode/v1',
     models: [
       {
         modelId: 'qwen-turbo',

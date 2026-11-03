@@ -184,12 +184,18 @@ export class ProvidersService {
     );
     const adapter = resolveAdapter(provider.type);
     const startedAt = Date.now();
+    const modelId = await this.resolveProbeModelId(
+      tenantId,
+      teamId,
+      String(provider._id),
+      provider.type,
+    );
 
     try {
       const request = await adapter.buildRequest({
         baseUrl: provider.baseUrl,
         apiKey: upstreamKey,
-        modelId: PROBE_MODEL[provider.type] ?? 'gpt-4o-mini',
+        modelId,
         body: {
           messages: [{ role: 'user', content: 'ping' }],
           max_tokens: 1,
@@ -227,6 +233,19 @@ export class ProvidersService {
 
   private encryptionSecret(): string {
     return this.configService.getOrThrow<string>('encryption.secret');
+  }
+
+  private async resolveProbeModelId(
+    tenantId: string,
+    teamId: string,
+    providerId: string,
+    type: ProviderType,
+  ): Promise<string> {
+    const models = await this.modelsService.list(tenantId, teamId);
+    const model = models.find(
+      (m) => m.providerId === providerId && m.status === 'active',
+    );
+    return model?.modelId ?? PROBE_MODEL[type] ?? 'gpt-4o-mini';
   }
 
   private async assertNameAvailable(
