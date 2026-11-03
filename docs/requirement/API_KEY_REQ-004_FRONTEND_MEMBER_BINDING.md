@@ -8,7 +8,7 @@
 | 所属 plan | `docs/plan/API_KEY_MEMBER_BINDING_PLAN.md` |
 | 需求管理 ID | — |
 | 分支 | `feat/api-key-member-binding` |
-| 状态 | `in-progress` |
+| 状态 | `in-review` |
 
 ## 2. 需求描述
 
@@ -39,5 +39,5 @@
 
 ## 5. 状态跟踪
 - [x] 开发中
-- [ ] 待验收
+- [x] 待验收
 - [ ] 已交付

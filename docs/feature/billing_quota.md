@@ -24,6 +24,7 @@
 | 同上 | [REQ-002 转发层联动](../requirement/BILLING_QUOTA_REQ-002_BACKEND_PROXY_ENFORCEMENT.md) | [开发记录](../development/BILLING_QUOTA_REQ-002_DEVELOPMENT.md) | — |
 | 同上 | [REQ-003 前端额度看板](../requirement/BILLING_QUOTA_REQ-003_FRONTEND_BILLING.md) | [开发记录](../development/BILLING_QUOTA_REQ-003_DEVELOPMENT.md) | — |
 | [TEAM_MANAGEMENT_OPTIMIZATION](../plan/TEAM_MANAGEMENT_OPTIMIZATION_PLAN.md) | [REQ-002 三级限额模型](../requirement/TEAM_MANAGEMENT_REQ-002_QUOTA_LIMIT.md) | [开发记录](../development/TEAM_MANAGEMENT_REQ-002_DEVELOPMENT.md) | — |
+| [API_KEY_MEMBER_BINDING](../plan/API_KEY_MEMBER_BINDING_PLAN.md) | [REQ-003 后端成员绑定与聚合](../requirement/API_KEY_REQ-003_BACKEND_MEMBER_BINDING.md) | [开发记录](../development/API_KEY_REQ-003_DEVELOPMENT.md) | — |
 
 ## 3. 相关文档
 - 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-10、§7.2、D-03）、`docs/technical/db_schema/BILLING_QUOTA_SCHEMA.MD`

@@ -23,6 +23,8 @@
 | [API_KEY](../plan/API_KEY_PLAN.md) | [REQ-001 后端 API Key](../requirement/API_KEY_REQ-001_BACKEND_KEY.md) | [开发记录](../development/API_KEY_REQ-001_DEVELOPMENT.md) | — |
 | 同上 | [REQ-002 前端 API Key 管理](../requirement/API_KEY_REQ-002_FRONTEND_KEY.md) | [开发记录](../development/API_KEY_REQ-002_DEVELOPMENT.md) | — |
 | [TEAM_MANAGEMENT_OPTIMIZATION](../plan/TEAM_MANAGEMENT_OPTIMIZATION_PLAN.md) | [REQ-002 三级限额模型](../requirement/TEAM_MANAGEMENT_REQ-002_QUOTA_LIMIT.md) | [开发记录](../development/TEAM_MANAGEMENT_REQ-002_DEVELOPMENT.md) | — |
+| [API_KEY_MEMBER_BINDING](../plan/API_KEY_MEMBER_BINDING_PLAN.md) | [REQ-003 后端成员绑定与聚合](../requirement/API_KEY_REQ-003_BACKEND_MEMBER_BINDING.md) | [开发记录](../development/API_KEY_REQ-003_DEVELOPMENT.md) | — |
+| 同上 | [REQ-004 前端成员绑定与展示](../requirement/API_KEY_REQ-004_FRONTEND_MEMBER_BINDING.md) | [开发记录](../development/API_KEY_REQ-004_DEVELOPMENT.md) | — |
 
 ## 3. 相关文档
 - 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-06/09、§7.1）、`docs/technical/db_schema/API_KEY_SCHEMA.MD`
