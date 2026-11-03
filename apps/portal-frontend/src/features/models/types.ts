@@ -22,6 +22,7 @@ export interface OfficialModelPreset {
 }
 
 export interface OfficialProviderPreset {
+  key: string
   type: ProviderType
   label: string
   baseUrl: string

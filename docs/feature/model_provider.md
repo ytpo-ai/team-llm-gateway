@@ -16,6 +16,7 @@
 - 上游 key AES-256-GCM 加密落库，明文仅创建/更新时输入、绝不返回。
 - 模型目录：`modelId` + `multiplier`（倍率）+ `capabilities`（能力标签）+ `aliases`。
 - OpenAI 兼容转发层（成员 key → Portal → 上游 key 转发，D-05）：已交付，见 `docs/plan/USAGE_METERING_PLAN.md`（M-01 闭环），代码在 `apps/portal-backend/src/modules/proxy/`。
+- 官方直连一键开启：渠道管理页内置主流 LLM 官方预置（默认未开启），填 Key 即建官方直连渠道并自动导入官方模型（`POST /providers/from-preset`），`Provider.presetKey` 标记来源官方预置。
 
 ## 2. 需求追溯
 
@@ -29,6 +30,8 @@
 | [OFFICIAL_API_PRESET](../plan/OFFICIAL_API_PRESET_PLAN.md) | [REQ-004 前端类型+预置+探活](../requirement/OFFICIAL_API_REQ-004_FRONTEND_PRESET_PROBE.md) | [开发记录](../development/OFFICIAL_API_REQ-004_DEVELOPMENT.md) | — |
 | [OFFICIAL_API_ADVANCED](../plan/OFFICIAL_API_ADVANCED_PLAN.md) | [REQ-005 Anthropic 工具调用+vision](../requirement/OFFICIAL_API_REQ-005_ANTHROPIC_TOOL_VISION.md) | [开发记录](../development/OFFICIAL_API_REQ-005_DEVELOPMENT.md) | — |
 | 同上 | [REQ-006 Gemini OAuth](../requirement/OFFICIAL_API_REQ-006_GEMINI_OAUTH.md) | [开发记录](../development/OFFICIAL_API_REQ-006_DEVELOPMENT.md) | — |
+| [OFFICIAL_CHANNEL_PRESET](../plan/OFFICIAL_CHANNEL_PRESET_PLAN.md) | [REQ-007 后端预置+一键开启](../requirement/OFFICIAL_API_REQ-007_BACKEND_CHANNEL_PRESET.md) | [开发记录](../development/OFFICIAL_API_REQ-007_DEVELOPMENT.md) | — |
+| 同上 | [REQ-008 前端官方直连卡片区](../requirement/OFFICIAL_API_REQ-008_FRONTEND_OFFICIAL_CHANNEL.md) | [开发记录](../development/OFFICIAL_API_REQ-008_DEVELOPMENT.md) | — |
 
 ## 3. 相关文档
 - 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（§3、ADR-09/10、D-05）、`docs/technical/db_schema/MODEL_PROVIDER_SCHEMA.MD`

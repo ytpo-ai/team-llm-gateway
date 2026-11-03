@@ -1,5 +1,7 @@
 import { request } from '@/lib/http'
 import type {
+  CreateProviderFromPresetInput,
+  CreateProviderFromPresetResult,
   Provider,
   ProviderInput,
   ProviderPatch,
@@ -12,6 +14,15 @@ export function listProviders(): Promise<Provider[]> {
 
 export function createProvider(input: ProviderInput): Promise<Provider> {
   return request<Provider>('/providers', { method: 'POST', body: input })
+}
+
+export function createProviderFromPreset(
+  input: CreateProviderFromPresetInput,
+): Promise<CreateProviderFromPresetResult> {
+  return request<CreateProviderFromPresetResult>('/providers/from-preset', {
+    method: 'POST',
+    body: input,
+  })
 }
 
 export function updateProvider(

@@ -12,6 +12,7 @@ export interface Provider {
   baseUrl: string
   apiKeyHint: string
   status: ProviderStatus
+  presetKey?: string | null
   createdAt?: string
 }
 
@@ -36,6 +37,17 @@ export interface ProviderProbeResult {
   ok: boolean
   latencyMs: number
   message: string
+}
+
+export interface CreateProviderFromPresetInput {
+  presetKey: string
+  apiKey: string
+  name?: string
+}
+
+export interface CreateProviderFromPresetResult {
+  provider: Provider
+  models: { created: unknown[]; skipped: string[] }
 }
 
 export const PROVIDER_TYPE_LABELS: Record<ProviderType, string> = {

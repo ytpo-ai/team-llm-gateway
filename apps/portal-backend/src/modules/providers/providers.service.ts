@@ -11,7 +11,10 @@ import {
   decrypt,
   encrypt,
 } from '../../common/crypto/cipher.js';
+import { BulkCreateResult } from '../models/models.service.js';
+import { ModelsService } from '../models/models.service.js';
 import { resolveAdapter } from '../proxy/adapters/adapter.factory.js';
+import { CreateProviderFromPresetDto } from './dto/create-provider-from-preset.dto.js';
 import { CreateProviderDto } from './dto/create-provider.dto.js';
 import { UpdateProviderDto } from './dto/update-provider.dto.js';
 import {
@@ -30,6 +33,7 @@ export interface ProviderView {
   baseUrl: string;
   apiKeyHint: string;
   status: ProviderStatus;
+  presetKey?: string | null;
   createdAt?: Date;
 }
 
@@ -37,6 +41,11 @@ export interface ProviderProbeResult {
   ok: boolean;
   latencyMs: number;
   message: string;
+}
+
+export interface CreateFromPresetResult {
+  provider: ProviderView;
+  models: BulkCreateResult;
 }
 
 const PROBE_MODEL: Record<ProviderType, string> = {
@@ -50,6 +59,7 @@ export class ProvidersService {
   constructor(
     @InjectModel(Provider.name) private readonly providerModel: Model<Provider>,
     private readonly configService: ConfigService,
+    private readonly modelsService: ModelsService,
   ) {}
 
   async list(tenantId: string, teamId: string): Promise<ProviderView[]> {
@@ -83,9 +93,44 @@ export class ProvidersService {
       apiKeyCiphertext: encrypt(secret, dto.apiKey),
       apiKeyHint: buildApiKeyHint(dto.apiKey),
       status: ProviderStatus.ACTIVE,
+      presetKey: dto.presetKey,
     });
 
     return this.toView(provider);
+  }
+
+  async createFromPreset(
+    tenantId: string,
+    teamId: string,
+    dto: CreateProviderFromPresetDto,
+  ): Promise<CreateFromPresetResult> {
+    const presets = await this.modelsService.getOfficialPresets();
+    const preset = presets.find((p) => p.key === dto.presetKey);
+    if (!preset) {
+      throw new NotFoundException('官方渠道预置不存在');
+    }
+
+    const provider = await this.create(tenantId, teamId, {
+      name: dto.name?.trim() || preset.label,
+      type: preset.type,
+      authType: ProviderAuthType.API_KEY,
+      baseUrl: preset.baseUrl,
+      apiKey: dto.apiKey,
+      presetKey: preset.key,
+    });
+
+    const models = await this.modelsService.bulkCreate(tenantId, teamId, {
+      providerId: provider.id,
+      models: preset.models.map((model) => ({
+        modelId: model.modelId,
+        displayName: model.displayName,
+        multiplier: model.multiplier,
+        capabilities: model.capabilities,
+        aliases: [],
+      })),
+    });
+
+    return { provider, models };
   }
 
   async update(
@@ -109,6 +154,7 @@ export class ProvidersService {
       provider.apiKeyHint = buildApiKeyHint(dto.apiKey);
     }
     if (dto.status !== undefined) provider.status = dto.status;
+    if (dto.presetKey !== undefined) provider.presetKey = dto.presetKey || undefined;
 
     await provider.save();
     return this.toView(provider);
@@ -219,6 +265,7 @@ export class ProvidersService {
       baseUrl: provider.baseUrl,
       apiKeyHint: provider.apiKeyHint,
       status: provider.status,
+      presetKey: provider.presetKey ?? null,
       createdAt: provider.createdAt,
     };
   }

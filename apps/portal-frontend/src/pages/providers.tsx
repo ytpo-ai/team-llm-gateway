@@ -10,8 +10,11 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useAuthStore } from '@/features/auth/store'
+import { listOfficialPresets } from '@/features/models/api'
+import type { OfficialProviderPreset } from '@/features/models/types'
 import {
   createProvider,
+  createProviderFromPreset,
   listProviders,
   removeProvider,
   testProvider,
@@ -62,14 +65,64 @@ export function ProvidersPage() {
   >({})
   const [probingId, setProbingId] = useState<string | null>(null)
 
+  const [enablePreset, setEnablePreset] =
+    useState<OfficialProviderPreset | null>(null)
+  const [enableName, setEnableName] = useState('')
+  const [enableKey, setEnableKey] = useState('')
+  const [enableError, setEnableError] = useState<string | null>(null)
+  const [enableResult, setEnableResult] = useState<string | null>(null)
+
   const providersQuery = useQuery({
     queryKey: ['providers'],
     queryFn: listProviders,
     enabled: isAdmin,
   })
 
+  const presetsQuery = useQuery({
+    queryKey: ['official-presets'],
+    queryFn: listOfficialPresets,
+  })
+
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['providers'] })
+
+  const openEnable = (preset: OfficialProviderPreset) => {
+    setEnablePreset(preset)
+    setEnableName('')
+    setEnableKey('')
+    setEnableError(null)
+    setEnableResult(null)
+  }
+
+  const enableMutation = useMutation({
+    mutationFn: () => {
+      if (!enablePreset) throw new Error('no preset')
+      return createProviderFromPreset({
+        presetKey: enablePreset.key,
+        apiKey: enableKey.trim(),
+        name: enableName.trim() || undefined,
+      })
+    },
+    onSuccess: (result) => {
+      setEnableResult(
+        `已开启「${result.provider.name}」，导入 ${result.models.created.length} 个模型` +
+          (result.models.skipped.length
+            ? `，跳过 ${result.models.skipped.length} 个已存在`
+            : ''),
+      )
+      setEnablePreset(null)
+      setEnableName('')
+      setEnableKey('')
+      setEnableError(null)
+      invalidate()
+      queryClient.invalidateQueries({ queryKey: ['models'] })
+    },
+    onError: (err) => {
+      setEnableError(
+        err instanceof ApiError ? err.message : '开启失败，请稍后重试',
+      )
+    },
+  })
 
   const testMutation = useMutation({
     mutationFn: (id: string) => testProvider(id),
@@ -147,6 +200,15 @@ export function ProvidersPage() {
   }
 
   const providers: Provider[] = providersQuery.data ?? []
+  const officialPresets: OfficialProviderPreset[] = presetsQuery.data ?? []
+
+  const providersByPreset: Record<string, Provider[]> = {}
+  for (const provider of providers) {
+    if (!provider.presetKey) continue
+    const list = providersByPreset[provider.presetKey] ?? []
+    providersByPreset[provider.presetKey] = list
+    list.push(provider)
+  }
 
   return (
     <div className="space-y-6">
@@ -156,6 +218,102 @@ export function ProvidersPage() {
           配置团队上游（OpenAI 兼容 / 直连），上游 key 加密存储、仅展示脱敏信息
         </p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>官方直连</CardTitle>
+          <CardDescription>
+            内置主流 LLM 官方直连，默认未开启；填 Key 即可一键开启并自动导入官方模型
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {enableResult && (
+            <p className="text-sm text-green-600">{enableResult}</p>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {officialPresets.map((preset) => {
+              const enabled = providersByPreset[preset.key] ?? []
+              const open = enablePreset?.key === preset.key
+              return (
+                <div
+                  key={preset.key}
+                  className="rounded-md border border-border p-3 text-sm"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{preset.label}</span>
+                    <span
+                      className={`text-xs ${
+                        enabled.length
+                          ? 'text-green-600'
+                          : 'text-muted-foreground'
+                      }`}
+                    >
+                      {enabled.length ? `已开启 ${enabled.length} 个` : '未开启'}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {PROVIDER_TYPE_LABELS[preset.type]} · {preset.models.length}{' '}
+                    个官方模型
+                  </div>
+                  <div className="mt-1 truncate text-xs text-muted-foreground">
+                    {preset.baseUrl}
+                  </div>
+                  {enabled.length > 0 && (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      {enabled.map((p) => p.name).join('、')}
+                    </div>
+                  )}
+                  {open ? (
+                    <div className="mt-3 space-y-2">
+                      <Input
+                        type="password"
+                        placeholder="sk-…"
+                        value={enableKey}
+                        onChange={(e) => setEnableKey(e.target.value)}
+                      />
+                      <Input
+                        placeholder={`渠道名称（默认 ${preset.label}）`}
+                        value={enableName}
+                        onChange={(e) => setEnableName(e.target.value)}
+                      />
+                      {enableError && (
+                        <p className="text-xs text-red-500">{enableError}</p>
+                      )}
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          disabled={
+                            enableMutation.isPending || !enableKey.trim()
+                          }
+                          onClick={() => enableMutation.mutate()}
+                        >
+                          {enableMutation.isPending ? '开启中…' : '确认开启'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setEnablePreset(null)}
+                        >
+                          取消
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      className="mt-3"
+                      size="sm"
+                      variant={enabled.length ? 'outline' : 'default'}
+                      onClick={() => openEnable(preset)}
+                    >
+                      {enabled.length ? '再添加一个' : '开启使用'}
+                    </Button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

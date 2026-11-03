@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
 import { decrypt, encrypt } from '../../common/crypto/cipher.js';
+import { ModelsService } from '../models/models.service.js';
 import { ProvidersService } from './providers.service.js';
 import { ProviderStatus, ProviderType } from './schemas/provider.schema.js';
 
@@ -22,6 +23,11 @@ describe('ProvidersService', () => {
 
   const configService = {
     getOrThrow: vi.fn().mockReturnValue(secret),
+  };
+
+  const modelsService = {
+    getOfficialPresets: vi.fn(),
+    bulkCreate: vi.fn(),
   };
 
   const makeProvider = (overrides: Record<string, unknown> = {}) => ({
@@ -50,6 +56,7 @@ describe('ProvidersService', () => {
         ProvidersService,
         { provide: 'ProviderModel', useValue: providerModel },
         { provide: ConfigService, useValue: configService },
+        { provide: ModelsService, useValue: modelsService },
       ],
     }).compile();
 
@@ -97,6 +104,95 @@ describe('ProvidersService', () => {
           apiKey: 'sk-x',
         }),
       ).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('createFromPreset', () => {
+    const preset = {
+      key: 'openai',
+      type: ProviderType.OPENAI_COMPATIBLE,
+      label: 'OpenAI',
+      baseUrl: 'https://api.openai.com/v1',
+      models: [
+        {
+          modelId: 'gpt-4o-mini',
+          displayName: 'GPT-4o mini',
+          capabilities: ['chat'],
+          multiplier: 0.3,
+        },
+      ],
+    };
+
+    it('creates provider with preset fields and imports models', async () => {
+      modelsService.getOfficialPresets.mockResolvedValue([preset]);
+      modelsService.bulkCreate.mockResolvedValue({
+        created: [],
+        skipped: [],
+      });
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(null),
+      });
+      providerModel.create.mockImplementation(async (input: any) => ({
+        ...makeProvider(),
+        ...input,
+      }));
+
+      const result = await service.createFromPreset(tenantId, teamId, {
+        presetKey: 'openai',
+        apiKey: 'sk-live-1234567890abcd',
+      });
+
+      expect(result.provider.name).toBe('OpenAI');
+      expect(result.provider.presetKey).toBe('openai');
+      const createArg = providerModel.create.mock.calls[0][0];
+      expect(createArg.baseUrl).toBe('https://api.openai.com/v1');
+      expect(createArg.type).toBe(ProviderType.OPENAI_COMPATIBLE);
+      expect(modelsService.bulkCreate).toHaveBeenCalledWith(tenantId, teamId, {
+        providerId: result.provider.id,
+        models: [
+          {
+            modelId: 'gpt-4o-mini',
+            displayName: 'GPT-4o mini',
+            multiplier: 0.3,
+            capabilities: ['chat'],
+            aliases: [],
+          },
+        ],
+      });
+    });
+
+    it('throws NotFound when preset key missing', async () => {
+      modelsService.getOfficialPresets.mockResolvedValue([preset]);
+
+      await expect(
+        service.createFromPreset(tenantId, teamId, {
+          presetKey: 'unknown',
+          apiKey: 'sk-x',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('uses custom name when provided', async () => {
+      modelsService.getOfficialPresets.mockResolvedValue([preset]);
+      modelsService.bulkCreate.mockResolvedValue({
+        created: [],
+        skipped: [],
+      });
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(null),
+      });
+      providerModel.create.mockImplementation(async (input: any) => ({
+        ...makeProvider(),
+        ...input,
+      }));
+
+      const result = await service.createFromPreset(tenantId, teamId, {
+        presetKey: 'openai',
+        apiKey: 'sk-live-1234567890abcd',
+        name: 'OpenAI 公司主账号',
+      });
+
+      expect(result.provider.name).toBe('OpenAI 公司主账号');
     });
   });
 

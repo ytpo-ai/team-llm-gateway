@@ -38,4 +38,10 @@ export class UpdateProviderDto {
   @IsOptional()
   @IsEnum(ProviderStatus)
   status?: ProviderStatus;
+
+  @ApiPropertyOptional({ example: 'openai', description: '来源官方预置 key（可选）' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  presetKey?: string;
 }

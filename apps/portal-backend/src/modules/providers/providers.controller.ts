@@ -23,6 +23,7 @@ import {
   AuditResourceType,
 } from '../system/schemas/audit-log.schema.js';
 import { CreateProviderDto } from './dto/create-provider.dto.js';
+import { CreateProviderFromPresetDto } from './dto/create-provider-from-preset.dto.js';
 import { UpdateProviderDto } from './dto/update-provider.dto.js';
 import { ProvidersService } from './providers.service.js';
 
@@ -67,6 +68,38 @@ export class ProvidersController {
       resourceId: result.id,
       summary: `创建上游渠道（${result.name}）`,
       after: { id: result.id, name: result.name, type: result.type },
+      ip: req.ip ?? null,
+      userAgent: req.headers['user-agent'] ?? null,
+    });
+    return result;
+  }
+
+  @Post('from-preset')
+  @ApiOperation({ summary: '一键开启官方直连渠道（预填名称/类型/Base URL + 自动导入官方模型）' })
+  async createFromPreset(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateProviderFromPresetDto,
+    @Req() req: Request,
+  ) {
+    const result = await this.providersService.createFromPreset(
+      user.tenantId,
+      user.teamId,
+      dto,
+    );
+    await this.auditService.log({
+      tenantId: user.tenantId,
+      teamId: user.teamId,
+      actorUserId: user.id,
+      action: AuditAction.CREATE,
+      resourceType: AuditResourceType.PROVIDER,
+      resourceId: result.provider.id,
+      summary: `一键开启官方直连渠道（${result.provider.name}，导入 ${result.models.created.length} 模型）`,
+      after: {
+        id: result.provider.id,
+        name: result.provider.name,
+        type: result.provider.type,
+        presetKey: result.provider.presetKey,
+      },
       ip: req.ip ?? null,
       userAgent: req.headers['user-agent'] ?? null,
     });

@@ -30,4 +30,10 @@ export class CreateProviderDto {
   @MinLength(1)
   @MaxLength(10000)
   apiKey: string;
+
+  @ApiPropertyOptional({ example: 'openai', description: '来源官方预置 key（可选，自定义渠道不填）' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  presetKey?: string;
 }

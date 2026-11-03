@@ -70,6 +70,9 @@ export class Provider {
   })
   status: ProviderStatus;
 
+  @Prop({ type: String, trim: true, index: true })
+  presetKey?: string;
+
   createdAt?: Date;
   updatedAt?: Date;
 }
