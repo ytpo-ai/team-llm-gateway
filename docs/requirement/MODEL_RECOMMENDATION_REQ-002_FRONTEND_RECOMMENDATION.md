@@ -22,10 +22,10 @@
 - 无写操作，纯只读展示。
 
 ### 验收条件
-- [ ] `pnpm --filter portal-frontend dev` / `build` 通过。
-- [ ] 导航可见「选型建议」，进入 `/recommendation` 展示 8 个场景。
-- [ ] 选中场景展示首选/降级方案与缓存/成本提示；无匹配时展示空态引导补充模型标签。
-- [ ] `pnpm --filter portal-frontend lint` / `typecheck` 通过。
+- [x] `pnpm --filter portal-frontend dev` / `build` 通过。
+- [x] 导航可见「选型建议」，进入 `/recommendation` 展示 8 个场景。
+- [x] 选中场景展示首选/降级方案与缓存/成本提示；无匹配时展示空态引导补充模型标签。
+- [x] `pnpm --filter portal-frontend lint` / `typecheck` 通过。
 
 ## 3. 技术方案摘要
 - 复用 TanStack Query + `request`（`@/lib/http`）+ shadcn/ui（`Card`/`Button`）既有模式（参考 `apps/portal-frontend/src/pages/models.tsx`）。

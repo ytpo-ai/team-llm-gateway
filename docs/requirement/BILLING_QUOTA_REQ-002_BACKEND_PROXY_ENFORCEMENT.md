@@ -22,11 +22,11 @@
 - 转发后扣减：计量落库后按 `cost = multiplier × totalTokens` 调用 `deduct()`，记 `deduction` 流水。
 
 ### 验收条件
-- [ ] 成员 key 超过 `rateLimitPerMinute` 被拒绝（429）。
-- [ ] 成员 key 累计 token 超过 `maxTokens` 被拒绝（429）。
-- [ ] 团队/成员额度余额 ≤ 0 时请求被拒绝（402）。
-- [ ] 成功请求按实际成本扣减额度并落流水。
-- [ ] `pnpm --filter portal-backend lint` / `typecheck` / `test` 通过。
+- [x] 成员 key 超过 `rateLimitPerMinute` 被拒绝（429）。
+- [x] 成员 key 累计 token 超过 `maxTokens` 被拒绝（429）。
+- [x] 团队/成员额度余额 ≤ 0 时请求被拒绝（402）。
+- [x] 成功请求按实际成本扣减额度并落流水。
+- [x] `pnpm --filter portal-backend lint` / `typecheck` / `test` 通过。
 
 ## 3. 技术方案摘要
 - 复用 `apps/portal-backend/src/modules/proxy/` 既有转发链路，在 `prepare()` 前插入预检、`recordUsage()` 后插入扣减。

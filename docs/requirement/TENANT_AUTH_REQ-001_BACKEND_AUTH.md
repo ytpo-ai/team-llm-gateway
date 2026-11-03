@@ -8,7 +8,7 @@
 | 所属 plan | `docs/plan/TENANT_AUTH_PLAN.md` |
 | 需求管理 ID | — |
 | 分支 | `feat/tenant-auth-backend` |
-| 状态 | `已交付` |
+| 状态 | `done` |
 
 ## 2. 需求描述
 

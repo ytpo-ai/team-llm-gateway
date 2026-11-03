@@ -4,7 +4,7 @@
 >
 > - 上游决策：`docs/technical/SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-01~12、§5.2、§6、§7、§8、§10）
 > - 定稿时间：2026-10-28
-> - 状态：已批准
+> - 状态：已完成
 
 ---
 

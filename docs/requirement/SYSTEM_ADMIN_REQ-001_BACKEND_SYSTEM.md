@@ -25,10 +25,10 @@
 - RBAC：`team_admin`；所有读写按 `tenantId` 隔离。
 
 ### 验收条件
-- [ ] `pnpm --filter portal-backend start:dev` 启动成功。
-- [ ] Swagger 可调 `GET/PUT /system/settings` 与 `GET /system/audit-logs`。
-- [ ] 执行关键写操作后，审计日志能查询到对应记录（action/resourceType/resourceId/summary）。
-- [ ] `pnpm --filter portal-backend lint` / `typecheck` / `test` 通过（含新增 system 单测）。
+- [x] `pnpm --filter portal-backend start:dev` 启动成功。
+- [x] Swagger 可调 `GET/PUT /system/settings` 与 `GET /system/audit-logs`。
+- [x] 执行关键写操作后，审计日志能查询到对应记录（action/resourceType/resourceId/summary）。
+- [x] `pnpm --filter portal-backend lint` / `typecheck` / `test` 通过（含新增 system 单测）。
 
 ## 3. 技术方案摘要
 - 复用 Nest.js + Mongoose 既有模式（参考 `apps/portal-backend/src/modules/billing/`、`usage/`）。

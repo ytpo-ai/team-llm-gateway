@@ -8,7 +8,7 @@
 | 所属 plan | `docs/plan/PORTAL_FOUNDATION_PLAN.md` |
 | 需求管理 ID | — |
 | 分支 | `feat/portal-monorepo-scaffold` |
-| 状态 | `draft` |
+| 状态 | `done` |
 
 ## 2. 需求描述
 
@@ -22,9 +22,9 @@ Portal 从零开始，需先建立 pnpm workspace + turbo 单仓骨架，为后�
 - `README.md` 基础说明。
 
 ### 验收条件
-- [ ] `pnpm install` 成功，无 workspace 冲突。
-- [ ] `pnpm lint` / `pnpm typecheck` 在双 app 各自可通过（骨架阶段允许空实现）。
-- [ ] `forks/` 与 `.worktrees/` 被 git 忽略，无嵌套 git 污染。
+- [x] `pnpm install` 成功，无 workspace 冲突。
+- [x] `pnpm lint` / `pnpm typecheck` 在双 app 各自可通过（骨架阶段允许空实现）。
+- [x] `forks/` 与 `.worktrees/` 被 git 忽略，无嵌套 git 污染。
 
 ## 3. 技术方案摘要
 - pnpm workspace + turbo 单仓；双 app 各自独立 `package.json`/`tsconfig`，共享根 lint 规则。
@@ -38,6 +38,6 @@ Portal 从零开始，需先建立 pnpm workspace + turbo 单仓骨架，为后�
 | fix | — |
 
 ## 5. 状态跟踪
-- [ ] 开发中
-- [ ] 待验收
-- [ ] 已交付
+- [x] 开发中
+- [x] 待验收
+- [x] 已交付

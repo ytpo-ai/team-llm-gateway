@@ -5,7 +5,7 @@
 > - 上游决策：`docs/technical/SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（§5.2/§5.3）
 > - 上游 plan：`docs/plan/PORTAL_FOUNDATION_PLAN.md`（9 大模块清单）
 > - 定稿时间：2026-10-29
-> - 状态：已批准
+> - 状态：已完成
 
 ---
 

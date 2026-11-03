@@ -8,7 +8,7 @@
 | 所属 plan | `docs/plan/PORTAL_FOUNDATION_PLAN.md` |
 | 需求管理 ID | — |
 | 分支 | `feat/portal-frontend-base` |
-| 状态 | `draft` |
+| 状态 | `done` |
 
 ## 2. 需求描述
 
@@ -23,9 +23,9 @@
 - 登录页骨架（对接后端 auth 接口占位）。
 
 ### 验收条件
-- [ ] `pnpm --filter frontend dev` 启动成功。
-- [ ] `pnpm --filter frontend build` 通过。
-- [ ] 路由/布局/登录页可访问，主题切换可用。
+- [x] `pnpm --filter frontend dev` 启动成功。
+- [x] `pnpm --filter frontend build` 通过。
+- [x] 路由/布局/登录页可访问，主题切换可用。
 
 ## 3. 技术方案摘要
 - Vite + React Router + TanStack Query + Zustand + shadcn/ui + Tailwind。
@@ -39,6 +39,6 @@
 | fix | — |
 
 ## 5. 状态跟踪
-- [ ] 开发中
-- [ ] 待验收
-- [ ] 已交付
+- [x] 开发中
+- [x] 待验收
+- [x] 已交付

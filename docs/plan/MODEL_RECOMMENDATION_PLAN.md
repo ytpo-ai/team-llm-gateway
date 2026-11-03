@@ -5,7 +5,7 @@
 > - 上游决策：`docs/technical/SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（§8、D-02）
 > - 上游 plan：`docs/plan/MODEL_PROVIDER_PLAN.md`（`Model.capabilities` 能力标签 + `multiplier` 倍率已交付，作为匹配与成本排序的单一事实来源）
 > - 定稿时间：2026-10-29
-> - 状态：已批准
+> - 状态：已完成
 
 ---
 

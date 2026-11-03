@@ -22,9 +22,9 @@
 - RBAC 前端表现：普通成员仅见自己的 key；`team_admin` 可看全团队 key。
 
 ### 验收条件
-- [ ] `pnpm --filter portal-frontend dev` / `build` 通过。
-- [ ] 创建 → 展示完整 key → 复制 → 列表可见 → 吊销/轮换 → 编辑限制闭环可用。
-- [ ] 列表/详情不展示完整 key，仅展示 `keyPrefix`。
+- [x] `pnpm --filter portal-frontend dev` / `build` 通过。
+- [x] 创建 → 展示完整 key → 复制 → 列表可见 → 吊销/轮换 → 编辑限制闭环可用。
+- [x] 列表/详情不展示完整 key，仅展示 `keyPrefix`。
 
 ## 3. 技术方案摘要
 - 复用 React + TypeScript + Tailwind + TanStack Query + Zustand 既有模式（参考 `apps/portal-frontend/src/features/teams/`、`pages/team.tsx`）。

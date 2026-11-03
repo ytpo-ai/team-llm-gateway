@@ -24,11 +24,11 @@
 - 租户/团队隔离：所有查询按 `tenantId + teamId` 过滤。
 
 ### 验收条件
-- [ ] `pnpm --filter portal-backend start:dev` 启动成功。
-- [ ] Swagger 可调 `POST/GET/GET:id/PATCH/DELETE /providers` 与 `POST/GET/GET:id/PATCH/DELETE /models`。
-- [ ] 上游 key 仅密文落库，列表/详情仅返回 `apiKeyHint`，不返回明文/密文。
-- [ ] 成员可读模型目录，但不可写渠道/模型；`team_admin` 可全量读写。
-- [ ] `pnpm --filter portal-backend lint` / `typecheck` / `test` 通过。
+- [x] `pnpm --filter portal-backend start:dev` 启动成功。
+- [x] Swagger 可调 `POST/GET/GET:id/PATCH/DELETE /providers` 与 `POST/GET/GET:id/PATCH/DELETE /models`。
+- [x] 上游 key 仅密文落库，列表/详情仅返回 `apiKeyHint`，不返回明文/密文。
+- [x] 成员可读模型目录，但不可写渠道/模型；`team_admin` 可全量读写。
+- [x] `pnpm --filter portal-backend lint` / `typecheck` / `test` 通过。
 
 ## 3. 技术方案摘要
 - 复用 Nest.js + Mongoose + class-validator + Swagger 既有模式（参考 `apps/portal-backend/src/modules/api-keys/`、`teams/`）。

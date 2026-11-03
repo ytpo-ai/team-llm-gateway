@@ -22,10 +22,10 @@
 - 路由 + 导航接入（仅 `system` 角色可见）。
 
 ### 验收条件
-- [ ] `pnpm --filter portal-frontend dev` / `build` 通过。
-- [ ] `system` 账号可见「全局」导航入口并可访问 `/admin/tenants`、`/admin/overview`。
-- [ ] 普通角色不可见导航入口，且访问 admin 路由被拦截（或后端 403）。
-- [ ] 租户管理页可新建/启停租户，看板页展示全局与按租户用量。
+- [x] `pnpm --filter portal-frontend dev` / `build` 通过。
+- [x] `system` 账号可见「全局」导航入口并可访问 `/admin/tenants`、`/admin/overview`。
+- [x] 普通角色不可见导航入口，且访问 admin 路由被拦截（或后端 403）。
+- [x] 租户管理页可新建/启停租户，看板页展示全局与按租户用量。
 
 ## 3. 技术方案摘要
 - 复用 React + TanStack Query + `request`（`@/lib/http`）既有模式（参考 `features/system/`、`features/billing/`）。

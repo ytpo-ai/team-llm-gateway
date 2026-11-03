@@ -5,7 +5,7 @@
 > - 上游决策：`docs/technical/SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-03 多租户内建、ADR-04 技术栈、§5.2 Portal 边界、§6）
 > - 上游 plan：`docs/plan/PORTAL_FOUNDATION_PLAN.md`（里程碑 6 的首个模块）
 > - 定稿时间：2026-10-28
-> - 状态：已批准
+> - 状态：已完成
 
 ---
 

@@ -13,6 +13,9 @@ export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 ## 功能文档维护规范及协议
 具体规范及约束请阅读 `docs/rules/FEATURE.md` 中的说明。
 
+## 计划文档管理规范及协议
+具体规范及约束请阅读 `docs/rules/PLAN.md` 中的说明。
+
 ## 需求文档管理规范及协议
 具体规范及约束请阅读 `docs/rules/REQUIREMENT.md` 中的说明。
 

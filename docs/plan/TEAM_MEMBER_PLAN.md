@@ -5,7 +5,7 @@
 > - 上游决策：`docs/technical/SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-03/04/06、§5.2、§7.1）
 > - 上游 plan：`docs/plan/TENANT_AUTH_PLAN.md`（租户与认证已交付，复用其 Tenant/User/JWT/RBAC 上下文）
 > - 定稿时间：2026-10-28
-> - 状态：已批准
+> - 状态：已完成
 
 ---
 

@@ -23,9 +23,9 @@
 - 路由 `/billing` + `app-layout` 导航接入。
 
 ### 验收条件
-- [ ] `pnpm --filter portal-frontend dev` / `build` 通过。
-- [ ] 看板展示真实余额/流水，空态友好。
-- [ ] `team_admin`/`finance` 充值/调整闭环可用；`member` 仅见本人余额。
+- [x] `pnpm --filter portal-frontend dev` / `build` 通过。
+- [x] 看板展示真实余额/流水，空态友好。
+- [x] `team_admin`/`finance` 充值/调整闭环可用；`member` 仅见本人余额。
 
 ## 3. 技术方案摘要
 - 复用 React + TanStack Query + shadcn/ui 既有模式（参考 `features/usage/`、`pages/dashboard.tsx`）。

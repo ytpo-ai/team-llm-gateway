@@ -5,7 +5,7 @@
 > - 上游决策：`docs/technical/SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-03/06/09、§5.2、§7.1）
 > - 上游 plan：`docs/plan/TEAM_MEMBER_PLAN.md`（团队与成员已交付，复用其 Team/User/RBAC/tenantId 上下文）
 > - 定稿时间：2026-10-28
-> - 状态：已批准
+> - 状态：已完成
 
 ---
 
@@ -52,8 +52,8 @@
 
 ## 6. 里程碑
 
-1. ⬜ REQ-001 后端 API Key（本文档拆解）。
-2. ⬜ REQ-002 前端 API Key 管理闭环。
+1. ✅ REQ-001 后端 API Key（本文档拆解）。
+2. ✅ REQ-002 前端 API Key 管理闭环。
 3. ⬜ 下游模块（usage_metering → model_provider → …）复用 key 归属与限制字段。
 
 ## 7. 待决事项与风险

@@ -24,12 +24,12 @@
 - 租户隔离：所有查询按 `tenantId` 过滤。
 
 ### 验收条件
-- [ ] `pnpm --filter portal-backend start:dev` 启动成功。
-- [ ] Swagger 可调 `POST /api-keys`、`GET /api-keys`、`GET /api-keys/:id`、`PATCH /api-keys/:id`、`DELETE /api-keys/:id`、`POST /api-keys/:id/rotate`。
-- [ ] 创建返回完整 key 一次；列表/详情仅返回 `keyPrefix`，不泄露明文。
-- [ ] Mongo 落库仅存 `keyHash`，无明文 key。
-- [ ] 成员只能操作自己的 key；`team_admin` 可看全团队 key。
-- [ ] `pnpm --filter portal-backend lint` / `typecheck` / `test` 通过。
+- [x] `pnpm --filter portal-backend start:dev` 启动成功。
+- [x] Swagger 可调 `POST /api-keys`、`GET /api-keys`、`GET /api-keys/:id`、`PATCH /api-keys/:id`、`DELETE /api-keys/:id`、`POST /api-keys/:id/rotate`。
+- [x] 创建返回完整 key 一次；列表/详情仅返回 `keyPrefix`，不泄露明文。
+- [x] Mongo 落库仅存 `keyHash`，无明文 key。
+- [x] 成员只能操作自己的 key；`team_admin` 可看全团队 key。
+- [x] `pnpm --filter portal-backend lint` / `typecheck` / `test` 通过。
 
 ## 3. 技术方案摘要
 - 复用 Nest.js + Mongoose + class-validator + Swagger 既有模式（参考 `apps/portal-backend/src/modules/teams/`、`auth/`）。

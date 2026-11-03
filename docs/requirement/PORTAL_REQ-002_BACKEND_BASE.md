@@ -8,7 +8,7 @@
 | 所属 plan | `docs/plan/PORTAL_FOUNDATION_PLAN.md` |
 | 需求管理 ID | — |
 | 分支 | `feat/portal-backend-base` |
-| 状态 | `draft` |
+| 状态 | `done` |
 
 ## 2. 需求描述
 
@@ -23,11 +23,11 @@
 - JWT 认证骨架（`modules/auth/`，Passport + 策略占位，首期本地账号）。
 
 ### 验收条件
-- [ ] `pnpm --filter backend start:dev` 启动成功。
-- [ ] `GET /health` 返回 200。
-- [ ] Swagger UI（`/api/docs`）可访问。
-- [ ] Mongo 连接成功（无 Mongo 时优雅降级，不阻塞启动）。
-- [ ] `pnpm --filter backend lint` / `typecheck` 通过。
+- [x] `pnpm --filter backend start:dev` 启动成功。
+- [x] `GET /health` 返回 200。
+- [x] Swagger UI（`/api/docs`）可访问。
+- [x] Mongo 连接成功（无 Mongo 时优雅降级，不阻塞启动）。
+- [x] `pnpm --filter backend lint` / `typecheck` 通过。
 
 ## 3. 技术方案摘要
 - Nest.js + TypeScript(strict) + Mongoose + class-validator + @nestjs/swagger + @nestjs/passport + @nestjs/jwt。
@@ -41,6 +41,6 @@
 | fix | — |
 
 ## 5. 状态跟踪
-- [ ] 开发中
-- [ ] 待验收
-- [ ] 已交付
+- [x] 开发中
+- [x] 待验收
+- [x] 已交付

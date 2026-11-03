@@ -5,7 +5,7 @@
 > - 上游决策：`docs/technical/SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-04/06/09/10、§3 核心解耦原则、§5.2、§7.1、D-05）
 > - 上游 plan：`docs/plan/MODEL_PROVIDER_PLAN.md`（M-01 转发层里程碑在本 plan 闭环）、`docs/plan/API_KEY_PLAN.md`（成员 key 已交付）
 > - 定稿时间：2026-10-29
-> - 状态：已批准
+> - 状态：已完成
 
 ---
 

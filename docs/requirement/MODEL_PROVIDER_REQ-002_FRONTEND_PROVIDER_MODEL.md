@@ -23,10 +23,10 @@
 - 上游 key 前端仅输入/展示脱敏 hint，不回显明文。
 
 ### 验收条件
-- [ ] `pnpm --filter portal-frontend dev` / `build` 通过。
-- [ ] 上游渠道：创建 → 列表可见（脱敏 hint）→ 编辑（可换 key）→ 删除闭环可用。
-- [ ] 模型目录：创建 → 列表可见 → 编辑（倍率/能力标签）→ 删除闭环可用。
-- [ ] 非 `team_admin` 角色不展示渠道管理入口与写操作。
+- [x] `pnpm --filter portal-frontend dev` / `build` 通过。
+- [x] 上游渠道：创建 → 列表可见（脱敏 hint）→ 编辑（可换 key）→ 删除闭环可用。
+- [x] 模型目录：创建 → 列表可见 → 编辑（倍率/能力标签）→ 删除闭环可用。
+- [x] 非 `team_admin` 角色不展示渠道管理入口与写操作。
 
 ## 3. 技术方案摘要
 - 复用 React + TypeScript + Tailwind + TanStack Query + Zustand 既有模式（参考 `apps/portal-frontend/src/features/api-keys/`、`pages/api-keys.tsx`）。

@@ -22,10 +22,10 @@
 - 路由 + 导航接入（`team_admin` 可见）。
 
 ### 验收条件
-- [ ] `pnpm --filter portal-frontend dev` / `build` 通过。
-- [ ] 设置页可读写配置项。
-- [ ] 审计日志页可筛选并分页查看。
-- [ ] 导航「系统」入口仅 `team_admin` 可见。
+- [x] `pnpm --filter portal-frontend dev` / `build` 通过。
+- [x] 设置页可读写配置项。
+- [x] 审计日志页可筛选并分页查看。
+- [x] 导航「系统」入口仅 `team_admin` 可见。
 
 ## 3. 技术方案摘要
 - 复用 React + TanStack Query + `request`（`@/lib/http`）既有模式（参考 `features/billing/`、`features/recommendation/`）。

@@ -23,11 +23,11 @@
 - 无新增数据集合，不新增 db_schema。
 
 ### 验收条件
-- [ ] `pnpm --filter portal-backend start:dev` 启动成功。
-- [ ] Swagger 可调 `GET /recommendations/scenarios` 返回 8 个场景模板。
-- [ ] `GET /recommendations/scenarios/:id` 对已知场景返回推荐（首选 + 替代 + 部分匹配 + 缓存/成本提示），对未知场景返回 404。
-- [ ] 推荐结果按「能力全匹配 + 倍率升序」排序，仅读取本团队 `status=active` 模型。
-- [ ] `pnpm --filter portal-backend lint` / `typecheck` / `test` 通过（含新增推荐引擎单测）。
+- [x] `pnpm --filter portal-backend start:dev` 启动成功。
+- [x] Swagger 可调 `GET /recommendations/scenarios` 返回 8 个场景模板。
+- [x] `GET /recommendations/scenarios/:id` 对已知场景返回推荐（首选 + 替代 + 部分匹配 + 缓存/成本提示），对未知场景返回 404。
+- [x] 推荐结果按「能力全匹配 + 倍率升序」排序，仅读取本团队 `status=active` 模型。
+- [x] `pnpm --filter portal-backend lint` / `typecheck` / `test` 通过（含新增推荐引擎单测）。
 
 ## 3. 技术方案摘要
 - 复用 Nest.js + Mongoose 既有模式（参考 `apps/portal-backend/src/modules/models/`）。

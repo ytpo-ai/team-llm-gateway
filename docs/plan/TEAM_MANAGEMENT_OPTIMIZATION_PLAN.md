@@ -5,7 +5,7 @@
 > - 需求来源：`docs/issue/团队管理功能的优化.md`、`docs/issue/菜单优化.md`（讨论结论已定稿）
 > - 上游决策：`docs/technical/SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-03/06/10、D-04）
 > - 定稿时间：2026-11-02
-> - 状态：已批准
+> - 状态：进行中
 
 ---
 
@@ -51,9 +51,9 @@
 
 ## 5. 里程碑
 
-1. ✅ REQ-001 角色体系重构（角色A 收敛 + RoleTemplate）。
-2. ✅ REQ-002 三级限额模型。
-3. ✅ REQ-003 系统管理员 + 菜单结构。
+1. 🔄 REQ-001 角色体系重构（角色A 收敛 + RoleTemplate）。
+2. 🔄 REQ-002 三级限额模型。
+3. 🔄 REQ-003 系统管理员 + 菜单结构。
 
 > 依赖关系：REQ-002 依赖 REQ-001（成员角色B 提供限额默认值）；REQ-003 依赖 REQ-001（system 角色）。建议按序推进。
 

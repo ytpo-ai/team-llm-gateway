@@ -24,11 +24,11 @@
 - 租户/团队隔离：账户/流水按 `tenantId + teamId`（成员再叠加 `userId`）过滤。
 
 ### 验收条件
-- [ ] `pnpm --filter portal-backend start:dev` 启动成功。
-- [ ] Swagger 可调 `/billing/*` 各接口，充值→扣减→流水闭环正确。
-- [ ] `member` 看不到他人账户/流水；`team_admin`/`finance` 可看团队全量并可充值/调整。
-- [ ] `deduct()` 防负余额（并发下余额不 < 0）。
-- [ ] `pnpm --filter portal-backend lint` / `typecheck` / `test` 通过。
+- [x] `pnpm --filter portal-backend start:dev` 启动成功。
+- [x] Swagger 可调 `/billing/*` 各接口，充值→扣减→流水闭环正确。
+- [x] `member` 看不到他人账户/流水；`team_admin`/`finance` 可看团队全量并可充值/调整。
+- [x] `deduct()` 防负余额（并发下余额不 < 0）。
+- [x] `pnpm --filter portal-backend lint` / `typecheck` / `test` 通过。
 
 ## 3. 技术方案摘要
 - 复用 Nest.js + Mongoose + Swagger 既有模式（参考 `apps/portal-backend/src/modules/usage/`、`api-keys/`）。

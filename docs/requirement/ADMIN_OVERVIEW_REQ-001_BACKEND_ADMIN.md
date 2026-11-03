@@ -25,11 +25,11 @@
 - RBAC：`@Roles(Role.SYSTEM)`；admin 端点全局查询，不复用租户过滤。
 
 ### 验收条件
-- [ ] `pnpm --filter portal-backend start:dev` 启动成功。
-- [ ] 配置 `SUPER_ADMIN_EMAIL`/`SUPER_ADMIN_PASSWORD` 后，`system` 账号可登录并调用 `/admin/*`。
-- [ ] 普通角色访问 `/admin/*` 被 403 拦截。
-- [ ] Swagger 可调 `GET/POST /admin/tenants`、`GET /admin/tenants/:id`、`PATCH /admin/tenants/:id/status`、`GET /admin/overview`、`GET /admin/overview/usage`。
-- [ ] `pnpm --filter portal-backend lint` / `typecheck` / `test` 通过（含新增 admin 单测）。
+- [x] `pnpm --filter portal-backend start:dev` 启动成功。
+- [x] 配置 `SUPER_ADMIN_EMAIL`/`SUPER_ADMIN_PASSWORD` 后，`system` 账号可登录并调用 `/admin/*`。
+- [x] 普通角色访问 `/admin/*` 被 403 拦截。
+- [x] Swagger 可调 `GET/POST /admin/tenants`、`GET /admin/tenants/:id`、`PATCH /admin/tenants/:id/status`、`GET /admin/overview`、`GET /admin/overview/usage`。
+- [x] `pnpm --filter portal-backend lint` / `typecheck` / `test` 通过（含新增 admin 单测）。
 
 ## 3. 技术方案摘要
 - 复用 Nest.js + Mongoose 既有模式（参考 `modules/system/`、`modules/billing/`）。

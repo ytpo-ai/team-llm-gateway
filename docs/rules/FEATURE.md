@@ -149,7 +149,8 @@ feature (功能模块)           docs/feature/<MODULE>.md
 ```
 
 - 各层文档模板见对应目录下的 `TEMPLATE.md`
-- requirement 管理规范见 `docs/requirement/RULES.md`
+- plan 管理规范见 `docs/rules/PLAN.md`
+- requirement 管理规范见 `docs/rules/REQUIREMENT.md`
 - 各层之间通过**文件名约定 + 文档内链接 + feature 追溯表**三重关联
 
 ---

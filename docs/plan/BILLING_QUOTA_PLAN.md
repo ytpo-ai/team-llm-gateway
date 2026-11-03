@@ -5,7 +5,7 @@
 > - 上游决策：`docs/technical/SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-03/06/10、§5.2、§7.2、D-03）
 > - 上游 plan：`docs/plan/USAGE_METERING_PLAN.md`（计量流水 + 转发层已交付，本 plan 复用其 `UsageLog` 成本口径与转发链路）
 > - 定稿时间：2026-10-29
-> - 状态：已批准
+> - 状态：已完成
 
 ---
 
@@ -54,9 +54,9 @@
 
 ## 6. 里程碑
 
-1. ⬜ REQ-001 后端计费（本文档拆解）。
-2. ⬜ REQ-002 转发层限额联动（闭环 USAGE_METERING U-01）。
-3. ⬜ REQ-003 前端额度看板。
+1. ✅ REQ-001 后端计费（本文档拆解）。
+2. ✅ REQ-002 转发层限额联动（闭环 USAGE_METERING U-01）。
+3. ✅ REQ-003 前端额度看板。
 
 ## 7. 待决事项与风险
 
