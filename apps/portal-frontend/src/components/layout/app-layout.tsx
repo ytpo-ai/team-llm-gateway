@@ -67,12 +67,17 @@ export function AppLayout() {
         { label: '角色管理', to: '/roles', icon: ShieldCheck },
         { label: '策略管理', to: '/policy-sets', icon: SlidersHorizontal },
         { label: 'API Key', to: '/api-keys', icon: KeyRound },
-        { label: '额度与计费', to: '/billing', icon: Wallet },
+        { label: '选型建议', to: '/recommendation', icon: Sparkles },
+      ],
+    },
+    {
+      title: 'LLM管理',
+      items: [
         ...(isTeamManager
           ? [{ label: '渠道管理', to: '/providers', icon: Server }]
           : []),
         { label: '模型管理', to: '/models', icon: Boxes },
-        { label: '选型建议', to: '/recommendation', icon: Sparkles },
+        { label: '额度与计费', to: '/billing', icon: Wallet },
       ],
     },
     {

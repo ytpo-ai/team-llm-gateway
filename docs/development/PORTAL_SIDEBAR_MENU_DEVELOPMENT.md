@@ -1,20 +1,21 @@
 # Portal 左侧分组侧边栏菜单 开发记录
 
-> 需求来源：`docs/issue/菜单优化.md`（在「团队管理/渠道模型/状态观察/系统设置」基础上，按用户最新要求收敛为「团队管理/系统设置/观察」三组）
+> 需求来源：`docs/issue/菜单优化.md`（在「团队管理/渠道模型/状态观察/系统设置」基础上，按用户最新要求收敛为分组侧边栏）
 > 分支：`main`
 
 ## 1. 实现摘要
 
-将 `app-layout.tsx` 的顶部水平导航重构为**左侧固定分组侧边栏**，按三个分组叠放菜单：
+将 `app-layout.tsx` 的顶部水平导航重构为**左侧固定分组侧边栏**，按分组叠放菜单：
 
 | 分组 | 菜单项 | 可见性 |
 |---|---|---|
-| 团队管理 | 成员管理 `/team`、角色管理 `/roles`、API Key `/api-keys`、额度与计费 `/billing`、渠道管理 `/providers`、模型管理 `/models`、选型建议 `/recommendation` | 渠道管理仅 team_admin/system |
+| 团队管理 | 成员管理 `/team`、角色管理 `/roles`、策略管理 `/policy-sets`、API Key `/api-keys`、选型建议 `/recommendation` | — |
+| LLM管理 | 渠道管理 `/providers`、模型管理 `/models`、额度与计费 `/billing` | 渠道管理仅 team_admin/system |
 | 系统设置 | 系统设置 `/settings`、租户管理 `/admin/tenants`、全局看板 `/admin/overview` | 设置仅 team_admin/system；租户/全局看板仅 system |
 | 观察 | 用量看板 `/`、使用日志 `/usage-logs`、审计日志 `/audit-logs` | 使用/审计日志仅 team_admin/system |
 
 - 侧边栏顶部为 Portal 品牌标题，底部展示当前用户名；主题切换、退出登录保留在顶部 header 右侧。
-- 原「额度与计费」按用户确认归入**团队管理**（非系统设置）。
+- 「渠道管理/模型管理/额度与计费」从团队管理独立为 **LLM管理** 分组（按用户确认）。
 
 ## 2. 代码改动点
 
