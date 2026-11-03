@@ -8,7 +8,7 @@
 | 所属 plan | `docs/plan/OFFICIAL_CHANNEL_PRESET_PLAN.md` |
 | 需求管理 ID | — |
 | 分支 | `feat/official-channel-preset` |
-| 状态 | `in-progress` |
+| 状态 | `done` |
 
 ## 2. 需求描述
 
@@ -21,11 +21,11 @@
 - 新增 `POST /providers/from-preset`：入参 `{ presetKey, apiKey, name? }` → 查预置（复用 `getOfficialPresets`）→ 预填 name/type/authType/baseUrl 创建渠道（复用 create + 加密 + 审计）→ 自动批量导入官方模型（复用 `bulkCreate`）→ 返回 `{ provider, models }`。
 
 ### 验收条件
-- [ ] `GET /models/presets` 返回的预置含国内外主流且带 `key`。
-- [ ] `Provider` 列表返回 `presetKey`（无则 null）。
-- [ ] `POST /providers/from-preset` 正确建渠道并导入模型；预置不存在返回 404；渠道名称冲突返回 409。
-- [ ] RBAC：仅 `team_admin`。
-- [ ] `pnpm --filter portal-backend lint`/`typecheck`/`test` 通过。
+- [x] `GET /models/presets` 返回的预置含国内外主流且带 `key`。
+- [x] `Provider` 列表返回 `presetKey`（无则 null）。
+- [x] `POST /providers/from-preset` 正确建渠道并导入模型；预置不存在返回 404；渠道名称冲突返回 409。
+- [x] RBAC：仅 `team_admin`。
+- [x] `pnpm --filter portal-backend lint`/`typecheck`/`test` 通过。
 
 ## 3. 技术方案摘要
 - 预置目录与一键开启方案见 `docs/plan/OFFICIAL_CHANNEL_PRESET_PLAN.md` §3。
@@ -35,10 +35,10 @@
 
 | 类型 | 文档 |
 |---|---|
-| development | `docs/development/OFFICIAL_API_REQ-007_DEVELOPMENT.md`（待补充） |
+| development | `docs/development/OFFICIAL_API_REQ-007_DEVELOPMENT.md` |
 | fix | — |
 
 ## 5. 状态跟踪
 - [x] 开发中
-- [ ] 待验收
-- [ ] 已交付
+- [x] 待验收
+- [x] 已交付

@@ -8,7 +8,7 @@
 | 所属 plan | `docs/plan/OFFICIAL_CHANNEL_PRESET_PLAN.md` |
 | 需求管理 ID | — |
 | 分支 | `feat/official-channel-preset` |
-| 状态 | `in-progress` |
+| 状态 | `done` |
 
 ## 2. 需求描述
 
@@ -21,11 +21,11 @@
 - 开启弹窗：输入 API Key（可选自定义名称）→ 调 `createProviderFromPreset` → 成功后刷新渠道列表并提示「新增渠道 + 导入模型数」。
 
 ### 验收条件
-- [ ] 卡片区正确展示所有官方预置，默认「未开启」。
-- [ ] 已开启的官方（存在 `presetKey` 匹配渠道）显示「已开启 N 个」并列出渠道名。
-- [ ] 开启弹窗填 Key 后一键建渠道并自动导入模型，提示导入结果。
-- [ ] 仅 `team_admin` 可见可操作。
-- [ ] 前端 `lint`/`typecheck`/`build` 通过。
+- [x] 卡片区正确展示所有官方预置，默认「未开启」。
+- [x] 已开启的官方（存在 `presetKey` 匹配渠道）显示「已开启 N 个」并列出渠道名。
+- [x] 开启弹窗填 Key 后一键建渠道并自动导入模型，提示导入结果。
+- [x] 仅 `team_admin` 可见可操作。
+- [x] 前端 `lint`/`typecheck`/`build` 通过。
 
 ## 3. 技术方案摘要
 - 复用 `features/providers` 与 `features/models` 现有 query/API；`OfficialProviderPreset` 类型补 `key`；`Provider` 类型补 `presetKey?`；新增 `createProviderFromPreset`。
@@ -34,10 +34,10 @@
 
 | 类型 | 文档 |
 |---|---|
-| development | `docs/development/OFFICIAL_API_REQ-008_DEVELOPMENT.md`（待补充） |
+| development | `docs/development/OFFICIAL_API_REQ-008_DEVELOPMENT.md` |
 | fix | — |
 
 ## 5. 状态跟踪
 - [x] 开发中
-- [ ] 待验收
-- [ ] 已交付
+- [x] 待验收
+- [x] 已交付

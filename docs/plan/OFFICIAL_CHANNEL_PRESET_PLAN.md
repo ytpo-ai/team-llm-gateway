@@ -5,7 +5,7 @@
 > - 上游决策：`docs/technical/SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-13、§5.2）
 > - 上游 plan：`docs/plan/OFFICIAL_API_PRESET_PLAN.md`（预置目录 + 探活，本 plan 复用其预置目录）
 > - 定稿时间：2026-11-03
-> - 状态：`approved`
+> - 状态：`done`
 
 ---
 
@@ -40,8 +40,8 @@
 
 ## 5. 里程碑
 
-1. REQ-007 后端预置 + 一键开启端点。
-2. REQ-008 前端官方直连卡片区。
+1. ✅ REQ-007 后端预置 + 一键开启端点。
+2. ✅ REQ-008 前端官方直连卡片区。
 
 ## 6. 待决事项与风险
 
