@@ -1,9 +1,39 @@
-import { LogOut, Moon, Sun } from 'lucide-react'
+import {
+  Boxes,
+  Building2,
+  FileClock,
+  Gauge,
+  KeyRound,
+  LayoutDashboard,
+  LogOut,
+  Moon,
+  ScrollText,
+  Server,
+  Settings,
+  ShieldCheck,
+  Sparkles,
+  Sun,
+  Users,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useTheme } from '@/components/theme/theme-provider'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/features/auth/store'
 import { cn } from '@/lib/utils'
+
+interface NavItem {
+  label: string
+  to: string
+  end?: boolean
+  icon: LucideIcon
+}
+
+interface NavSection {
+  title: string
+  items: NavItem[]
+}
 
 export function AppLayout() {
   const { theme, toggle } = useTheme()
@@ -18,89 +48,122 @@ export function AppLayout() {
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     cn(
-      'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+      'flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
       isActive
         ? 'bg-muted text-foreground'
-        : 'text-muted-foreground hover:text-foreground',
+        : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
     )
 
   const isTeamManager =
     user?.role === 'team_admin' || user?.role === 'system'
+  const isSystem = user?.role === 'system'
+
+  const sections: NavSection[] = [
+    {
+      title: '团队管理',
+      items: [
+        { label: '成员管理', to: '/team', icon: Users },
+        { label: '角色管理', to: '/roles', icon: ShieldCheck },
+        { label: 'API Key', to: '/api-keys', icon: KeyRound },
+        { label: '额度与计费', to: '/billing', icon: Wallet },
+        ...(isTeamManager
+          ? [{ label: '渠道管理', to: '/providers', icon: Server }]
+          : []),
+        { label: '模型管理', to: '/models', icon: Boxes },
+        { label: '选型建议', to: '/recommendation', icon: Sparkles },
+      ],
+    },
+    {
+      title: '系统设置',
+      items: [
+        ...(isTeamManager
+          ? [{ label: '系统设置', to: '/settings', icon: Settings }]
+          : []),
+        ...(isSystem
+          ? [{ label: '租户管理', to: '/admin/tenants', icon: Building2 }]
+          : []),
+        ...(isSystem
+          ? [{ label: '全局看板', to: '/admin/overview', icon: LayoutDashboard }]
+          : []),
+      ],
+    },
+    {
+      title: '观察',
+      items: [
+        { label: '用量看板', to: '/', end: true, icon: Gauge },
+        ...(isTeamManager
+          ? [{ label: '使用日志', to: '/usage-logs', icon: ScrollText }]
+          : []),
+        ...(isTeamManager
+          ? [{ label: '审计日志', to: '/audit-logs', icon: FileClock }]
+          : []),
+      ],
+    },
+  ].filter((section) => section.items.length > 0)
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border px-6">
-        <div className="flex items-center gap-4">
+      <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-border bg-card">
+        <div className="flex h-14 shrink-0 items-center border-b border-border px-4">
           <Link to="/" className="text-lg font-semibold tracking-tight">
             Portal
           </Link>
-          <nav className="flex items-center gap-1">
-            <NavLink to="/" end className={navLinkClass}>
-              概览
-            </NavLink>
-            <NavLink to="/team" className={navLinkClass}>
-              团队
-            </NavLink>
-            <NavLink to="/roles" className={navLinkClass}>
-              角色
-            </NavLink>
-            <NavLink to="/api-keys" className={navLinkClass}>
-              API Key
-            </NavLink>
-            <NavLink to="/billing" className={navLinkClass}>
-              额度
-            </NavLink>
-            <NavLink to="/models" className={navLinkClass}>
-              模型
-            </NavLink>
-            <NavLink to="/recommendation" className={navLinkClass}>
-              选型建议
-            </NavLink>
-            {isTeamManager && (
-              <NavLink to="/usage-logs" className={navLinkClass}>
-                使用日志
-              </NavLink>
-            )}
-            {isTeamManager && (
-              <NavLink to="/providers" className={navLinkClass}>
-                上游
-              </NavLink>
-            )}
-            {isTeamManager && (
-              <NavLink to="/settings" className={navLinkClass}>
-                设置
-              </NavLink>
-            )}
-            {isTeamManager && (
-              <NavLink to="/audit-logs" className={navLinkClass}>
-                审计
-              </NavLink>
-            )}
-            {user?.role === 'system' && (
-              <NavLink to="/admin/overview" className={navLinkClass}>
-                全局概览
-              </NavLink>
-            )}
-            {user?.role === 'system' && (
-              <NavLink to="/admin/tenants" className={navLinkClass}>
-                租户
-              </NavLink>
-            )}
-          </nav>
         </div>
-        <div className="flex items-center gap-2">
-          {user && <span className="text-sm text-muted-foreground">{user.name}</span>}
-          <Button variant="ghost" size="icon" onClick={toggle} aria-label="切换主题">
-            {theme === 'dark' ? <Sun /> : <Moon />}
-          </Button>
-          <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="退出登录">
-            <LogOut />
-          </Button>
+        <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
+          {sections.map((section) => (
+            <div key={section.title}>
+              <div className="px-3 pb-2 text-xs font-medium tracking-wide text-muted-foreground">
+                {section.title}
+              </div>
+              <div className="space-y-1">
+                {section.items.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end}
+                    className={navLinkClass}
+                  >
+                    <item.icon className="h-4 w-4 shrink-0" />
+                    {item.label}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          ))}
+        </nav>
+        <div className="flex items-center gap-2 border-t border-border px-4 py-3">
+          {user && (
+            <span className="truncate text-sm text-muted-foreground">
+              {user.name}
+            </span>
+          )}
         </div>
-      </header>
-      <main className="container mx-auto p-6">
-        <Outlet />
-      </main>
+      </aside>
+      <div className="pl-64">
+        <header className="sticky top-0 z-50 flex h-14 items-center justify-end border-b border-border px-6">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggle}
+              aria-label="切换主题"
+            >
+              {theme === 'dark' ? <Sun /> : <Moon />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleLogout}
+              aria-label="退出登录"
+            >
+              <LogOut />
+            </Button>
+          </div>
+        </header>
+        <main className="container mx-auto p-6">
+          <Outlet />
+        </main>
+      </div>
     </div>
   )
 }
