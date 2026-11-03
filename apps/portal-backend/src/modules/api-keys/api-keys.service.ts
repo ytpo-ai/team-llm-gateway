@@ -23,13 +23,7 @@ export interface ApiKeyView {
   keyPrefix: string;
   status: ApiKeyStatus;
   expiresAt: Date | null;
-  allowedModels: string[];
-  rateLimitPerMinute: number | null;
-  maxTokens: number | null;
-  limitDaily: number | null;
-  limitWeekly: number | null;
-  limitMonthly: number | null;
-  providerIds: string[];
+  policySetId: string | null;
   lastUsedAt: Date | null;
   userId: string;
   userName: string | null;
@@ -102,28 +96,10 @@ export class ApiKeysService {
     if (dto.expiresAt !== undefined) {
       key.expiresAt = dto.expiresAt ? new Date(dto.expiresAt) : null;
     }
-    if (dto.allowedModels !== undefined) {
-      key.allowedModels = dto.allowedModels ?? [];
-    }
-    if (dto.rateLimitPerMinute !== undefined) {
-      key.rateLimitPerMinute = dto.rateLimitPerMinute ?? null;
-    }
-    if (dto.maxTokens !== undefined) {
-      key.maxTokens = dto.maxTokens ?? null;
-    }
-    if (dto.limitDaily !== undefined) {
-      key.limitDaily = dto.limitDaily ?? null;
-    }
-    if (dto.limitWeekly !== undefined) {
-      key.limitWeekly = dto.limitWeekly ?? null;
-    }
-    if (dto.limitMonthly !== undefined) {
-      key.limitMonthly = dto.limitMonthly ?? null;
-    }
-    if (dto.providerIds !== undefined) {
-      key.providerIds = (dto.providerIds ?? []).map(
-        (id) => new Types.ObjectId(id),
-      );
+    if (dto.policySetId !== undefined) {
+      key.policySetId = dto.policySetId
+        ? new Types.ObjectId(dto.policySetId)
+        : null;
     }
 
     await key.save();
@@ -152,13 +128,7 @@ export class ApiKeysService {
       {
         name: old.name ?? undefined,
         expiresAt: old.expiresAt?.toISOString(),
-        allowedModels: old.allowedModels,
-        rateLimitPerMinute: old.rateLimitPerMinute ?? undefined,
-        maxTokens: old.maxTokens ?? undefined,
-        limitDaily: old.limitDaily ?? undefined,
-        limitWeekly: old.limitWeekly ?? undefined,
-        limitMonthly: old.limitMonthly ?? undefined,
-        providerIds: old.providerIds.map((id) => String(id)),
+        policySetId: old.policySetId ? String(old.policySetId) : undefined,
       },
       String(old.userId),
     );
@@ -181,13 +151,7 @@ export class ApiKeysService {
       keyPrefix: key.slice(0, 12),
       status: ApiKeyStatus.ACTIVE,
       expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
-      allowedModels: dto.allowedModels ?? [],
-      rateLimitPerMinute: dto.rateLimitPerMinute ?? null,
-      maxTokens: dto.maxTokens ?? null,
-      limitDaily: dto.limitDaily ?? null,
-      limitWeekly: dto.limitWeekly ?? null,
-      limitMonthly: dto.limitMonthly ?? null,
-      providerIds: (dto.providerIds ?? []).map((id) => new Types.ObjectId(id)),
+      policySetId: dto.policySetId ? new Types.ObjectId(dto.policySetId) : null,
     });
 
     const brief = await this.resolveUserBrief(targetUserId);
@@ -264,13 +228,7 @@ export class ApiKeysService {
       keyPrefix: key.keyPrefix,
       status: key.status,
       expiresAt: key.expiresAt,
-      allowedModels: key.allowedModels,
-      rateLimitPerMinute: key.rateLimitPerMinute,
-      maxTokens: key.maxTokens,
-      limitDaily: key.limitDaily ?? null,
-      limitWeekly: key.limitWeekly ?? null,
-      limitMonthly: key.limitMonthly ?? null,
-      providerIds: key.providerIds?.map((id) => String(id)) ?? [],
+      policySetId: key.policySetId ? String(key.policySetId) : null,
       lastUsedAt: key.lastUsedAt,
       userId: String(key.userId),
       userName: brief?.name ?? null,

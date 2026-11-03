@@ -7,10 +7,7 @@ export interface Team {
   name: string
   status: TeamStatus
   tenantId: string
-  limitDaily: number | null
-  limitWeekly: number | null
-  limitMonthly: number | null
-  providerIds: string[]
+  policySetId: string | null
 }
 
 export type MemberStatus = 'active' | 'disabled'

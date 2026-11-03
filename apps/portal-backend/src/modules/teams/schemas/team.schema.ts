@@ -28,21 +28,13 @@ export class Team {
   })
   status: TeamStatus;
 
-  @Prop({ type: Number, default: null })
-  limitDaily?: number | null;
-
-  @Prop({ type: Number, default: null })
-  limitWeekly?: number | null;
-
-  @Prop({ type: Number, default: null })
-  limitMonthly?: number | null;
-
   @Prop({
-    type: [MongooseSchema.Types.ObjectId],
-    ref: 'Provider',
-    default: [],
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'PolicySet',
+    default: null,
+    index: true,
   })
-  providerIds: Types.ObjectId[];
+  policySetId?: Types.ObjectId | null;
 }
 
 export const TeamSchema = SchemaFactory.createForClass(Team);

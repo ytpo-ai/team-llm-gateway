@@ -13,6 +13,7 @@ import {
 } from '../providers/schemas/provider.schema.js';
 import { UsageStatus } from '../usage/schemas/usage-log.schema.js';
 import { UsageService } from '../usage/usage.service.js';
+import { ConcurrencyService } from './concurrency.service.js';
 import type { ApiKeyContext } from './decorators/api-key-context.decorator.js';
 import { ProxyService } from './proxy.service.js';
 import { RateLimitService } from './rate-limit.service.js';
@@ -29,20 +30,20 @@ describe('ProxyService', () => {
   const modelModel = { find: vi.fn(), findOne: vi.fn() };
   const providerModel = { findOne: vi.fn() };
   const apiKeyModel = { updateOne: vi.fn() };
-  const usageService = { record: vi.fn(), sumTokensByApiKey: vi.fn(), sumTokens: vi.fn() };
+  const usageService = { record: vi.fn() };
   const billingService = { getSpendableBalance: vi.fn(), deduct: vi.fn() };
   const quotaLimitService = {
     resolve: vi.fn(),
+    resolveRateLimits: vi.fn(),
+    assertUsageLimits: vi.fn(),
     isModelAllowed: vi.fn(() => true),
     isProviderAllowed: vi.fn(() => true),
   };
   const rateLimitService = { assertAllowed: vi.fn() };
+  const concurrencyService = { acquire: vi.fn(() => () => undefined) };
   const configService = { getOrThrow: vi.fn(() => 'test-secret') };
 
-  const makeContext = (
-    allowedModels: string[] = [],
-    apiKeyOverrides: Record<string, unknown> = {},
-  ): ApiKeyContext => ({
+  const makeContext = (apiKeyOverrides: Record<string, unknown> = {}): ApiKeyContext => ({
     tenantId,
     teamId,
     userId,
@@ -56,13 +57,7 @@ describe('ProxyService', () => {
       keyPrefix: 'pk_test',
       status: ApiKeyStatus.ACTIVE,
       expiresAt: null,
-      allowedModels,
-      rateLimitPerMinute: null,
-      maxTokens: null,
-      limitDaily: null,
-      limitWeekly: null,
-      limitMonthly: null,
-      providerIds: [],
+      policySetId: null,
       lastUsedAt: null,
       _id: apiKeyId,
       ...apiKeyOverrides,
@@ -117,22 +112,28 @@ describe('ProxyService', () => {
         { provide: BillingService, useValue: billingService },
         { provide: QuotaLimitService, useValue: quotaLimitService },
         { provide: RateLimitService, useValue: rateLimitService },
+        { provide: ConcurrencyService, useValue: concurrencyService },
       ],
     }).compile();
 
-    usageService.sumTokensByApiKey.mockResolvedValue(0);
-    usageService.sumTokens.mockResolvedValue(0);
     billingService.getSpendableBalance.mockResolvedValue(100);
     billingService.deduct.mockResolvedValue(undefined);
     quotaLimitService.resolve.mockResolvedValue({
-      memberRateLimitPerMinute: null,
-      keyRateLimitPerMinute: null,
       team: null,
-      memberTemplate: null,
+      role: null,
+      key: null,
     });
+    quotaLimitService.resolveRateLimits.mockReturnValue({
+      teamPerMinute: null,
+      memberPerMinute: null,
+      keyPerMinute: null,
+      keyConcurrency: null,
+    });
+    quotaLimitService.assertUsageLimits.mockResolvedValue(undefined);
     quotaLimitService.isModelAllowed.mockReturnValue(true);
     quotaLimitService.isProviderAllowed.mockReturnValue(true);
     rateLimitService.assertAllowed.mockReset();
+    concurrencyService.acquire.mockReturnValue(() => undefined);
 
     service = module.get(ProxyService);
   });
@@ -142,7 +143,7 @@ describe('ProxyService', () => {
   });
 
   describe('listModels', () => {
-    it('should filter by key allowedModels', async () => {
+    it('should filter by key policy set modelWhitelist', async () => {
       modelModel.find.mockReturnValue({
         sort: vi.fn().mockReturnThis(),
         exec: vi.fn().mockResolvedValue([
@@ -150,8 +151,13 @@ describe('ProxyService', () => {
           { ...makeModel(), modelId: 'gpt-4o' },
         ]),
       });
+      quotaLimitService.resolve.mockResolvedValue({
+        team: null,
+        role: null,
+        key: { modelWhitelist: ['gpt-4o-mini'] },
+      });
 
-      const result = await service.listModels(makeContext(['gpt-4o-mini']));
+      const result = await service.listModels(makeContext());
 
       expect(result.object).toBe('list');
       expect(result.data).toHaveLength(1);
@@ -199,7 +205,7 @@ describe('ProxyService', () => {
       expect(apiKeyModel.updateOne).toHaveBeenCalled();
     });
 
-    it('should reject model not in allowedModels', async () => {
+    it('should reject model not in whitelist', async () => {
       modelModel.findOne.mockReturnValue({
         exec: vi.fn().mockResolvedValue(makeModel()),
       });
@@ -207,7 +213,7 @@ describe('ProxyService', () => {
 
       await expect(
         service.chatCompletions(
-          makeContext(['gpt-4o']),
+          makeContext(),
           { model: 'gpt-4o-mini' },
           makeRes() as never,
         ),
@@ -216,12 +222,14 @@ describe('ProxyService', () => {
   });
 
   describe('limits', () => {
-    it('should reject when maxTokens budget is exhausted', async () => {
-      usageService.sumTokensByApiKey.mockResolvedValue(1000);
+    it('should reject when usage limits block', async () => {
+      quotaLimitService.assertUsageLimits.mockRejectedValue(
+        new HttpException('团队日 Token 限额已用尽', 429),
+      );
 
       await expect(
         service.chatCompletions(
-          makeContext([], { maxTokens: 1000 }),
+          makeContext(),
           { model: 'gpt-4o-mini' },
           makeRes() as never,
         ),
@@ -241,13 +249,19 @@ describe('ProxyService', () => {
     });
 
     it('should reject when rate limit is exceeded', async () => {
+      quotaLimitService.resolveRateLimits.mockReturnValue({
+        teamPerMinute: null,
+        memberPerMinute: 30,
+        keyPerMinute: null,
+        keyConcurrency: null,
+      });
       rateLimitService.assertAllowed.mockImplementation(() => {
         throw new HttpException('rate limited', 429);
       });
 
       await expect(
         service.chatCompletions(
-          makeContext([], { rateLimitPerMinute: 1 }),
+          makeContext(),
           { model: 'gpt-4o-mini' },
           makeRes() as never,
         ),
@@ -255,11 +269,11 @@ describe('ProxyService', () => {
     });
 
     it('should enforce member rate limit by userId and key rate limit by apiKeyId', async () => {
-      quotaLimitService.resolve.mockResolvedValue({
-        memberRateLimitPerMinute: 30,
-        keyRateLimitPerMinute: 60,
-        team: null,
-        memberTemplate: null,
+      quotaLimitService.resolveRateLimits.mockReturnValue({
+        teamPerMinute: null,
+        memberPerMinute: 30,
+        keyPerMinute: 60,
+        keyConcurrency: null,
       });
       modelModel.findOne.mockReturnValue({
         exec: vi.fn().mockResolvedValue(makeModel()),
@@ -294,6 +308,67 @@ describe('ProxyService', () => {
         String(apiKeyId),
         60,
       );
+    });
+
+    it('should acquire and release concurrency for the api key', async () => {
+      const release = vi.fn();
+      quotaLimitService.resolveRateLimits.mockReturnValue({
+        teamPerMinute: null,
+        memberPerMinute: null,
+        keyPerMinute: null,
+        keyConcurrency: 5,
+      });
+      concurrencyService.acquire.mockReturnValue(release);
+      modelModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(makeModel()),
+      });
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(makeProvider()),
+      });
+      usageService.record.mockResolvedValue(undefined);
+      apiKeyModel.updateOne.mockResolvedValue(undefined);
+
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              choices: [{ message: { content: 'hi' } }],
+              usage: { total_tokens: 0 },
+            }),
+            { status: 200 },
+          ),
+        ),
+      );
+
+      await service.chatCompletions(
+        makeContext(),
+        { model: 'gpt-4o-mini' },
+        makeRes() as never,
+      );
+
+      expect(concurrencyService.acquire).toHaveBeenCalledWith(String(apiKeyId), 5);
+      expect(release).toHaveBeenCalled();
+    });
+
+    it('should reject when concurrency limit exceeded', async () => {
+      quotaLimitService.resolveRateLimits.mockReturnValue({
+        teamPerMinute: null,
+        memberPerMinute: null,
+        keyPerMinute: null,
+        keyConcurrency: 1,
+      });
+      concurrencyService.acquire.mockImplementation(() => {
+        throw new HttpException('API Key 并发数已达上限', 429);
+      });
+
+      await expect(
+        service.chatCompletions(
+          makeContext(),
+          { model: 'gpt-4o-mini' },
+          makeRes() as never,
+        ),
+      ).rejects.toThrow(HttpException);
     });
   });
 

@@ -6,13 +6,7 @@ export interface ApiKey {
   keyPrefix: string
   status: ApiKeyStatus
   expiresAt: string | null
-  allowedModels: string[]
-  rateLimitPerMinute: number | null
-  maxTokens: number | null
-  limitDaily: number | null
-  limitWeekly: number | null
-  limitMonthly: number | null
-  providerIds: string[]
+  policySetId: string | null
   lastUsedAt: string | null
   userId: string
   userName: string | null
@@ -29,24 +23,12 @@ export interface ApiKeyInput {
   userId?: string
   name?: string
   expiresAt?: string
-  allowedModels?: string[]
-  rateLimitPerMinute?: number
-  maxTokens?: number
-  limitDaily?: number
-  limitWeekly?: number
-  limitMonthly?: number
-  providerIds?: string[]
+  policySetId?: string
 }
 
 export interface ApiKeyPatch {
   userId?: string
   name?: string | null
   expiresAt?: string | null
-  allowedModels?: string[]
-  rateLimitPerMinute?: number | null
-  maxTokens?: number | null
-  limitDaily?: number | null
-  limitWeekly?: number | null
-  limitMonthly?: number | null
-  providerIds?: string[]
+  policySetId?: string | null
 }

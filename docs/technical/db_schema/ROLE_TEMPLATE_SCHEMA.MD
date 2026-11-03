@@ -21,17 +21,14 @@
 | `teamId` | ObjectId | 可选、ref `Team`、索引 | 所属团队；内置模板为 `null` |
 | `name` | string | 必填、trim | 模板名（如「设计师」「开发人员」） |
 | `description` | string | 默认 `''` | 说明 |
-| `limitDaily` | number | 可选、默认 `null` | 日 token 上限（null = 不限） |
-| `limitWeekly` | number | 可选、默认 `null` | 周 token 上限（null = 不限） |
-| `limitMonthly` | number | 可选、默认 `null` | 月 token 上限（null = 不限） |
-| `rateLimitPerMinute` | number | 可选、默认 `null` | 每分钟速率上限（null = 不限） |
-| `providerIds` | ObjectId[] | 默认 `[]`、ref `Provider` | 可用渠道白名单（空 = 全部） |
-| `modelWhitelist` | string[] | 默认 `[]` | 可用模型白名单（空 = 全部） |
+| `policySetId` | ObjectId | 可选、ref `PolicySet`、索引、默认 `null` | 绑定的策略集（`null` = 不限） |
 | `builtIn` | boolean | 默认 `false` | 是否内置模板 |
 | `createdAt` | Date | 自动 | 创建时间 |
 | `updatedAt` | Date | 自动 | 更新时间 |
 
 **索引**：`{ tenantId: 1, teamId: 1, name: 1 }`。
+
+> 限额字段（`limitDaily/Weekly/Monthly`、`rateLimitPerMinute`、`providerIds`、`modelWhitelist`）已策略化迁入 `PolicySet`（见 `POLICY_SET_SCHEMA.MD`），模板仅保留 `policySetId` 引用挂载。
 
 ## 3. User 增量变更
 
@@ -43,16 +40,16 @@
 
 ## 4. 内置模板
 
-应用启动时 `RoleTemplateSeedService` 调用 `ensureBuiltInTemplates()`，确保以下内置模板存在（`builtIn = true`、`tenantId`/`teamId` 为 `null`）：
+应用启动时确保以下内置模板存在（`builtIn = true`、`tenantId`/`teamId` 为 `null`），并关联同名内置策略集（`builtIn = true`、`teamId = null`，见 `POLICY_SET_SCHEMA.MD`）：
 
 | 名称 | 说明 | 默认限制 |
 |---|---|---|
 | 设计师 | 面向设计团队的默认配置 | 全部不限、全渠道 |
 | 开发人员 | 面向开发团队的默认配置 | 全部不限、全渠道 |
 
-> 字段值「先跑通再优化」，内置模板默认全部放开，由管理员按需编辑。
+> 字段值「先跑通再优化」，内置策略集默认全部放开，由管理员按需编辑。
 
 ## 5. 查询可见性
 
 - `list` 返回：`{ $or: [ { builtIn: true }, { tenantId, teamId } ] }`（内置模板对所有团队可见，自定义模板仅本团队可见）。
-- 成员绑定角色B 后，其限额继承自模板（REQ-002 转发层生效）。
+- 成员绑定角色B 后，其限额继承自模板所挂载的策略集（转发层按 `RoleTemplate.policySetId` 下发）。

@@ -1,19 +1,34 @@
+import { HttpException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
 import { ApiKeyStatus } from '../api-keys/schemas/api-key.schema.js';
+import {
+  PolicyAction,
+  PolicyMeasure,
+  PolicySetDocument,
+  PolicyWindow,
+} from '../policy-sets/schemas/policy-set.schema.js';
 import { QuotaLimitService } from './quota-limit.service.js';
+import type { ResolvedPolicyContext } from './quota-limit.service.js';
+import { UsageService } from '../usage/usage.service.js';
 
 describe('QuotaLimitService', () => {
   let service: QuotaLimitService;
 
   const teamId = String(new Types.ObjectId());
   const userId = String(new Types.ObjectId());
-  const providerId = new Types.ObjectId();
   const templateId = new Types.ObjectId();
+  const providerId = new Types.ObjectId();
 
   const teamModel = { findById: vi.fn() };
   const userModel = { findById: vi.fn() };
   const roleTemplateModel = { findById: vi.fn() };
+  const policySetModel = { findById: vi.fn() };
+  const usageService = {
+    sumTokens: vi.fn(),
+    sumCost: vi.fn(),
+    countRequests: vi.fn(),
+  };
 
   const makeApiKey = (overrides: Record<string, unknown> = {}) => ({
     _id: new Types.ObjectId(),
@@ -25,32 +40,26 @@ describe('QuotaLimitService', () => {
     keyPrefix: 'pk_test',
     status: ApiKeyStatus.ACTIVE,
     expiresAt: null,
-    allowedModels: [],
-    rateLimitPerMinute: null,
-    maxTokens: null,
-    limitDaily: null,
-    limitWeekly: null,
-    limitMonthly: null,
-    providerIds: [],
+    policySetId: null,
     lastUsedAt: null,
     ...overrides,
   });
 
-  const makeTemplate = (overrides: Record<string, unknown> = {}) => ({
-    _id: templateId,
-    tenantId: null,
-    teamId: null,
-    name: '设计师',
-    description: '',
-    limitDaily: null,
-    limitWeekly: null,
-    limitMonthly: null,
-    rateLimitPerMinute: null,
-    providerIds: [],
-    modelWhitelist: [],
-    builtIn: true,
-    ...overrides,
-  });
+  const makeSet = (overrides: Record<string, unknown> = {}) =>
+    ({
+      _id: new Types.ObjectId(),
+      tenantId: null,
+      teamId: null,
+      name: '策略集',
+      description: '',
+      entries: [],
+      providerIds: [],
+      modelWhitelist: [],
+      builtIn: false,
+      ...overrides,
+    }) as unknown as PolicySetDocument;
+
+  const exec = (value: unknown) => ({ exec: vi.fn().mockResolvedValue(value) });
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -61,6 +70,8 @@ describe('QuotaLimitService', () => {
         { provide: 'TeamModel', useValue: teamModel },
         { provide: 'UserModel', useValue: userModel },
         { provide: 'RoleTemplateModel', useValue: roleTemplateModel },
+        { provide: 'PolicySetModel', useValue: policySetModel },
+        { provide: UsageService, useValue: usageService },
       ],
     }).compile();
 
@@ -68,18 +79,39 @@ describe('QuotaLimitService', () => {
   });
 
   describe('resolve', () => {
-    it('should return null limits when no team/template/key limits', async () => {
-      teamModel.findById.mockReturnValue({
-        exec: vi.fn().mockResolvedValue({
-          limitDaily: null,
-          limitWeekly: null,
-          limitMonthly: null,
-          providerIds: [],
-        }),
+    it('should resolve team/role/key policy sets', async () => {
+      const teamSet = makeSet({ name: '团队策略' });
+      const roleSet = makeSet({ name: '角色策略' });
+      const keySet = makeSet({ name: 'Key 策略' });
+
+      teamModel.findById.mockReturnValue(
+        exec({ _id: new Types.ObjectId(teamId), policySetId: teamSet._id }),
+      );
+      userModel.findById.mockReturnValue(
+        exec({ roleTemplateId: templateId }),
+      );
+      roleTemplateModel.findById.mockReturnValue(
+        exec({ _id: templateId, policySetId: roleSet._id }),
+      );
+      policySetModel.findById
+        .mockReturnValueOnce(exec(teamSet))
+        .mockReturnValueOnce(exec(roleSet))
+        .mockReturnValueOnce(exec(keySet));
+
+      const result = await service.resolve({
+        teamId,
+        userId,
+        apiKey: makeApiKey({ policySetId: keySet._id }),
       });
-      userModel.findById.mockReturnValue({
-        exec: vi.fn().mockResolvedValue({ roleTemplateId: null }),
-      });
+
+      expect(result.team?.name).toBe('团队策略');
+      expect(result.role?.name).toBe('角色策略');
+      expect(result.key?.name).toBe('Key 策略');
+    });
+
+    it('should return null sets when nothing bound', async () => {
+      teamModel.findById.mockReturnValue(exec({ _id: new Types.ObjectId(teamId) }));
+      userModel.findById.mockReturnValue(exec({ roleTemplateId: null }));
 
       const result = await service.resolve({
         teamId,
@@ -87,107 +119,258 @@ describe('QuotaLimitService', () => {
         apiKey: makeApiKey(),
       });
 
-      expect(result.memberRateLimitPerMinute).toBeNull();
-      expect(result.keyRateLimitPerMinute).toBeNull();
-      expect(result.team).not.toBeNull();
-      expect(result.memberTemplate).toBeNull();
-    });
-
-    it('should split member and key rate limits', async () => {
-      teamModel.findById.mockReturnValue({ exec: vi.fn().mockResolvedValue({}) });
-      userModel.findById.mockReturnValue({
-        exec: vi.fn().mockResolvedValue({ roleTemplateId: templateId }),
-      });
-      roleTemplateModel.findById.mockReturnValue({
-        exec: vi.fn().mockResolvedValue(makeTemplate({ rateLimitPerMinute: 30 })),
-      });
-
-      const result = await service.resolve({
-        teamId,
-        userId,
-        apiKey: makeApiKey({ rateLimitPerMinute: 60 }),
-      });
-
-      expect(result.memberRateLimitPerMinute).toBe(30);
-      expect(result.keyRateLimitPerMinute).toBe(60);
+      expect(result.team).toBeNull();
+      expect(result.role).toBeNull();
+      expect(result.key).toBeNull();
     });
   });
 
-  describe('resolveMemberTemplate', () => {
-    it('should return null when user has no roleTemplateId', async () => {
-      userModel.findById.mockReturnValue({
-        exec: vi.fn().mockResolvedValue({ roleTemplateId: null }),
-      });
+  describe('resolveRateLimits', () => {
+    it('should extract minute request and concurrency block limits', () => {
+      const resolved: ResolvedPolicyContext = {
+        team: makeSet({
+          entries: [
+            {
+              measure: PolicyMeasure.REQUEST,
+              window: PolicyWindow.MINUTE,
+              limit: 100,
+              action: PolicyAction.BLOCK,
+            },
+          ],
+        }),
+        role: makeSet({
+          entries: [
+            {
+              measure: PolicyMeasure.REQUEST,
+              window: PolicyWindow.MINUTE,
+              limit: 30,
+              action: PolicyAction.BLOCK,
+            },
+          ],
+        }),
+        key: makeSet({
+          entries: [
+            {
+              measure: PolicyMeasure.REQUEST,
+              window: PolicyWindow.MINUTE,
+              limit: 60,
+              action: PolicyAction.BLOCK,
+            },
+            {
+              measure: PolicyMeasure.CONCURRENCY,
+              window: PolicyWindow.PERMANENT,
+              limit: 5,
+              action: PolicyAction.BLOCK,
+            },
+          ],
+        }),
+      };
 
-      const result = await service.resolveMemberTemplate(userId);
+      const limits = service.resolveRateLimits(resolved);
 
-      expect(result).toBeNull();
-      expect(roleTemplateModel.findById).not.toHaveBeenCalled();
+      expect(limits.teamPerMinute).toBe(100);
+      expect(limits.memberPerMinute).toBe(30);
+      expect(limits.keyPerMinute).toBe(60);
+      expect(limits.keyConcurrency).toBe(5);
     });
 
-    it('should load template when user binds one', async () => {
-      userModel.findById.mockReturnValue({
-        exec: vi.fn().mockResolvedValue({ roleTemplateId: templateId }),
-      });
-      roleTemplateModel.findById.mockReturnValue({
-        exec: vi.fn().mockResolvedValue(makeTemplate()),
-      });
+    it('should ignore warn and zero/unlimited entries', () => {
+      const resolved: ResolvedPolicyContext = {
+        team: null,
+        role: null,
+        key: makeSet({
+          entries: [
+            {
+              measure: PolicyMeasure.REQUEST,
+              window: PolicyWindow.MINUTE,
+              limit: 60,
+              action: PolicyAction.WARN,
+            },
+            {
+              measure: PolicyMeasure.CONCURRENCY,
+              window: PolicyWindow.PERMANENT,
+              limit: 0,
+              action: PolicyAction.BLOCK,
+            },
+          ],
+        }),
+      };
 
-      const result = await service.resolveMemberTemplate(userId);
+      const limits = service.resolveRateLimits(resolved);
 
-      expect(result?.name).toBe('设计师');
+      expect(limits.keyPerMinute).toBeNull();
+      expect(limits.keyConcurrency).toBeNull();
     });
   });
 
   describe('isProviderAllowed', () => {
-    it('should allow when no whitelist configured', () => {
-      const allowed = service.isProviderAllowed(
-        null,
-        null,
-        makeApiKey(),
-        String(providerId),
-      );
-      expect(allowed).toBe(true);
-    });
+    it('should intersect provider whitelists across levels', () => {
+      const allowed: ResolvedPolicyContext = {
+        team: makeSet({ providerIds: [providerId] }),
+        role: makeSet({ providerIds: [providerId] }),
+        key: null,
+      };
+      expect(service.isProviderAllowed(allowed, String(providerId))).toBe(true);
 
-    it('should reject when key whitelist excludes provider', () => {
-      const allowed = service.isProviderAllowed(
-        null,
-        null,
-        makeApiKey({ providerIds: [new Types.ObjectId()] }),
-        String(providerId),
-      );
-      expect(allowed).toBe(false);
-    });
-
-    it('should allow when provider is in key whitelist', () => {
-      const allowed = service.isProviderAllowed(
-        null,
-        null,
-        makeApiKey({ providerIds: [providerId] }),
-        String(providerId),
-      );
-      expect(allowed).toBe(true);
+      const denied: ResolvedPolicyContext = {
+        team: null,
+        role: makeSet({ providerIds: [new Types.ObjectId()] }),
+        key: null,
+      };
+      expect(service.isProviderAllowed(denied, String(providerId))).toBe(false);
     });
   });
 
   describe('isModelAllowed', () => {
-    it('should reject when member template whitelist excludes model', () => {
-      const allowed = service.isModelAllowed(
-        makeTemplate({ modelWhitelist: ['gpt-4o'] }) as never,
-        makeApiKey(),
-        'gpt-4o-mini',
+    it('should intersect model whitelists across levels', () => {
+      const resolved: ResolvedPolicyContext = {
+        team: null,
+        role: makeSet({ modelWhitelist: ['gpt-4o-mini'] }),
+        key: makeSet({ modelWhitelist: ['gpt-4o-mini'] }),
+      };
+      expect(service.isModelAllowed(resolved, 'gpt-4o-mini')).toBe(true);
+      expect(service.isModelAllowed(resolved, 'gpt-4o')).toBe(false);
+    });
+  });
+
+  describe('assertUsageLimits', () => {
+    const subject = {
+      tenantId: String(new Types.ObjectId()),
+      teamId,
+      userId,
+      apiKeyId: String(new Types.ObjectId()),
+    };
+
+    it('should block when team token day limit exceeded', async () => {
+      usageService.sumTokens.mockResolvedValue(1000);
+      const resolved: ResolvedPolicyContext = {
+        team: makeSet({
+          entries: [
+            {
+              measure: PolicyMeasure.TOKEN,
+              window: PolicyWindow.DAY,
+              limit: 1000,
+              action: PolicyAction.BLOCK,
+            },
+          ],
+        }),
+        role: null,
+        key: null,
+      };
+
+      await expect(
+        service.assertUsageLimits(resolved, subject),
+      ).rejects.toThrow(HttpException);
+      expect(usageService.sumTokens).toHaveBeenCalledWith(
+        expect.objectContaining({ teamId, since: expect.any(Date) }),
       );
-      expect(allowed).toBe(false);
     });
 
-    it('should allow when both whitelists permit the model', () => {
-      const allowed = service.isModelAllowed(
-        makeTemplate({ modelWhitelist: ['gpt-4o-mini'] }) as never,
-        makeApiKey({ allowedModels: ['gpt-4o-mini'] }),
-        'gpt-4o-mini',
+    it('should block when member spend month limit exceeded', async () => {
+      usageService.sumCost.mockResolvedValue(500);
+      const resolved: ResolvedPolicyContext = {
+        team: null,
+        role: makeSet({
+          entries: [
+            {
+              measure: PolicyMeasure.SPEND,
+              window: PolicyWindow.MONTH,
+              limit: 500,
+              action: PolicyAction.BLOCK,
+            },
+          ],
+        }),
+        key: null,
+      };
+
+      await expect(
+        service.assertUsageLimits(resolved, subject),
+      ).rejects.toThrow(HttpException);
+      expect(usageService.sumCost).toHaveBeenCalledWith(
+        expect.objectContaining({ userId }),
       );
-      expect(allowed).toBe(true);
+    });
+
+    it('should block when key request long-window count exceeded', async () => {
+      usageService.countRequests.mockResolvedValue(10);
+      const resolved: ResolvedPolicyContext = {
+        team: null,
+        role: null,
+        key: makeSet({
+          entries: [
+            {
+              measure: PolicyMeasure.REQUEST,
+              window: PolicyWindow.HOUR,
+              limit: 10,
+              action: PolicyAction.BLOCK,
+            },
+          ],
+        }),
+      };
+
+      await expect(
+        service.assertUsageLimits(resolved, subject),
+      ).rejects.toThrow(HttpException);
+      expect(usageService.countRequests).toHaveBeenCalledWith(
+        expect.objectContaining({ apiKeyId: subject.apiKeyId }),
+      );
+    });
+
+    it('should not throw for warn action (record event only)', async () => {
+      usageService.sumTokens.mockResolvedValue(1000);
+      const resolved: ResolvedPolicyContext = {
+        team: makeSet({
+          entries: [
+            {
+              measure: PolicyMeasure.TOKEN,
+              window: PolicyWindow.DAY,
+              limit: 1000,
+              action: PolicyAction.WARN,
+            },
+          ],
+        }),
+        role: null,
+        key: null,
+      };
+
+      await expect(
+        service.assertUsageLimits(resolved, subject),
+      ).resolves.toBeUndefined();
+    });
+
+    it('should skip unlimited (limit <= 0) and minute/concurrency entries', async () => {
+      const resolved: ResolvedPolicyContext = {
+        team: null,
+        role: null,
+        key: makeSet({
+          entries: [
+            {
+              measure: PolicyMeasure.TOKEN,
+              window: PolicyWindow.PERMANENT,
+              limit: 0,
+              action: PolicyAction.BLOCK,
+            },
+            {
+              measure: PolicyMeasure.REQUEST,
+              window: PolicyWindow.MINUTE,
+              limit: 60,
+              action: PolicyAction.BLOCK,
+            },
+            {
+              measure: PolicyMeasure.CONCURRENCY,
+              window: PolicyWindow.PERMANENT,
+              limit: 5,
+              action: PolicyAction.BLOCK,
+            },
+          ],
+        }),
+      };
+
+      await expect(
+        service.assertUsageLimits(resolved, subject),
+      ).resolves.toBeUndefined();
+      expect(usageService.sumTokens).not.toHaveBeenCalled();
+      expect(usageService.countRequests).not.toHaveBeenCalled();
     });
   });
 });

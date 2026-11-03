@@ -11,6 +11,7 @@ import {
   Server,
   Settings,
   ShieldCheck,
+  SlidersHorizontal,
   Sparkles,
   Sun,
   Users,
@@ -64,6 +65,7 @@ export function AppLayout() {
       items: [
         { label: '成员管理', to: '/team', icon: Users },
         { label: '角色管理', to: '/roles', icon: ShieldCheck },
+        { label: '策略管理', to: '/policy-sets', icon: SlidersHorizontal },
         { label: 'API Key', to: '/api-keys', icon: KeyRound },
         { label: '额度与计费', to: '/billing', icon: Wallet },
         ...(isTeamManager

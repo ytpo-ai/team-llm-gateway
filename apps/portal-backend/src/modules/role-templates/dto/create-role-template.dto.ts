@@ -1,12 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsArray,
   IsMongoId,
-  IsNumber,
   IsOptional,
   IsString,
   MaxLength,
-  Min,
   MinLength,
 } from 'class-validator';
 
@@ -23,39 +20,10 @@ export class CreateRoleTemplateDto {
   @MaxLength(500)
   description?: string;
 
-  @ApiPropertyOptional({ description: '日 token 上限（null 不限）' })
+  @ApiPropertyOptional({
+    description: '绑定策略集 ID（空 = 不限）',
+  })
   @IsOptional()
-  @IsNumber()
-  @Min(0)
-  limitDaily?: number;
-
-  @ApiPropertyOptional({ description: '周 token 上限（null 不限）' })
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  limitWeekly?: number;
-
-  @ApiPropertyOptional({ description: '月 token 上限（null 不限）' })
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  limitMonthly?: number;
-
-  @ApiPropertyOptional({ description: '每分钟速率上限' })
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  rateLimitPerMinute?: number;
-
-  @ApiPropertyOptional({ type: [String], description: '可用渠道白名单（空 = 全部）' })
-  @IsOptional()
-  @IsArray()
-  @IsMongoId({ each: true })
-  providerIds?: string[];
-
-  @ApiPropertyOptional({ type: [String], description: '可用模型白名单（空 = 全部）' })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  modelWhitelist?: string[];
+  @IsMongoId()
+  policySetId?: string;
 }

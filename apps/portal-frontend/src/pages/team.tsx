@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +35,8 @@ import {
 } from '@/components/ui/select'
 import { useAuthStore } from '@/features/auth/store'
 import type { Role } from '@/features/auth/types'
+import { listPolicySets } from '@/features/policy-sets/api'
+import type { PolicySet } from '@/features/policy-sets/types'
 import { listRoleTemplates } from '@/features/role-templates/api'
 import type { RoleTemplate } from '@/features/role-templates/types'
 import {
@@ -119,34 +121,23 @@ export function TeamPage() {
     enabled: isAdmin,
   })
 
-  const [teamLimits, setTeamLimits] = useState({
-    limitDaily: '',
-    limitWeekly: '',
-    limitMonthly: '',
+  const policySetsQuery = useQuery({
+    queryKey: ['policy-sets'],
+    queryFn: listPolicySets,
+    enabled: isAdmin,
   })
 
-  useEffect(() => {
-    if (team) {
-      setTeamLimits({
-        limitDaily: team.limitDaily != null ? String(team.limitDaily) : '',
-        limitWeekly: team.limitWeekly != null ? String(team.limitWeekly) : '',
-        limitMonthly: team.limitMonthly != null ? String(team.limitMonthly) : '',
-      })
-    }
-  }, [team?.id, team?.limitDaily, team?.limitWeekly, team?.limitMonthly])
+  const [teamPolicySetId, setTeamPolicySetId] = useState('')
+
+  const openLimits = () => {
+    setTeamPolicySetId(team?.policySetId ?? '')
+    setLimitsOpen(true)
+  }
 
   const updateTeamMutation = useMutation({
     mutationFn: () =>
       updateTeam(team!.id, {
-        limitDaily: teamLimits.limitDaily
-          ? Number(teamLimits.limitDaily)
-          : null,
-        limitWeekly: teamLimits.limitWeekly
-          ? Number(teamLimits.limitWeekly)
-          : null,
-        limitMonthly: teamLimits.limitMonthly
-          ? Number(teamLimits.limitMonthly)
-          : null,
+        policySetId: teamPolicySetId || null,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teams'] })
@@ -229,6 +220,7 @@ export function TeamPage() {
   const members: Member[] = membersQuery.data ?? []
   const invitations: Invitation[] = invitationsQuery.data ?? []
   const roleTemplates: RoleTemplate[] = roleTemplatesQuery.data ?? []
+  const policySets: PolicySet[] = policySetsQuery.data ?? []
 
   return (
     <div className="space-y-6">
@@ -241,7 +233,7 @@ export function TeamPage() {
         </div>
         {isAdmin && (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setLimitsOpen(true)}>
+            <Button variant="outline" onClick={openLimits}>
               团队使用限额
             </Button>
             <Button onClick={openInvite}>邀请成员</Button>
@@ -449,50 +441,30 @@ export function TeamPage() {
           <DialogHeader>
             <DialogTitle>团队使用限额</DialogTitle>
             <DialogDescription>
-              设置团队级日/周/月 token 上限，与成员角色、API Key 限额取最严格生效
+              为团队绑定策略集，与成员角色、API Key 的策略取最严格生效
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  日 token 上限（留空不限）
-                </label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={teamLimits.limitDaily}
-                  onChange={(e) =>
-                    setTeamLimits({ ...teamLimits, limitDaily: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  周 token 上限（留空不限）
-                </label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={teamLimits.limitWeekly}
-                  onChange={(e) =>
-                    setTeamLimits({ ...teamLimits, limitWeekly: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  月 token 上限（留空不限）
-                </label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={teamLimits.limitMonthly}
-                  onChange={(e) =>
-                    setTeamLimits({ ...teamLimits, limitMonthly: e.target.value })
-                  }
-                />
-              </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                团队策略集
+              </label>
+              <Select
+                value={teamPolicySetId || ''}
+                onValueChange={(v) => setTeamPolicySetId(v)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="不限" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">不限</SelectItem>
+                  {policySets.map((set) => (
+                    <SelectItem key={set.id} value={set.id}>
+                      {set.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <DialogFooter>
               <Button

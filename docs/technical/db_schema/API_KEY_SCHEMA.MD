@@ -11,8 +11,8 @@
 - **多租户内建（ADR-03）**：`ApiKey` 携带 `tenantId` 引用 `Tenant`，查询一律按 `tenantId` 过滤。
 - **key 归属成员（ADR-06）**：`tenantId → teamId → userId` 三级归属，用量归到成员/团队。`team_admin`/`system` 可为本团队任意成员签发/改绑 key，`member` 仅能绑定自己。
 - **哈希存储**：只落 `keyHash`（sha256）与 `keyPrefix`（展示前缀），明文 key 绝不落库；完整值仅在创建/轮换时返回一次。
-- **细粒度限制（ADR-06/09）**：每 key 独立 `allowedModels` / `rateLimitPerMinute` / `maxTokens` / `limitDaily` / `limitWeekly` / `limitMonthly` / `providerIds` / `expiresAt`。
-- **三级限额（团队管理优化 REQ-002）**：apikey 只设限额、不持余额；转发层对团队/成员/key 三级日/周/月限额逐级校验，任一超标即拦截。
+- **策略化限制（ADR-06/09 + BILLING_QUOTA_POLICY）**：每 key 通过 `policySetId` 挂载策略集，统一表达模型/渠道白名单、速率、预算与周期上限（见 `POLICY_SET_SCHEMA.MD`）。
+- **三级限额**：apikey 只设限额、不持余额；转发层对团队/角色/key 三级策略逐级校验（AND、取最严），任一超标即拦截。
 
 ## 2. ApiKey（API 密钥）
 
@@ -27,13 +27,7 @@
 | `keyPrefix` | string | 必填 | 展示前缀（如 `pk_ab12cd34ef`，12 字符） |
 | `status` | enum | `active` / `revoked`，默认 `active` | key 状态 |
 | `expiresAt` | Date | 可选 | 过期时间；`null` = 永久有效 |
-| `allowedModels` | string[] | 可选 | 模型白名单；空/缺省 = 不限制 |
-| `rateLimitPerMinute` | number | 可选 | 每分钟请求速率上限；缺省 = 不限制 |
-| `maxTokens` | number | 可选 | token 预算上限（总用量）；缺省 = 不限制 |
-| `limitDaily` | number | 可选 | 日 token 上限（自然日窗口）；缺省 = 不限制 |
-| `limitWeekly` | number | 可选 | 周 token 上限（自然周窗口）；缺省 = 不限制 |
-| `limitMonthly` | number | 可选 | 月 token 上限（自然月窗口）；缺省 = 不限制 |
-| `providerIds` | ObjectId[] | 可选、ref `Provider` | 可用渠道白名单；空 = 全部渠道 |
+| `policySetId` | ObjectId | 可选、ref `PolicySet`、索引 | 绑定的策略集；空 = 不限 |
 | `lastUsedAt` | Date | 可选 | 最近使用时间（下游计量写入） |
 | `createdAt` | Date | 自动 | 创建时间 |
 | `updatedAt` | Date | 自动 | 更新时间 |
@@ -64,13 +58,7 @@ interface ApiKeyView {
   keyPrefix: string;          // 仅前缀，不含完整值
   status: 'active' | 'revoked';
   expiresAt: Date | null;
-  allowedModels: string[];
-  rateLimitPerMinute: number | null;
-  maxTokens: number | null;
-  limitDaily: number | null;
-  limitWeekly: number | null;
-  limitMonthly: number | null;
-  providerIds: string[];
+  policySetId: string | null; // 绑定的策略集
   lastUsedAt: Date | null;
   userId: string;
   userName: string | null;      // 绑定成员姓名（脱敏视图填充）

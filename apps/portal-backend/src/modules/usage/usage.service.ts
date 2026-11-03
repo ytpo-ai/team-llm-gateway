@@ -147,6 +147,48 @@ export class UsageService {
     apiKeyId?: string;
     since?: Date;
   }): Promise<number> {
+    const [result] = await this.usageLogModel
+      .aggregate<{ total: number }>([
+        { $match: this.buildAggregateMatch(filter) },
+        { $group: { _id: null, total: { $sum: '$totalTokens' } } },
+      ])
+      .exec();
+    return result?.total ?? 0;
+  }
+
+  async sumCost(filter: {
+    tenantId: string;
+    teamId?: string;
+    userId?: string;
+    apiKeyId?: string;
+    since?: Date;
+  }): Promise<number> {
+    const [result] = await this.usageLogModel
+      .aggregate<{ total: number }>([
+        { $match: this.buildAggregateMatch(filter) },
+        { $group: { _id: null, total: { $sum: '$cost' } } },
+      ])
+      .exec();
+    return result?.total ?? 0;
+  }
+
+  async countRequests(filter: {
+    tenantId: string;
+    teamId?: string;
+    userId?: string;
+    apiKeyId?: string;
+    since?: Date;
+  }): Promise<number> {
+    return this.usageLogModel.countDocuments(this.buildAggregateMatch(filter)).exec();
+  }
+
+  private buildAggregateMatch(filter: {
+    tenantId: string;
+    teamId?: string;
+    userId?: string;
+    apiKeyId?: string;
+    since?: Date;
+  }): Record<string, unknown> {
     const match: Record<string, unknown> = {
       tenantId: new Types.ObjectId(filter.tenantId),
     };
@@ -154,14 +196,7 @@ export class UsageService {
     if (filter.userId) match.userId = new Types.ObjectId(filter.userId);
     if (filter.apiKeyId) match.apiKeyId = new Types.ObjectId(filter.apiKeyId);
     if (filter.since) match.createdAt = { $gte: filter.since };
-
-    const [result] = await this.usageLogModel
-      .aggregate<{ total: number }>([
-        { $match: match },
-        { $group: { _id: null, total: { $sum: '$totalTokens' } } },
-      ])
-      .exec();
-    return result?.total ?? 0;
+    return match;
   }
 
   async summary(user: AuthUser, query: UsageQueryDto): Promise<UsageSummary> {

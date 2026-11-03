@@ -28,6 +28,7 @@ export enum AuditResourceType {
   INVITATION = 'invitation',
   ROLE_TEMPLATE = 'role_template',
   CURRENCY = 'currency',
+  POLICY_SET = 'policy_set',
 }
 
 @Schema({ timestamps: true })

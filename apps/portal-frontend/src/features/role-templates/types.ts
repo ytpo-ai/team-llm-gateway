@@ -2,12 +2,7 @@ export interface RoleTemplate {
   id: string
   name: string
   description: string
-  limitDaily: number | null
-  limitWeekly: number | null
-  limitMonthly: number | null
-  rateLimitPerMinute: number | null
-  providerIds: string[]
-  modelWhitelist: string[]
+  policySetId: string | null
   builtIn: boolean
   createdAt?: string
 }
@@ -15,12 +10,11 @@ export interface RoleTemplate {
 export interface CreateRoleTemplateInput {
   name: string
   description?: string
-  limitDaily?: number
-  limitWeekly?: number
-  limitMonthly?: number
-  rateLimitPerMinute?: number
-  providerIds?: string[]
-  modelWhitelist?: string[]
+  policySetId?: string
 }
 
-export type UpdateRoleTemplateInput = Partial<CreateRoleTemplateInput>
+export interface UpdateRoleTemplateInput {
+  name?: string
+  description?: string
+  policySetId?: string | null
+}

@@ -20,10 +20,7 @@ export function updateTeam(
   teamId: string,
   patch: {
     name?: string
-    limitDaily?: number | null
-    limitWeekly?: number | null
-    limitMonthly?: number | null
-    providerIds?: string[]
+    policySetId?: string | null
   },
 ): Promise<Team> {
   return request<Team>(`/teams/${teamId}`, { method: 'PATCH', body: patch })

@@ -19,6 +19,13 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -27,6 +34,8 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { useAuthStore } from '@/features/auth/store'
+import { listPolicySets } from '@/features/policy-sets/api'
+import type { PolicySet } from '@/features/policy-sets/types'
 import {
   createRoleTemplate,
   listRoleTemplates,
@@ -42,53 +51,21 @@ import { ApiError } from '@/lib/http'
 interface FormState {
   name: string
   description: string
-  limitDaily: string
-  limitWeekly: string
-  limitMonthly: string
-  rateLimitPerMinute: string
-  modelWhitelist: string
+  policySetId: string
 }
 
 const emptyForm: FormState = {
   name: '',
   description: '',
-  limitDaily: '',
-  limitWeekly: '',
-  limitMonthly: '',
-  rateLimitPerMinute: '',
-  modelWhitelist: '',
-}
-
-function parseList(raw: string): string[] {
-  return raw
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
-}
-
-function toNumber(raw: string): number | undefined {
-  const value = raw.trim()
-  return value === '' ? undefined : Number(value)
+  policySetId: '',
 }
 
 function toForm(template: RoleTemplate): FormState {
   return {
     name: template.name,
     description: template.description,
-    limitDaily: template.limitDaily != null ? String(template.limitDaily) : '',
-    limitWeekly: template.limitWeekly != null ? String(template.limitWeekly) : '',
-    limitMonthly:
-      template.limitMonthly != null ? String(template.limitMonthly) : '',
-    rateLimitPerMinute:
-      template.rateLimitPerMinute != null
-        ? String(template.rateLimitPerMinute)
-        : '',
-    modelWhitelist: template.modelWhitelist.join(', '),
+    policySetId: template.policySetId ?? '',
   }
-}
-
-function formatLimit(value: number | null): string {
-  return value == null ? '不限' : value.toLocaleString()
 }
 
 export function RolesPage() {
@@ -107,6 +84,12 @@ export function RolesPage() {
     queryFn: listRoleTemplates,
   })
 
+  const policySetsQuery = useQuery({
+    queryKey: ['policy-sets'],
+    queryFn: listPolicySets,
+    enabled: isAdmin,
+  })
+
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['role-templates'] })
 
@@ -123,18 +106,16 @@ export function RolesPage() {
 
   const submitMutation = useMutation({
     mutationFn: () => {
-      const modelWhitelist = parseList(form.modelWhitelist)
       const base: CreateRoleTemplateInput = {
         name: form.name.trim(),
         description: form.description.trim() || undefined,
-        limitDaily: toNumber(form.limitDaily),
-        limitWeekly: toNumber(form.limitWeekly),
-        limitMonthly: toNumber(form.limitMonthly),
-        rateLimitPerMinute: toNumber(form.rateLimitPerMinute),
-        modelWhitelist,
+        policySetId: form.policySetId || undefined,
       }
       if (editing) {
-        return updateRoleTemplate(editing.id, base)
+        return updateRoleTemplate(editing.id, {
+          ...base,
+          policySetId: form.policySetId || null,
+        })
       }
       return createRoleTemplate(base)
     },
@@ -173,6 +154,10 @@ export function RolesPage() {
   }
 
   const templates: RoleTemplate[] = templatesQuery.data ?? []
+  const policySets: PolicySet[] = policySetsQuery.data ?? []
+
+  const policySetName = (id: string | null) =>
+    policySets.find((s) => s.id === id)?.name ?? '不限'
 
   return (
     <div className="space-y-6">
@@ -180,7 +165,7 @@ export function RolesPage() {
         <div>
           <h1 className="text-xl font-semibold">角色管理</h1>
           <p className="text-sm text-muted-foreground">
-            通过角色区分成员的 LLM 使用能力（额度上限与可用渠道/模型）
+            通过角色区分成员的 LLM 使用能力，绑定策略集下发额度与渠道/模型范围
           </p>
         </div>
         {isAdmin && <Button onClick={openCreate}>添加角色</Button>}
@@ -203,9 +188,7 @@ export function RolesPage() {
                 <thead>
                   <tr className="border-b text-left text-muted-foreground">
                     <th className="py-2 pr-4 font-medium">名称</th>
-                    <th className="py-2 pr-4 font-medium">日 / 周 / 月上限</th>
-                    <th className="py-2 pr-4 font-medium">每分钟速率</th>
-                    <th className="py-2 pr-4 font-medium">模型白名单</th>
+                    <th className="py-2 pr-4 font-medium">策略集</th>
                     <th className="py-2 pr-4 font-medium">类型</th>
                     {isAdmin && <th className="py-2 font-medium">操作</th>}
                   </tr>
@@ -214,18 +197,8 @@ export function RolesPage() {
                   {templates.map((template) => (
                     <tr key={template.id} className="border-b last:border-0">
                       <td className="py-2 pr-4">{template.name}</td>
-                      <td className="py-2 pr-4">
-                        {formatLimit(template.limitDaily)} /{' '}
-                        {formatLimit(template.limitWeekly)} /{' '}
-                        {formatLimit(template.limitMonthly)}
-                      </td>
-                      <td className="py-2 pr-4">
-                        {formatLimit(template.rateLimitPerMinute)}
-                      </td>
                       <td className="py-2 pr-4 text-muted-foreground">
-                        {template.modelWhitelist.length > 0
-                          ? template.modelWhitelist.join(', ')
-                          : '全部'}
+                        {policySetName(template.policySetId)}
                       </td>
                       <td className="py-2 pr-4">
                         {template.builtIn ? (
@@ -270,7 +243,7 @@ export function RolesPage() {
           <SheetHeader>
             <SheetTitle>{editing ? '编辑角色' : '添加角色'}</SheetTitle>
             <SheetDescription>
-              内置角色不可删除，但可修改；额度留空表示不限制
+              内置角色不可删除，但可修改；未绑定策略集表示不限制
             </SheetDescription>
           </SheetHeader>
           <form
@@ -293,78 +266,33 @@ export function RolesPage() {
                 描述（可选）
               </label>
               <Input
-                placeholder="该角色可用的模型与额度说明"
+                placeholder="该角色的用途说明"
                 value={form.description}
                 onChange={(e) =>
                   setForm({ ...form, description: e.target.value })
                 }
               />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  日 token 上限（留空不限）
-                </label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={form.limitDaily}
-                  onChange={(e) =>
-                    setForm({ ...form, limitDaily: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  周 token 上限（留空不限）
-                </label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={form.limitWeekly}
-                  onChange={(e) =>
-                    setForm({ ...form, limitWeekly: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  月 token 上限（留空不限）
-                </label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={form.limitMonthly}
-                  onChange={(e) =>
-                    setForm({ ...form, limitMonthly: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  每分钟速率（留空不限）
-                </label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={form.rateLimitPerMinute}
-                  onChange={(e) =>
-                    setForm({ ...form, rateLimitPerMinute: e.target.value })
-                  }
-                />
-              </div>
-            </div>
             <div>
               <label className="mb-1 block text-sm text-muted-foreground">
-                可用模型白名单（逗号分隔，留空 = 全部）
+                绑定策略集
               </label>
-              <Input
-                placeholder="gpt-4o-mini, claude-3-5-sonnet"
-                value={form.modelWhitelist}
-                onChange={(e) =>
-                  setForm({ ...form, modelWhitelist: e.target.value })
-                }
-              />
+              <Select
+                value={form.policySetId || ''}
+                onValueChange={(v) => setForm({ ...form, policySetId: v })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="不限" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">不限</SelectItem>
+                  {policySets.map((set) => (
+                    <SelectItem key={set.id} value={set.id}>
+                      {set.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {error && <p className="text-sm text-red-500">{error}</p>}

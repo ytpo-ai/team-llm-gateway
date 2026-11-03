@@ -23,12 +23,7 @@ describe('RoleTemplatesService', () => {
     teamId: new Types.ObjectId(teamId),
     name: '设计师',
     description: '',
-    limitDaily: null,
-    limitWeekly: null,
-    limitMonthly: null,
-    rateLimitPerMinute: null,
-    providerIds: [],
-    modelWhitelist: [],
+    policySetId: null,
     builtIn: false,
     createdAt: new Date(),
     save: vi.fn(async function (this: Record<string, unknown>) {
@@ -108,12 +103,11 @@ describe('RoleTemplatesService', () => {
 
       const result = await service.create(tenantId, teamId, {
         name: '数据分析师',
-        limitMonthly: 1000000,
-        providerIds: [],
+        policySetId: String(new Types.ObjectId()),
       });
 
       expect(result.name).toBe('数据分析师');
-      expect(result.limitMonthly).toBe(1000000);
+      expect(result.policySetId).toBeDefined();
       expect(result.builtIn).toBe(false);
     });
 

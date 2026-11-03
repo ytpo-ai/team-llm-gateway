@@ -54,6 +54,8 @@ import type {
   ApiKeyPatch,
 } from '@/features/api-keys/types'
 import { useAuthStore } from '@/features/auth/store'
+import { listPolicySets } from '@/features/policy-sets/api'
+import type { PolicySet } from '@/features/policy-sets/types'
 import { listMembers } from '@/features/teams/api'
 import type { Member } from '@/features/teams/types'
 import { ApiError } from '@/lib/http'
@@ -63,61 +65,25 @@ function formatDate(value: string | null): string {
   return new Date(value).toLocaleDateString()
 }
 
-function formatLimits(key: ApiKey): string {
-  const parts: string[] = []
-  if (key.allowedModels.length > 0) parts.push(`模型: ${key.allowedModels.join(', ')}`)
-  if (key.rateLimitPerMinute) parts.push(`${key.rateLimitPerMinute}/min`)
-  if (key.maxTokens) parts.push(`预算: ${key.maxTokens.toLocaleString()} tokens`)
-  const period = [key.limitDaily, key.limitWeekly, key.limitMonthly]
-    .filter((v) => v)
-    .map((v) => v!.toLocaleString())
-  if (period.length > 0) parts.push(`日/周/月: ${period.join(' / ')}`)
-  return parts.length > 0 ? parts.join(' · ') : '不限'
-}
-
 interface FormState {
   userId: string
   name: string
-  allowedModels: string
-  rateLimitPerMinute: string
-  maxTokens: string
-  limitDaily: string
-  limitWeekly: string
-  limitMonthly: string
+  policySetId: string
   expiresAt: string
 }
 
 const emptyForm: FormState = {
   userId: '',
   name: '',
-  allowedModels: '',
-  rateLimitPerMinute: '',
-  maxTokens: '',
-  limitDaily: '',
-  limitWeekly: '',
-  limitMonthly: '',
+  policySetId: '',
   expiresAt: '',
-}
-
-function parseModels(raw: string): string[] {
-  return raw
-    .split(',')
-    .map((m) => m.trim())
-    .filter(Boolean)
 }
 
 function toForm(key: ApiKey): FormState {
   return {
     userId: key.userId,
     name: key.name ?? '',
-    allowedModels: key.allowedModels.join(', '),
-    rateLimitPerMinute: key.rateLimitPerMinute
-      ? String(key.rateLimitPerMinute)
-      : '',
-    maxTokens: key.maxTokens ? String(key.maxTokens) : '',
-    limitDaily: key.limitDaily ? String(key.limitDaily) : '',
-    limitWeekly: key.limitWeekly ? String(key.limitWeekly) : '',
-    limitMonthly: key.limitMonthly ? String(key.limitMonthly) : '',
+    policySetId: key.policySetId ?? '',
     expiresAt: key.expiresAt ? key.expiresAt.slice(0, 10) : '',
   }
 }
@@ -142,12 +108,21 @@ export function ApiKeysPage() {
 
   const keysQuery = useQuery({ queryKey: ['api-keys'], queryFn: () => listApiKeys() })
 
+  const policySetsQuery = useQuery({
+    queryKey: ['policy-sets'],
+    queryFn: listPolicySets,
+  })
+
   const membersQuery = useQuery({
     queryKey: ['team-members', user?.teamId],
     queryFn: () => listMembers(user!.teamId!),
     enabled: isTeamAdmin && Boolean(user?.teamId),
   })
   const members: Member[] = membersQuery.data ?? []
+  const policySets: PolicySet[] = policySetsQuery.data ?? []
+
+  const policySetName = (id: string | null) =>
+    policySets.find((s) => s.id === id)?.name ?? '不限'
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['api-keys'] })
@@ -165,20 +140,12 @@ export function ApiKeysPage() {
 
   const submitMutation = useMutation({
     mutationFn: () => {
-      const models = parseModels(form.allowedModels)
       if (editing) {
         const patch: ApiKeyPatch = {
           userId: form.userId || undefined,
           name: form.name.trim() || null,
           expiresAt: form.expiresAt || null,
-          allowedModels: models,
-          rateLimitPerMinute: form.rateLimitPerMinute
-            ? Number(form.rateLimitPerMinute)
-            : null,
-          maxTokens: form.maxTokens ? Number(form.maxTokens) : null,
-          limitDaily: form.limitDaily ? Number(form.limitDaily) : null,
-          limitWeekly: form.limitWeekly ? Number(form.limitWeekly) : null,
-          limitMonthly: form.limitMonthly ? Number(form.limitMonthly) : null,
+          policySetId: form.policySetId || null,
         }
         return updateApiKey(editing.id, patch)
       }
@@ -186,14 +153,7 @@ export function ApiKeysPage() {
         userId: form.userId || undefined,
         name: form.name.trim() || undefined,
         expiresAt: form.expiresAt || undefined,
-        allowedModels: models,
-        rateLimitPerMinute: form.rateLimitPerMinute
-          ? Number(form.rateLimitPerMinute)
-          : undefined,
-        maxTokens: form.maxTokens ? Number(form.maxTokens) : undefined,
-        limitDaily: form.limitDaily ? Number(form.limitDaily) : undefined,
-        limitWeekly: form.limitWeekly ? Number(form.limitWeekly) : undefined,
-        limitMonthly: form.limitMonthly ? Number(form.limitMonthly) : undefined,
+        policySetId: form.policySetId || undefined,
       }
       return createApiKey(input).then((r) => r.apiKey)
     },
@@ -266,7 +226,7 @@ export function ApiKeysPage() {
         <div>
           <h1 className="text-xl font-semibold">API Key</h1>
           <p className="text-sm text-muted-foreground">
-            为成员签发 API Key，并按 key 设置模型白名单、速率、预算与过期时间
+            为成员签发 API Key，并绑定策略集控制额度与访问范围
           </p>
         </div>
         <Button onClick={openCreate}>创建 API Key</Button>
@@ -292,7 +252,7 @@ export function ApiKeysPage() {
                     <th className="py-2 pr-4 font-medium">成员</th>
                     <th className="py-2 pr-4 font-medium">Key</th>
                     <th className="py-2 pr-4 font-medium">状态</th>
-                    <th className="py-2 pr-4 font-medium">限制</th>
+                    <th className="py-2 pr-4 font-medium">策略集</th>
                     <th className="py-2 pr-4 font-medium">过期</th>
                     <th className="py-2 pr-4 font-medium">最近使用</th>
                     <th className="py-2 font-medium">操作</th>
@@ -318,7 +278,7 @@ export function ApiKeysPage() {
                         )}
                       </td>
                       <td className="py-2 pr-4 text-muted-foreground">
-                        {formatLimits(key)}
+                        {policySetName(key.policySetId)}
                       </td>
                       <td className="py-2 pr-4 text-muted-foreground">
                         {formatDate(key.expiresAt)}
@@ -415,99 +375,36 @@ export function ApiKeysPage() {
                 </Select>
               </div>
             )}
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  模型白名单（逗号分隔，留空不限）
-                </label>
-                <Input
-                  placeholder="gpt-4o-mini, claude-sonnet"
-                  value={form.allowedModels}
-                  onChange={(e) =>
-                    setForm({ ...form, allowedModels: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  过期时间（留空永久）
-                </label>
-                <Input
-                  type="date"
-                  value={form.expiresAt}
-                  onChange={(e) =>
-                    setForm({ ...form, expiresAt: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  速率限制（次/分钟，留空不限）
-                </label>
-                <Input
-                  type="number"
-                  min={1}
-                  placeholder="60"
-                  value={form.rateLimitPerMinute}
-                  onChange={(e) =>
-                    setForm({ ...form, rateLimitPerMinute: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  预算上限（tokens，留空不限）
-                </label>
-                <Input
-                  type="number"
-                  min={1}
-                  placeholder="1000000"
-                  value={form.maxTokens}
-                  onChange={(e) => setForm({ ...form, maxTokens: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  日 token 上限（留空不限）
-                </label>
-                <Input
-                  type="number"
-                  min={1}
-                  placeholder="100000"
-                  value={form.limitDaily}
-                  onChange={(e) =>
-                    setForm({ ...form, limitDaily: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  周 token 上限（留空不限）
-                </label>
-                <Input
-                  type="number"
-                  min={1}
-                  placeholder="500000"
-                  value={form.limitWeekly}
-                  onChange={(e) =>
-                    setForm({ ...form, limitWeekly: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  月 token 上限（留空不限）
-                </label>
-                <Input
-                  type="number"
-                  min={1}
-                  placeholder="2000000"
-                  value={form.limitMonthly}
-                  onChange={(e) =>
-                    setForm({ ...form, limitMonthly: e.target.value })
-                  }
-                />
-              </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                绑定策略集
+              </label>
+              <Select
+                value={form.policySetId || ''}
+                onValueChange={(v) => setForm({ ...form, policySetId: v })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="不限" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">不限</SelectItem>
+                  {policySets.map((set) => (
+                    <SelectItem key={set.id} value={set.id}>
+                      {set.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                过期时间（留空永久）
+              </label>
+              <Input
+                type="date"
+                value={form.expiresAt}
+                onChange={(e) => setForm({ ...form, expiresAt: e.target.value })}
+              />
             </div>
 
             {error && <p className="text-sm text-red-500">{error}</p>}

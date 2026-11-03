@@ -15,7 +15,7 @@ import { decrypt } from '../../common/crypto/cipher.js';
 import { BillingService } from '../billing/billing.service.js';
 import {
   QuotaLimitService,
-  type ResolvedQuotaLimits,
+  type ResolvedPolicyContext,
 } from '../billing/quota-limit.service.js';
 import { ApiKey } from '../api-keys/schemas/api-key.schema.js';
 import { Model as ModelEntity, ModelStatus } from '../models/schemas/model.schema.js';
@@ -26,6 +26,7 @@ import {
 import { UsageService } from '../usage/usage.service.js';
 import { UsageStatus } from '../usage/schemas/usage-log.schema.js';
 import type { ApiKeyContext } from './decorators/api-key-context.decorator.js';
+import { ConcurrencyService } from './concurrency.service.js';
 import { RateLimitService } from './rate-limit.service.js';
 import { resolveAdapter } from './adapters/adapter.factory.js';
 import {
@@ -50,25 +51,7 @@ interface PreparedRequest {
   request: AdapterRequest;
   requestId: string;
   startedAt: number;
-}
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-function startOfDay(now: Date): Date {
-  return new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  );
-}
-
-function startOfWeek(now: Date): Date {
-  const day = startOfDay(now);
-  const weekday = day.getUTCDay();
-  const diff = (weekday + 6) % 7;
-  return new Date(day.getTime() - diff * DAY_MS);
-}
-
-function startOfMonth(now: Date): Date {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  releaseConcurrency: () => void;
 }
 
 @Injectable()
@@ -83,6 +66,7 @@ export class ProxyService {
     private readonly billingService: BillingService,
     private readonly quotaLimitService: QuotaLimitService,
     private readonly rateLimitService: RateLimitService,
+    private readonly concurrencyService: ConcurrencyService,
   ) {}
 
   async listModels(ctx: ApiKeyContext) {
@@ -95,9 +79,14 @@ export class ProxyService {
       .sort({ createdAt: -1 })
       .exec();
 
-    const allowed = ctx.apiKey.allowedModels ?? [];
-    const visible = allowed.length > 0
-      ? models.filter((m) => allowed.includes(m.modelId))
+    const resolved = await this.quotaLimitService.resolve({
+      teamId: ctx.teamId,
+      userId: ctx.userId,
+      apiKey: ctx.apiKey,
+    });
+    const whitelist = resolved.key?.modelWhitelist ?? [];
+    const visible = whitelist.length > 0
+      ? models.filter((m) => whitelist.includes(m.modelId))
       : models;
 
     return {
@@ -118,23 +107,27 @@ export class ProxyService {
   ): Promise<unknown> {
     const prepared = await this.prepare(ctx, body);
 
-    const upstreamRes = await this.requestUpstream(prepared);
-    const text = await upstreamRes.text();
+    try {
+      const upstreamRes = await this.requestUpstream(prepared);
+      const text = await upstreamRes.text();
 
-    if (upstreamRes.ok) {
-      const openaiJson = prepared.adapter.parseResponse(text, prepared.modelId);
-      await this.recordUsage(
-        ctx,
-        prepared,
-        (openaiJson as { usage?: UpstreamUsage }).usage,
-      );
+      if (upstreamRes.ok) {
+        const openaiJson = prepared.adapter.parseResponse(text, prepared.modelId);
+        await this.recordUsage(
+          ctx,
+          prepared,
+          (openaiJson as { usage?: UpstreamUsage }).usage,
+        );
+        res.status(upstreamRes.status);
+        return openaiJson;
+      }
+
+      await this.recordError(ctx, prepared, upstreamRes.status);
       res.status(upstreamRes.status);
-      return openaiJson;
+      return parseJsonObject(text) ?? { message: text };
+    } finally {
+      prepared.releaseConcurrency();
     }
-
-    await this.recordError(ctx, prepared, upstreamRes.status);
-    res.status(upstreamRes.status);
-    return parseJsonObject(text) ?? { message: text };
   }
 
   async streamChatCompletions(
@@ -148,6 +141,7 @@ export class ProxyService {
     if (!upstreamRes.ok || !upstreamRes.body) {
       const text = await upstreamRes.text();
       await this.recordError(ctx, prepared, upstreamRes.status);
+      prepared.releaseConcurrency();
       res.status(upstreamRes.status).json(parseJsonObject(text) ?? { message: text });
       return;
     }
@@ -174,6 +168,7 @@ export class ProxyService {
     } finally {
       res.end();
       await this.recordUsage(ctx, prepared, transformer.getUsage());
+      prepared.releaseConcurrency();
     }
   }
 
@@ -181,10 +176,11 @@ export class ProxyService {
     ctx: ApiKeyContext,
     body: ChatCompletionsBody,
   ): Promise<PreparedRequest> {
-    const limits = await this.enforceLimits(ctx);
+    const { resolved, releaseConcurrency } = await this.enforceLimits(ctx);
 
     const requestedModel = body.model;
     if (typeof requestedModel !== 'string' || !requestedModel.trim()) {
+      releaseConcurrency();
       throw new BadRequestException('请求体缺少 model 字段');
     }
 
@@ -197,16 +193,12 @@ export class ProxyService {
       })
       .exec();
     if (!model) {
+      releaseConcurrency();
       throw new NotFoundException(`模型不存在或已禁用：${requestedModel}`);
     }
 
-    if (
-      !this.quotaLimitService.isModelAllowed(
-        limits.memberTemplate,
-        ctx.apiKey,
-        model.modelId,
-      )
-    ) {
+    if (!this.quotaLimitService.isModelAllowed(resolved, model.modelId)) {
+      releaseConcurrency();
       throw new ForbiddenException('该 API Key 或成员角色不允许访问此模型');
     }
 
@@ -219,17 +211,14 @@ export class ProxyService {
       })
       .exec();
     if (!provider) {
+      releaseConcurrency();
       throw new NotFoundException('上游渠道不存在或已禁用');
     }
 
     if (
-      !this.quotaLimitService.isProviderAllowed(
-        limits.team,
-        limits.memberTemplate,
-        ctx.apiKey,
-        String(provider._id),
-      )
+      !this.quotaLimitService.isProviderAllowed(resolved, String(provider._id))
     ) {
+      releaseConcurrency();
       throw new ForbiddenException('该渠道不在允许范围内');
     }
 
@@ -256,41 +245,40 @@ export class ProxyService {
       request,
       requestId: `req_${randomUUID()}`,
       startedAt: Date.now(),
+      releaseConcurrency,
     };
   }
 
   private async enforceLimits(
     ctx: ApiKeyContext,
-  ): Promise<ResolvedQuotaLimits> {
-    const limits = await this.quotaLimitService.resolve({
+  ): Promise<{ resolved: ResolvedPolicyContext; releaseConcurrency: () => void }> {
+    const resolved = await this.quotaLimitService.resolve({
       teamId: ctx.teamId,
       userId: ctx.userId,
       apiKey: ctx.apiKey,
     });
 
-    this.rateLimitService.assertAllowed(
-      ctx.userId,
-      limits.memberRateLimitPerMinute,
-    );
-    this.rateLimitService.assertAllowed(
-      ctx.apiKeyId,
-      limits.keyRateLimitPerMinute,
-    );
+    const rateLimits = this.quotaLimitService.resolveRateLimits(resolved);
 
-    if (ctx.apiKey.maxTokens != null) {
-      const used = await this.usageService.sumTokensByApiKey(
-        ctx.tenantId,
-        ctx.apiKeyId,
+    if (rateLimits.teamPerMinute != null) {
+      this.rateLimitService.assertAllowed(
+        `team:${ctx.teamId}`,
+        rateLimits.teamPerMinute,
       );
-      if (used >= ctx.apiKey.maxTokens) {
-        throw new HttpException(
-          '该 API Key 的 Token 预算已用尽',
-          HttpStatus.TOO_MANY_REQUESTS,
-        );
-      }
+    }
+    if (rateLimits.memberPerMinute != null) {
+      this.rateLimitService.assertAllowed(ctx.userId, rateLimits.memberPerMinute);
+    }
+    if (rateLimits.keyPerMinute != null) {
+      this.rateLimitService.assertAllowed(ctx.apiKeyId, rateLimits.keyPerMinute);
     }
 
-    await this.assertPeriodLimits(ctx, limits);
+    await this.quotaLimitService.assertUsageLimits(resolved, {
+      tenantId: ctx.tenantId,
+      teamId: ctx.teamId,
+      userId: ctx.userId,
+      apiKeyId: ctx.apiKeyId,
+    });
 
     const balance = await this.billingService.getSpendableBalance(
       ctx.tenantId,
@@ -301,79 +289,12 @@ export class ProxyService {
       throw new HttpException('额度余额不足', HttpStatus.PAYMENT_REQUIRED);
     }
 
-    return limits;
-  }
+    const releaseConcurrency = this.concurrencyService.acquire(
+      ctx.apiKeyId,
+      rateLimits.keyConcurrency,
+    );
 
-  private async assertPeriodLimits(
-    ctx: ApiKeyContext,
-    limits: ResolvedQuotaLimits,
-  ): Promise<void> {
-    const now = new Date();
-    const periods = [
-      {
-        label: '日',
-        start: startOfDay(now),
-        teamLimit: limits.team?.limitDaily,
-        memberLimit: limits.memberTemplate?.limitDaily,
-        keyLimit: ctx.apiKey.limitDaily,
-      },
-      {
-        label: '周',
-        start: startOfWeek(now),
-        teamLimit: limits.team?.limitWeekly,
-        memberLimit: limits.memberTemplate?.limitWeekly,
-        keyLimit: ctx.apiKey.limitWeekly,
-      },
-      {
-        label: '月',
-        start: startOfMonth(now),
-        teamLimit: limits.team?.limitMonthly,
-        memberLimit: limits.memberTemplate?.limitMonthly,
-        keyLimit: ctx.apiKey.limitMonthly,
-      },
-    ];
-
-    for (const period of periods) {
-      if (period.teamLimit != null) {
-        const used = await this.usageService.sumTokens({
-          tenantId: ctx.tenantId,
-          teamId: ctx.teamId,
-          since: period.start,
-        });
-        if (used >= period.teamLimit) {
-          throw new HttpException(
-            `团队${period.label} Token 限额已用尽`,
-            HttpStatus.TOO_MANY_REQUESTS,
-          );
-        }
-      }
-      if (period.memberLimit != null) {
-        const used = await this.usageService.sumTokens({
-          tenantId: ctx.tenantId,
-          userId: ctx.userId,
-          since: period.start,
-        });
-        if (used >= period.memberLimit) {
-          throw new HttpException(
-            `成员${period.label} Token 限额已用尽`,
-            HttpStatus.TOO_MANY_REQUESTS,
-          );
-        }
-      }
-      if (period.keyLimit != null) {
-        const used = await this.usageService.sumTokens({
-          tenantId: ctx.tenantId,
-          apiKeyId: ctx.apiKeyId,
-          since: period.start,
-        });
-        if (used >= period.keyLimit) {
-          throw new HttpException(
-            `API Key ${period.label} Token 限额已用尽`,
-            HttpStatus.TOO_MANY_REQUESTS,
-          );
-        }
-      }
-    }
+    return { resolved, releaseConcurrency };
   }
 
   private async requestUpstream(

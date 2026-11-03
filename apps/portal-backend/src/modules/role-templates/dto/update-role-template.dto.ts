@@ -1,12 +1,9 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsArray,
   IsMongoId,
-  IsNumber,
   IsOptional,
   IsString,
   MaxLength,
-  Min,
   MinLength,
 } from 'class-validator';
 
@@ -24,39 +21,11 @@ export class UpdateRoleTemplateDto {
   @MaxLength(500)
   description?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description: '绑定策略集 ID（null/空 = 不限）',
+    nullable: true,
+  })
   @IsOptional()
-  @IsNumber()
-  @Min(0)
-  limitDaily?: number;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  limitWeekly?: number;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  limitMonthly?: number;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  rateLimitPerMinute?: number;
-
-  @ApiPropertyOptional({ type: [String] })
-  @IsOptional()
-  @IsArray()
-  @IsMongoId({ each: true })
-  providerIds?: string[];
-
-  @ApiPropertyOptional({ type: [String] })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  modelWhitelist?: string[];
+  @IsMongoId()
+  policySetId?: string | null;
 }

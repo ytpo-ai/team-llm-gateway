@@ -10,6 +10,7 @@ import { AuthModule } from './modules/auth/auth.module.js';
 import { BillingModule } from './modules/billing/billing.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { ModelsModule } from './modules/models/models.module.js';
+import { PolicySetsModule } from './modules/policy-sets/policy-sets.module.js';
 import { ProvidersModule } from './modules/providers/providers.module.js';
 import { ProxyModule } from './modules/proxy/proxy.module.js';
 import { RecommendationModule } from './modules/recommendation/recommendation.module.js';
@@ -33,6 +34,7 @@ import { UsageModule } from './modules/usage/usage.module.js';
     BillingModule,
     ProvidersModule,
     ModelsModule,
+    PolicySetsModule,
     UsageModule,
     ProxyModule,
     RecommendationModule,

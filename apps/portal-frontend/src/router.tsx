@@ -10,6 +10,7 @@ import { DashboardPage } from '@/pages/dashboard'
 import { InvitePage } from '@/pages/invite'
 import { LoginPage } from '@/pages/login'
 import { ModelsPage } from '@/pages/models'
+import { PolicySetsPage } from '@/pages/policy-sets'
 import { ProvidersPage } from '@/pages/providers'
 import { RecommendationPage } from '@/pages/recommendation'
 import { RolesPage } from '@/pages/roles'
@@ -36,6 +37,7 @@ export const router = createBrowserRouter([
           { index: true, element: <DashboardPage /> },
           { path: 'team', element: <TeamPage /> },
           { path: 'roles', element: <RolesPage /> },
+          { path: 'policy-sets', element: <PolicySetsPage /> },
           { path: 'api-keys', element: <ApiKeysPage /> },
           { path: 'billing', element: <BillingPage /> },
           { path: 'providers', element: <ProvidersPage /> },

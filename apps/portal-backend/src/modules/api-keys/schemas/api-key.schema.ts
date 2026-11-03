@@ -53,30 +53,13 @@ export class ApiKey {
   @Prop({ type: Date, default: null })
   expiresAt: Date | null;
 
-  @Prop({ type: [String], default: [] })
-  allowedModels: string[];
-
-  @Prop({ type: Number, default: null })
-  rateLimitPerMinute: number | null;
-
-  @Prop({ type: Number, default: null })
-  maxTokens: number | null;
-
-  @Prop({ type: Number, default: null })
-  limitDaily: number | null;
-
-  @Prop({ type: Number, default: null })
-  limitWeekly: number | null;
-
-  @Prop({ type: Number, default: null })
-  limitMonthly: number | null;
-
   @Prop({
-    type: [MongooseSchema.Types.ObjectId],
-    ref: 'Provider',
-    default: [],
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'PolicySet',
+    default: null,
+    index: true,
   })
-  providerIds: Types.ObjectId[];
+  policySetId?: Types.ObjectId | null;
 
   @Prop({ type: Date, default: null })
   lastUsedAt: Date | null;

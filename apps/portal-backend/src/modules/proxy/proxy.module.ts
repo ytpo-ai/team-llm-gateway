@@ -6,6 +6,7 @@ import { Model, ModelSchema } from '../models/schemas/model.schema.js';
 import { Provider, ProviderSchema } from '../providers/schemas/provider.schema.js';
 import { UsageModule } from '../usage/usage.module.js';
 import { ApiKeyAuthGuard } from './guards/api-key-auth.guard.js';
+import { ConcurrencyService } from './concurrency.service.js';
 import { ProxyController } from './proxy.controller.js';
 import { ProxyService } from './proxy.service.js';
 import { RateLimitService } from './rate-limit.service.js';
@@ -21,7 +22,12 @@ import { RateLimitService } from './rate-limit.service.js';
     ]),
   ],
   controllers: [ProxyController],
-  providers: [ProxyService, ApiKeyAuthGuard, RateLimitService],
+  providers: [
+    ProxyService,
+    ApiKeyAuthGuard,
+    RateLimitService,
+    ConcurrencyService,
+  ],
   exports: [ProxyService],
 })
 export class ProxyModule {}

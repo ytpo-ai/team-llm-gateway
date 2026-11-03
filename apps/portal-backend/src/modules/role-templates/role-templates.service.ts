@@ -16,12 +16,7 @@ export interface RoleTemplateView {
   id: string;
   name: string;
   description: string;
-  limitDaily: number | null;
-  limitWeekly: number | null;
-  limitMonthly: number | null;
-  rateLimitPerMinute: number | null;
-  providerIds: string[];
-  modelWhitelist: string[];
+  policySetId: string | null;
   builtIn: boolean;
   createdAt?: Date;
 }
@@ -29,32 +24,14 @@ export interface RoleTemplateView {
 const BUILT_IN_TEMPLATES: Array<{
   name: string;
   description: string;
-  limitDaily: number | null;
-  limitWeekly: number | null;
-  limitMonthly: number | null;
-  rateLimitPerMinute: number | null;
-  providerIds: string[];
-  modelWhitelist: string[];
 }> = [
   {
     name: '设计师',
     description: '面向设计团队的默认配置，全部渠道可用',
-    limitDaily: null,
-    limitWeekly: null,
-    limitMonthly: null,
-    rateLimitPerMinute: null,
-    providerIds: [],
-    modelWhitelist: [],
   },
   {
     name: '开发人员',
     description: '面向开发团队的默认配置，全部渠道可用',
-    limitDaily: null,
-    limitWeekly: null,
-    limitMonthly: null,
-    rateLimitPerMinute: null,
-    providerIds: [],
-    modelWhitelist: [],
   },
 ];
 
@@ -74,7 +51,9 @@ export class RoleTemplatesService {
         await this.roleTemplateModel.create({
           tenantId: null,
           teamId: null,
-          ...template,
+          name: template.name,
+          description: template.description,
+          policySetId: null,
           builtIn: true,
         });
       }
@@ -114,12 +93,7 @@ export class RoleTemplatesService {
       teamId: new Types.ObjectId(teamId),
       name: dto.name,
       description: dto.description ?? '',
-      limitDaily: dto.limitDaily ?? null,
-      limitWeekly: dto.limitWeekly ?? null,
-      limitMonthly: dto.limitMonthly ?? null,
-      rateLimitPerMinute: dto.rateLimitPerMinute ?? null,
-      providerIds: (dto.providerIds ?? []).map((id) => new Types.ObjectId(id)),
-      modelWhitelist: dto.modelWhitelist ?? [],
+      policySetId: dto.policySetId ? new Types.ObjectId(dto.policySetId) : null,
       builtIn: false,
     });
     return this.toView(template);
@@ -138,17 +112,10 @@ export class RoleTemplatesService {
       template.name = dto.name;
     }
     if (dto.description !== undefined) template.description = dto.description;
-    if (dto.limitDaily !== undefined) template.limitDaily = dto.limitDaily ?? null;
-    if (dto.limitWeekly !== undefined) template.limitWeekly = dto.limitWeekly ?? null;
-    if (dto.limitMonthly !== undefined) template.limitMonthly = dto.limitMonthly ?? null;
-    if (dto.rateLimitPerMinute !== undefined) {
-      template.rateLimitPerMinute = dto.rateLimitPerMinute ?? null;
-    }
-    if (dto.providerIds !== undefined) {
-      template.providerIds = dto.providerIds.map((id) => new Types.ObjectId(id));
-    }
-    if (dto.modelWhitelist !== undefined) {
-      template.modelWhitelist = dto.modelWhitelist;
+    if (dto.policySetId !== undefined) {
+      template.policySetId = dto.policySetId
+        ? new Types.ObjectId(dto.policySetId)
+        : null;
     }
 
     await template.save();
@@ -214,12 +181,7 @@ export class RoleTemplatesService {
       id: String(template._id),
       name: template.name,
       description: template.description,
-      limitDaily: template.limitDaily ?? null,
-      limitWeekly: template.limitWeekly ?? null,
-      limitMonthly: template.limitMonthly ?? null,
-      rateLimitPerMinute: template.rateLimitPerMinute ?? null,
-      providerIds: template.providerIds.map((id) => String(id)),
-      modelWhitelist: template.modelWhitelist,
+      policySetId: template.policySetId ? String(template.policySetId) : null,
       builtIn: template.builtIn,
       createdAt: template.createdAt,
     };

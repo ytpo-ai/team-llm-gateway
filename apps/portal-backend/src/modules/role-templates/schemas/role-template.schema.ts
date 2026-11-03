@@ -27,27 +27,13 @@ export class RoleTemplate {
   @Prop({ type: String, trim: true, default: '' })
   description: string;
 
-  @Prop({ type: Number, default: null })
-  limitDaily?: number | null;
-
-  @Prop({ type: Number, default: null })
-  limitWeekly?: number | null;
-
-  @Prop({ type: Number, default: null })
-  limitMonthly?: number | null;
-
-  @Prop({ type: Number, default: null })
-  rateLimitPerMinute?: number | null;
-
   @Prop({
-    type: [MongooseSchema.Types.ObjectId],
-    ref: 'Provider',
-    default: [],
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'PolicySet',
+    default: null,
+    index: true,
   })
-  providerIds: Types.ObjectId[];
-
-  @Prop({ type: [String], default: [] })
-  modelWhitelist: string[];
+  policySetId?: Types.ObjectId | null;
 
   @Prop({ type: Boolean, default: false })
   builtIn: boolean;

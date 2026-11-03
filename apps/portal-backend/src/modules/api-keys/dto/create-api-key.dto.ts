@@ -1,13 +1,10 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsArray,
   IsDateString,
-  IsInt,
   IsMongoId,
   IsOptional,
   IsString,
   MaxLength,
-  Min,
 } from 'class-validator';
 
 export class CreateApiKeyDto {
@@ -27,45 +24,8 @@ export class CreateApiKeyDto {
   @IsDateString()
   expiresAt?: string;
 
-  @ApiPropertyOptional({ type: [String], example: ['gpt-4o-mini'] })
+  @ApiPropertyOptional({ description: '绑定策略集 ID（空 = 不限）' })
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  allowedModels?: string[];
-
-  @ApiPropertyOptional({ example: 60 })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  rateLimitPerMinute?: number;
-
-  @ApiPropertyOptional({ example: 1000000 })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  maxTokens?: number;
-
-  @ApiPropertyOptional({ description: '日 token 上限' })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  limitDaily?: number;
-
-  @ApiPropertyOptional({ description: '周 token 上限' })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  limitWeekly?: number;
-
-  @ApiPropertyOptional({ description: '月 token 上限' })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  limitMonthly?: number;
-
-  @ApiPropertyOptional({ type: [String], description: '可用渠道白名单' })
-  @IsOptional()
-  @IsArray()
-  @IsMongoId({ each: true })
-  providerIds?: string[];
+  @IsMongoId()
+  policySetId?: string;
 }

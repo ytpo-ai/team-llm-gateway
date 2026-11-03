@@ -20,14 +20,13 @@
 | `tenantId` | ObjectId | 必填、ref `Tenant`、索引 | 所属租户 |
 | `name` | string | 必填、trim | 团队显示名 |
 | `status` | enum | `active` / `suspended`，默认 `active` | 团队状态 |
-| `limitDaily` | number | 可选、默认 `null` | 团队日 token 上限（null = 不限） |
-| `limitWeekly` | number | 可选、默认 `null` | 团队周 token 上限（null = 不限） |
-| `limitMonthly` | number | 可选、默认 `null` | 团队月 token 上限（null = 不限） |
-| `providerIds` | ObjectId[] | 默认 `[]`、ref `Provider` | 团队可用渠道白名单（空 = 全部） |
+| `policySetId` | ObjectId | 可选、ref `PolicySet`、索引 | 团队绑定的策略集（`null` = 不限） |
 | `createdAt` | Date | 自动 | 创建时间 |
 | `updatedAt` | Date | 自动 | 更新时间 |
 
 **唯一索引**：`{ tenantId, name }`，保证同租户内团队名唯一。
+
+> 团队限额字段（`limitDaily/Weekly/Monthly`、`providerIds`）已策略化迁入 `PolicySet`（见 `POLICY_SET_SCHEMA.MD`），团队仅保留 `policySetId` 引用挂载。
 
 ## 3. User（用户）增量变更
 
