@@ -136,6 +136,19 @@ export function AppLayout() {
       ],
     },
     {
+      title: '观察',
+      items: [
+        { label: '用量看板', to: '/', end: true, icon: Gauge },
+        { label: '余额与流水', to: '/billing', icon: Wallet },
+        ...(isTeamManager
+          ? [{ label: '使用日志', to: '/usage-logs', icon: ScrollText }]
+          : []),
+        ...(isTeamManager
+          ? [{ label: '审计日志', to: '/audit-logs', icon: FileClock }]
+          : []),
+      ],
+    },
+    {
       title: '系统管理',
       items: [
         ...(isTeamManager
@@ -149,19 +162,6 @@ export function AppLayout() {
           : []),
         ...(isSystem
           ? [{ label: '全局看板', to: '/admin/overview', icon: LayoutDashboard }]
-          : []),
-      ],
-    },
-    {
-      title: '观察',
-      items: [
-        { label: '用量看板', to: '/', end: true, icon: Gauge },
-        { label: '余额与流水', to: '/billing', icon: Wallet },
-        ...(isTeamManager
-          ? [{ label: '使用日志', to: '/usage-logs', icon: ScrollText }]
-          : []),
-        ...(isTeamManager
-          ? [{ label: '审计日志', to: '/audit-logs', icon: FileClock }]
           : []),
       ],
     },
