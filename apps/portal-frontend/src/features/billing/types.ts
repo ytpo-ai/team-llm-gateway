@@ -6,6 +6,8 @@ export type QuotaTransactionSource = 'recharge' | 'manual' | 'usage'
 export interface QuotaAccount {
   id: string
   type: QuotaAccountType
+  teamId: string
+  teamName: string | null
   userId: string | null
   label: string | null
   balance: number
@@ -30,12 +32,14 @@ export interface QuotaTransaction {
 
 export interface RechargeInput {
   amount: number
+  teamId?: string
   userId?: string
   description?: string
 }
 
 export interface AdjustInput {
   amount: number
+  teamId?: string
   userId?: string
   description?: string
 }

@@ -37,6 +37,8 @@ import type {
 } from '@/features/billing/types'
 import { getCurrency } from '@/features/system/api'
 import type { CurrencyConfig } from '@/features/system/types'
+import { listTeams } from '@/features/teams/api'
+import type { Team } from '@/features/teams/types'
 import { useAuthStore } from '@/features/auth/store'
 
 const fmtNum = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 })
@@ -141,6 +143,7 @@ function TransactionTable({
 interface TopupFormState {
   mode: 'recharge' | 'adjust'
   amount: string
+  teamId: string
   target: string
   description: string
 }
@@ -148,6 +151,7 @@ interface TopupFormState {
 const emptyForm: TopupFormState = {
   mode: 'recharge',
   amount: '',
+  teamId: '',
   target: '',
   description: '',
 }
@@ -173,8 +177,13 @@ export function BillingPage() {
     queryKey: ['system', 'currency'],
     queryFn: getCurrency,
   })
+  const teamsQuery = useQuery({
+    queryKey: ['teams'],
+    queryFn: listTeams,
+  })
 
   const canManage = user?.role === 'team_admin' || user?.role === 'system'
+  const isSystem = user?.role === 'system'
 
   const rechargeMutation = useMutation({
     mutationFn: rechargeQuota,
@@ -201,12 +210,24 @@ export function BillingPage() {
   })
 
   const accounts: QuotaAccount[] = accountsQuery.data ?? []
-  const teamAccount = accounts.find((a) => a.type === 'team')
+  const teams: Team[] = teamsQuery.data ?? []
+  const teamAccounts = accounts.filter((a) => a.type === 'team')
   const memberAccounts = accounts.filter((a) => a.type === 'member')
+  const teamAccount =
+    teamAccounts.find((a) => a.teamId === user?.teamId) ?? teamAccounts[0]
   const currencyConfig = currencyQuery.data ?? null
+  const teamBalanceMap = new Map(teamAccounts.map((a) => [a.teamId, a]))
+  const selectedTeamMemberAccounts = memberAccounts.filter(
+    (a) => a.teamId === form.teamId,
+  )
 
   const openTopup = () => {
-    setForm(emptyForm)
+    const defaultTeamId =
+      teams.find((t) => t.id === user?.teamId)?.id ??
+      teams[0]?.id ??
+      user?.teamId ??
+      ''
+    setForm({ ...emptyForm, teamId: defaultTeamId })
     setError(null)
     setTopupOpen(true)
   }
@@ -222,6 +243,7 @@ export function BillingPage() {
     }
     const payload = {
       amount,
+      teamId: form.teamId || undefined,
       userId: form.target || undefined,
       description: form.description || undefined,
     }
@@ -251,26 +273,50 @@ export function BillingPage() {
       {message && <p className="text-sm text-green-600">{message}</p>}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardDescription>团队额度余额</CardDescription>
-            <CardTitle className="text-2xl">
-              {accountsQuery.isLoading
-                ? '…'
-                : fmtNum.format(teamAccount?.balance ?? 0)}
-            </CardTitle>
-            {teamAccount &&
-              formatCurrencyAmount(teamAccount.balance, currencyConfig) && (
-                <p className="text-sm text-muted-foreground">
-                  ≈ {formatCurrencyAmount(teamAccount.balance, currencyConfig)}
-                </p>
-              )}
-          </CardHeader>
-        </Card>
+        {isSystem ? (
+          teams.map((team) => {
+            const balance = teamBalanceMap.get(team.id)?.balance ?? 0
+            return (
+              <Card key={team.id}>
+                <CardHeader>
+                  <CardDescription>{team.name} · 团队额度余额</CardDescription>
+                  <CardTitle className="text-2xl">
+                    {accountsQuery.isLoading ? '…' : fmtNum.format(balance)}
+                  </CardTitle>
+                  {formatCurrencyAmount(balance, currencyConfig) && (
+                    <p className="text-sm text-muted-foreground">
+                      ≈ {formatCurrencyAmount(balance, currencyConfig)}
+                    </p>
+                  )}
+                </CardHeader>
+              </Card>
+            )
+          })
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardDescription>团队额度余额</CardDescription>
+              <CardTitle className="text-2xl">
+                {accountsQuery.isLoading
+                  ? '…'
+                  : fmtNum.format(teamAccount?.balance ?? 0)}
+              </CardTitle>
+              {teamAccount &&
+                formatCurrencyAmount(teamAccount.balance, currencyConfig) && (
+                  <p className="text-sm text-muted-foreground">
+                    ≈ {formatCurrencyAmount(teamAccount.balance, currencyConfig)}
+                  </p>
+                )}
+            </CardHeader>
+          </Card>
+        )}
         {memberAccounts.map((account) => (
           <Card key={account.id}>
             <CardHeader>
-              <CardDescription>成员额度 · {account.label ?? account.userId}</CardDescription>
+              <CardDescription>
+                成员额度 · {account.label ?? account.userId}
+                {isSystem && account.teamName ? ` · ${account.teamName}` : ''}
+              </CardDescription>
               <CardTitle className="text-2xl">{fmtNum.format(account.balance)}</CardTitle>
               {formatCurrencyAmount(account.balance, currencyConfig) && (
                 <p className="text-sm text-muted-foreground">
@@ -331,6 +377,30 @@ export function BillingPage() {
                   </SelectContent>
                 </Select>
               </div>
+              {isSystem && (
+                <div>
+                  <label className="mb-1 block text-sm text-muted-foreground">
+                    团队
+                  </label>
+                  <Select
+                    value={form.teamId}
+                    onValueChange={(v) =>
+                      setForm((f) => ({ ...f, teamId: v, target: '' }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {teams.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div>
                 <label className="mb-1 block text-sm text-muted-foreground">
                   目标账户
@@ -344,7 +414,7 @@ export function BillingPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">团队账户</SelectItem>
-                    {memberAccounts.map((a) => (
+                    {selectedTeamMemberAccounts.map((a) => (
                       <SelectItem key={a.id} value={a.userId ?? ''}>
                         {a.label ?? a.userId}
                       </SelectItem>
