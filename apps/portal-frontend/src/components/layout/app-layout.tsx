@@ -1,6 +1,7 @@
 import {
   Boxes,
   Building2,
+  CreditCard,
   FileClock,
   Gauge,
   KeyRound,
@@ -77,7 +78,6 @@ export function AppLayout() {
           ? [{ label: '渠道管理', to: '/providers', icon: Server }]
           : []),
         { label: '模型管理', to: '/models', icon: Boxes },
-        { label: '额度与计费', to: '/billing', icon: Wallet },
       ],
     },
     {
@@ -85,6 +85,9 @@ export function AppLayout() {
       items: [
         ...(isTeamManager
           ? [{ label: '系统设置', to: '/settings', icon: Settings }]
+          : []),
+        ...(isTeamManager
+          ? [{ label: '额度充值 / 调整', to: '/quota-topup', icon: CreditCard }]
           : []),
         ...(isSystem
           ? [{ label: '租户管理', to: '/admin/tenants', icon: Building2 }]
@@ -98,6 +101,7 @@ export function AppLayout() {
       title: '观察',
       items: [
         { label: '用量看板', to: '/', end: true, icon: Gauge },
+        { label: '余额与流水', to: '/billing', icon: Wallet },
         ...(isTeamManager
           ? [{ label: '使用日志', to: '/usage-logs', icon: ScrollText }]
           : []),

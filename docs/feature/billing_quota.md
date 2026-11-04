@@ -29,6 +29,7 @@
 | [BILLING_QUOTA_CURRENCY_RATE](../plan/BILLING_QUOTA_CURRENCY_RATE_PLAN.md) | [REQ-004 后端货币汇率](../requirement/BILLING_QUOTA_REQ-004_BACKEND_CURRENCY.md) | [开发记录](../development/BILLING_QUOTA_REQ-004_DEVELOPMENT.md) | — |
 | 同上 | [REQ-005 前端货币设置与展示](../requirement/BILLING_QUOTA_REQ-005_FRONTEND_CURRENCY.md) | [开发记录](../development/BILLING_QUOTA_REQ-005_DEVELOPMENT.md) | — |
 | [BILLING_QUOTA_POLICY](../plan/BILLING_QUOTA_POLICY_PLAN.md) | [REQ-006 策略数据模型](../requirement/BILLING_QUOTA_REQ-006_POLICY_MODEL.md)、[REQ-007 策略求值引擎](../requirement/BILLING_QUOTA_REQ-007_POLICY_ENGINE.md)、[REQ-008 策略管理 UI](../requirement/BILLING_QUOTA_REQ-008_POLICY_UI.md) | [REQ-006](../development/BILLING_QUOTA_REQ-006_DEVELOPMENT.md)、[REQ-007](../development/BILLING_QUOTA_REQ-007_DEVELOPMENT.md)、[REQ-008](../development/BILLING_QUOTA_REQ-008_DEVELOPMENT.md) | — |
+| [BILLING_QUOTA_MENU_SPLIT](../plan/BILLING_QUOTA_MENU_SPLIT_PLAN.md) | [REQ-009 前端导航拆分](../requirement/BILLING_QUOTA_REQ-009_FRONTEND_NAV_SPLIT.md) | [开发记录](../development/BILLING_QUOTA_REQ-009_DEVELOPMENT.md) | — |
 
 ## 3. 相关文档
 - 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-10、§7.2、D-03）、`docs/technical/db_schema/BILLING_QUOTA_SCHEMA.MD`
@@ -36,4 +37,4 @@
 
 ## 4. 相关代码文件
 - 后端：`apps/portal-backend/src/modules/billing/`、`apps/portal-backend/src/modules/proxy/`（限额联动）
-- 前端：`apps/portal-frontend/src/features/billing/`、`pages/billing.tsx`
+- 前端：`apps/portal-frontend/src/features/billing/`、`pages/billing.tsx`（余额/流水，观察）、`pages/quota-topup.tsx`（充值/调整，系统设置）

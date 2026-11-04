@@ -12,6 +12,7 @@ import { LoginPage } from '@/pages/login'
 import { ModelsPage } from '@/pages/models'
 import { PolicySetsPage } from '@/pages/policy-sets'
 import { ProvidersPage } from '@/pages/providers'
+import { QuotaTopupPage } from '@/pages/quota-topup'
 import { RecommendationPage } from '@/pages/recommendation'
 import { RolesPage } from '@/pages/roles'
 import { SettingsPage } from '@/pages/settings'
@@ -40,6 +41,7 @@ export const router = createBrowserRouter([
           { path: 'policy-sets', element: <PolicySetsPage /> },
           { path: 'api-keys', element: <ApiKeysPage /> },
           { path: 'billing', element: <BillingPage /> },
+          { path: 'quota-topup', element: <QuotaTopupPage /> },
           { path: 'providers', element: <ProvidersPage /> },
           { path: 'models', element: <ModelsPage /> },
           { path: 'recommendation', element: <RecommendationPage /> },
