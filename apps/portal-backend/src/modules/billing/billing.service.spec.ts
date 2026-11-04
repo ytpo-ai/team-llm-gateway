@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ForbiddenException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { Role } from '../../common/enums/role.enum.js';
 import type { AuthUser } from '../auth/decorators/current-user.decorator.js';
@@ -33,6 +34,10 @@ describe('BillingService', () => {
   const userModel = {
     find: vi.fn(),
   };
+  const teamModel = {
+    findOne: vi.fn(),
+    find: vi.fn(),
+  };
 
   const makeUser = (overrides: Partial<AuthUser> = {}): AuthUser => ({
     id: String(userId),
@@ -64,6 +69,7 @@ describe('BillingService', () => {
         { provide: 'QuotaAccountModel', useValue: quotaAccountModel },
         { provide: 'QuotaTransactionModel', useValue: quotaTransactionModel },
         { provide: 'UserModel', useValue: userModel },
+        { provide: 'TeamModel', useValue: teamModel },
       ],
     }).compile();
 
@@ -100,6 +106,46 @@ describe('BillingService', () => {
         }),
       );
     });
+
+    it('should let system recharge another team account', async () => {
+      const otherTeamId = new Types.ObjectId();
+      const account = makeAccount({ teamId: otherTeamId });
+      teamModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue({ _id: otherTeamId, tenantId }),
+      });
+      quotaAccountModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(account),
+      });
+      quotaAccountModel.findOneAndUpdate.mockResolvedValue({
+        ...account,
+        balance: 1500,
+      });
+      quotaTransactionModel.create.mockResolvedValue({
+        amount: 500,
+        balanceAfter: 1500,
+        type: QuotaTransactionType.RECHARGE,
+      });
+
+      const result = await service.recharge(makeUser({ role: Role.SYSTEM }), {
+        amount: 500,
+        teamId: String(otherTeamId),
+      });
+
+      expect(result.balance).toBe(1500);
+      const createArg = quotaTransactionModel.create.mock.calls[0][0];
+      expect(String(createArg.teamId)).toBe(String(otherTeamId));
+    });
+
+    it('should forbid team_admin from recharging another team', async () => {
+      const otherTeamId = new Types.ObjectId();
+
+      await expect(
+        service.recharge(makeUser({ role: Role.TEAM_ADMIN }), {
+          amount: 500,
+          teamId: String(otherTeamId),
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
   });
 
   describe('adjust', () => {
@@ -123,6 +169,13 @@ describe('BillingService', () => {
   });
 
   describe('listAccounts', () => {
+    const mockTeamFind = () => {
+      teamModel.find.mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        exec: vi.fn().mockResolvedValue([]),
+      });
+    };
+
     it('should filter to own account for a regular member', async () => {
       quotaAccountModel.find.mockReturnValue({
         exec: vi.fn().mockResolvedValue([makeAccount({ userId, type: QuotaAccountType.MEMBER })]),
@@ -131,6 +184,7 @@ describe('BillingService', () => {
         select: vi.fn().mockReturnThis(),
         exec: vi.fn().mockResolvedValue([]),
       });
+      mockTeamFind();
 
       await service.listAccounts(makeUser());
 
@@ -146,12 +200,30 @@ describe('BillingService', () => {
         select: vi.fn().mockReturnThis(),
         exec: vi.fn().mockResolvedValue([]),
       });
+      mockTeamFind();
 
       await service.listAccounts(makeUser({ role: Role.TEAM_ADMIN }));
 
       const filter = quotaAccountModel.find.mock.calls[0][0];
       expect(filter.userId).toBeUndefined();
       expect(filter.teamId).toEqual(teamId);
+    });
+
+    it('should list accounts across all teams for system', async () => {
+      quotaAccountModel.find.mockReturnValue({
+        exec: vi.fn().mockResolvedValue([makeAccount()]),
+      });
+      userModel.find.mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        exec: vi.fn().mockResolvedValue([]),
+      });
+      mockTeamFind();
+
+      await service.listAccounts(makeUser({ role: Role.SYSTEM }));
+
+      const filter = quotaAccountModel.find.mock.calls[0][0];
+      expect(filter.userId).toBeUndefined();
+      expect(filter.teamId).toBeUndefined();
     });
   });
 

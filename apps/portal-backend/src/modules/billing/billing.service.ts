@@ -1,8 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Role } from '../../common/enums/role.enum.js';
 import type { AuthUser } from '../auth/decorators/current-user.decorator.js';
+import { Team } from '../teams/schemas/team.schema.js';
 import { User } from '../users/schemas/user.schema.js';
 import { AdjustQuotaDto } from './dto/adjust-quota.dto.js';
 import { ListTransactionsQueryDto } from './dto/list-transactions-query.dto.js';
@@ -22,6 +27,8 @@ import {
 export interface QuotaAccountView {
   id: string;
   type: QuotaAccountType;
+  teamId: string;
+  teamName: string | null;
   userId: string | null;
   label: string | null;
   balance: number;
@@ -63,18 +70,20 @@ export class BillingService {
     @InjectModel(QuotaTransaction.name)
     private readonly quotaTransactionModel: Model<QuotaTransaction>,
     @InjectModel(User.name) private readonly userModel: Model<User>,
+    @InjectModel(Team.name) private readonly teamModel: Model<Team>,
   ) {}
 
   async recharge(user: AuthUser, dto: RechargeQuotaDto): Promise<QuotaAccountView> {
+    const teamId = await this.resolveTargetTeamId(user, dto.teamId);
     const account = await this.resolveTargetAccount(
       user.tenantId,
-      user.teamId,
+      teamId,
       dto.userId,
     );
     const updated = await this.applyDelta(account, dto.amount);
     await this.quotaTransactionModel.create({
       tenantId: new Types.ObjectId(user.tenantId),
-      teamId: new Types.ObjectId(user.teamId),
+      teamId: new Types.ObjectId(teamId),
       userId: account.userId,
       accountId: account._id,
       accountType: account.type,
@@ -86,19 +95,20 @@ export class BillingService {
       referenceId: null,
       description: dto.description ?? null,
     });
-    return this.toAccountView(updated, null);
+    return this.toAccountView(updated, null, null);
   }
 
   async adjust(user: AuthUser, dto: AdjustQuotaDto): Promise<QuotaAccountView> {
+    const teamId = await this.resolveTargetTeamId(user, dto.teamId);
     const account = await this.resolveTargetAccount(
       user.tenantId,
-      user.teamId,
+      teamId,
       dto.userId,
     );
     const updated = await this.applyDelta(account, dto.amount);
     await this.quotaTransactionModel.create({
       tenantId: new Types.ObjectId(user.tenantId),
-      teamId: new Types.ObjectId(user.teamId),
+      teamId: new Types.ObjectId(teamId),
       userId: account.userId,
       accountId: account._id,
       accountType: account.type,
@@ -110,27 +120,36 @@ export class BillingService {
       referenceId: null,
       description: dto.description ?? null,
     });
-    return this.toAccountView(updated, null);
+    return this.toAccountView(updated, null, null);
   }
 
   async listAccounts(user: AuthUser): Promise<QuotaAccountView[]> {
     const filter: Record<string, unknown> = {
       tenantId: new Types.ObjectId(user.tenantId),
-      teamId: new Types.ObjectId(user.teamId),
       status: QuotaAccountStatus.ACTIVE,
     };
     if (user.role === Role.MEMBER) {
       filter.userId = new Types.ObjectId(user.id);
+    } else if (user.role === Role.TEAM_ADMIN) {
+      filter.teamId = new Types.ObjectId(user.teamId);
     }
 
     const accounts = await this.quotaAccountModel.find(filter).exec();
     const memberIds = accounts
       .filter((a) => a.type === QuotaAccountType.MEMBER && a.userId)
       .map((a) => String(a.userId));
-    const labelMap = await this.buildLabelMap(memberIds);
+    const teamIds = [...new Set(accounts.map((a) => String(a.teamId)))];
+    const [labelMap, teamNameMap] = await Promise.all([
+      this.buildLabelMap(memberIds),
+      this.buildTeamNameMap(teamIds),
+    ]);
 
     return accounts.map((a) =>
-      this.toAccountView(a, a.userId ? labelMap.get(String(a.userId)) ?? null : null),
+      this.toAccountView(
+        a,
+        a.userId ? (labelMap.get(String(a.userId)) ?? null) : null,
+        teamNameMap.get(String(a.teamId)) ?? null,
+      ),
     );
   }
 
@@ -251,6 +270,25 @@ export class BillingService {
       : this.getOrCreateTeamAccount(tenantId, teamId);
   }
 
+  private async resolveTargetTeamId(
+    user: AuthUser,
+    requestedTeamId?: string,
+  ): Promise<string> {
+    if (!requestedTeamId || requestedTeamId === user.teamId) {
+      return user.teamId;
+    }
+    if (user.role !== Role.SYSTEM) {
+      throw new ForbiddenException('无权操作其他团队的额度');
+    }
+    const team = await this.teamModel
+      .findOne({ _id: requestedTeamId, tenantId: user.tenantId })
+      .exec();
+    if (!team) {
+      throw new NotFoundException('团队不存在');
+    }
+    return requestedTeamId;
+  }
+
   private async resolveSpendableAccount(
     tenantId: string,
     teamId: string,
@@ -349,13 +387,25 @@ export class BillingService {
     );
   }
 
+  private async buildTeamNameMap(ids: string[]): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const teams = await this.teamModel
+      .find({ _id: { $in: ids.map((id) => new Types.ObjectId(id)) } })
+      .select('name')
+      .exec();
+    return new Map(teams.map((t) => [String(t._id), t.name]));
+  }
+
   private toAccountView(
     account: QuotaAccountDocument,
     label: string | null,
+    teamName: string | null,
   ): QuotaAccountView {
     return {
       id: String(account._id),
       type: account.type,
+      teamId: String(account.teamId),
+      teamName,
       userId: account.userId ? String(account.userId) : null,
       label,
       balance: account.balance,
