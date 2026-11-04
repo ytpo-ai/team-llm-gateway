@@ -91,7 +91,8 @@ export function ProvidersPage() {
   const isAdmin = user?.role === 'team_admin' || user?.role === 'system'
 
   const [addOpen, setAddOpen] = useState(false)
-  const [formOpen, setFormOpen] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
   const [form, setForm] = useState<FormState>(emptyForm)
   const [editing, setEditing] = useState<Provider | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -189,7 +190,7 @@ export function ProvidersPage() {
 
   const openCreate = () => {
     resetForm()
-    setFormOpen(true)
+    setCreateOpen(true)
   }
 
   const submitMutation = useMutation({
@@ -216,7 +217,8 @@ export function ProvidersPage() {
     },
     onSuccess: () => {
       resetForm()
-      setFormOpen(false)
+      setCreateOpen(false)
+      setEditOpen(false)
       invalidate()
     },
     onError: (err) => {
@@ -249,7 +251,7 @@ export function ProvidersPage() {
       presetKey: provider.presetKey ?? '',
     })
     setError(null)
-    setFormOpen(true)
+    setEditOpen(true)
   }
 
   if (!isAdmin) {
@@ -262,6 +264,139 @@ export function ProvidersPage() {
 
   const providers: Provider[] = providersQuery.data ?? []
   const officialPresets: OfficialProviderPreset[] = presetsQuery.data ?? []
+
+  const formBody = (
+    <>
+      <div>
+        <label className="mb-1 block text-sm text-muted-foreground">
+          渠道名称
+        </label>
+        <Input
+          placeholder="如：OpenAI 直连"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          required
+        />
+      </div>
+      <div>
+        <label className="mb-1 block text-sm text-muted-foreground">
+          协议类型
+        </label>
+        <Select
+          value={form.type}
+          onValueChange={(v) => {
+            const type = v as ProviderType
+            setForm({
+              ...form,
+              type,
+              authType: type === 'gemini' ? form.authType : 'api-key',
+            })
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(PROVIDER_TYPE_LABELS) as ProviderType[]).map(
+              (type) => (
+                <SelectItem key={type} value={type}>
+                  {PROVIDER_TYPE_LABELS[type]}
+                </SelectItem>
+              ),
+            )}
+          </SelectContent>
+        </Select>
+      </div>
+      {editing && (
+        <div>
+          <label className="mb-1 block text-sm text-muted-foreground">
+            是否官方渠道
+          </label>
+          <Select
+            value={form.presetKey || NONE_PRESET}
+            onValueChange={(v) =>
+              setForm({
+                ...form,
+                presetKey: v === NONE_PRESET ? '' : v,
+              })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE_PRESET}>无（普通渠道）</SelectItem>
+              {officialPresets.map((preset) => (
+                <SelectItem key={preset.key} value={preset.key}>
+                  {preset.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      {form.type === 'gemini' && (
+        <div>
+          <label className="mb-1 block text-sm text-muted-foreground">
+            认证方式
+          </label>
+          <Select
+            value={form.authType}
+            onValueChange={(v) =>
+              setForm({ ...form, authType: v as ProviderAuthType })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(PROVIDER_AUTH_TYPE_LABELS) as ProviderAuthType[]).map(
+                (authType) => (
+                  <SelectItem key={authType} value={authType}>
+                    {PROVIDER_AUTH_TYPE_LABELS[authType]}
+                  </SelectItem>
+                ),
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      <div>
+        <label className="mb-1 block text-sm text-muted-foreground">
+          Base URL
+        </label>
+        <Input
+          placeholder={PROVIDER_TYPE_BASE_URL_HINTS[form.type]}
+          value={form.baseUrl}
+          onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
+          required
+        />
+      </div>
+      <div>
+        <label className="mb-1 block text-sm text-muted-foreground">
+          {form.authType === 'oauth' ? '服务账号 JSON' : '上游 API Key'}
+        </label>
+        {form.authType === 'oauth' ? (
+          <textarea
+            className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            placeholder={editing ? '留空表示不修改' : '粘贴服务账号 JSON（含 client_email / private_key）'}
+            value={form.apiKey}
+            onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
+            required={!editing}
+          />
+        ) : (
+          <Input
+            type="password"
+            placeholder={editing ? '留空表示不修改' : 'sk-…'}
+            value={form.apiKey}
+            onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
+            required={!editing}
+          />
+        )}
+      </div>
+      {error && <p className="text-sm text-red-500">{error}</p>}
+    </>
+  )
 
   return (
     <div className="space-y-6">
@@ -376,7 +511,7 @@ export function ProvidersPage() {
       </Card>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>添加渠道</DialogTitle>
             <DialogDescription>
@@ -403,7 +538,7 @@ export function ProvidersPage() {
 
             <div>
               <div className="mb-2 text-sm font-medium">官方渠道</div>
-              <div className="grid gap-2">
+              <div className="grid gap-2 sm:grid-cols-2">
                 {officialPresets.map((preset) => (
                   <div
                     key={preset.key}
@@ -436,162 +571,58 @@ export function ProvidersPage() {
         </DialogContent>
       </Dialog>
 
-      <Sheet open={formOpen} onOpenChange={setFormOpen}>
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>添加自定义渠道</DialogTitle>
+            <DialogDescription>
+              上游 key 提交后不可再次查看，仅显示脱敏信息
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            className="grid max-h-[75vh] gap-4 overflow-y-auto"
+            onSubmit={handleSubmit}
+          >
+            {formBody}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCreateOpen(false)}
+              >
+                取消
+              </Button>
+              <Button type="submit" disabled={submitMutation.isPending}>
+                添加
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Sheet open={editOpen} onOpenChange={setEditOpen}>
         <SheetContent className="sm:max-w-md">
           <SheetHeader>
-            <SheetTitle>{editing ? '编辑渠道' : '添加上游渠道'}</SheetTitle>
+            <SheetTitle>编辑渠道</SheetTitle>
             <SheetDescription>
-              {editing
-                ? `正在编辑 ${editing.name}（留空 key 表示保持不变）`
-                : '上游 key 提交后不可再次查看，仅显示脱敏信息'}
+              正在编辑 {editing?.name}（留空 key 表示保持不变）
             </SheetDescription>
           </SheetHeader>
           <form
             className="flex flex-1 flex-col gap-4 overflow-y-auto"
             onSubmit={handleSubmit}
           >
-            <div>
-              <label className="mb-1 block text-sm text-muted-foreground">
-                渠道名称
-              </label>
-              <Input
-                placeholder="如：OpenAI 直连"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                required
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm text-muted-foreground">
-                协议类型
-              </label>
-              <Select
-                value={form.type}
-                onValueChange={(v) => {
-                  const type = v as ProviderType
-                  setForm({
-                    ...form,
-                    type,
-                    authType: type === 'gemini' ? form.authType : 'api-key',
-                  })
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(PROVIDER_TYPE_LABELS) as ProviderType[]).map(
-                    (type) => (
-                      <SelectItem key={type} value={type}>
-                        {PROVIDER_TYPE_LABELS[type]}
-                      </SelectItem>
-                    ),
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            {editing && (
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  是否官方渠道
-                </label>
-                <Select
-                  value={form.presetKey || NONE_PRESET}
-                  onValueChange={(v) =>
-                    setForm({
-                      ...form,
-                      presetKey: v === NONE_PRESET ? '' : v,
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE_PRESET}>无（普通渠道）</SelectItem>
-                    {officialPresets.map((preset) => (
-                      <SelectItem key={preset.key} value={preset.key}>
-                        {preset.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            {form.type === 'gemini' && (
-              <div>
-                <label className="mb-1 block text-sm text-muted-foreground">
-                  认证方式
-                </label>
-                <Select
-                  value={form.authType}
-                  onValueChange={(v) =>
-                    setForm({ ...form, authType: v as ProviderAuthType })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(
-                      Object.keys(
-                        PROVIDER_AUTH_TYPE_LABELS,
-                      ) as ProviderAuthType[]
-                    ).map((authType) => (
-                      <SelectItem key={authType} value={authType}>
-                        {PROVIDER_AUTH_TYPE_LABELS[authType]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div>
-              <label className="mb-1 block text-sm text-muted-foreground">
-                Base URL
-              </label>
-              <Input
-                placeholder={PROVIDER_TYPE_BASE_URL_HINTS[form.type]}
-                value={form.baseUrl}
-                onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
-                required
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm text-muted-foreground">
-                {form.authType === 'oauth' ? '服务账号 JSON' : '上游 API Key'}
-              </label>
-              {form.authType === 'oauth' ? (
-                <textarea
-                  className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder={editing ? '留空表示不修改' : '粘贴服务账号 JSON（含 client_email / private_key）'}
-                  value={form.apiKey}
-                  onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
-                  required={!editing}
-                />
-              ) : (
-                <Input
-                  type="password"
-                  placeholder={editing ? '留空表示不修改' : 'sk-…'}
-                  value={form.apiKey}
-                  onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
-                  required={!editing}
-                />
-              )}
-            </div>
-
-            {error && <p className="text-sm text-red-500">{error}</p>}
-
+            {formBody}
             <SheetFooter>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setFormOpen(false)}
+                onClick={() => setEditOpen(false)}
               >
                 取消
               </Button>
               <Button type="submit" disabled={submitMutation.isPending}>
-                {editing ? '保存修改' : '添加'}
+                保存修改
               </Button>
             </SheetFooter>
           </form>
