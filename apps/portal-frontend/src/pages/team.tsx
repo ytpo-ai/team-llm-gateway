@@ -40,19 +40,16 @@ import type { PolicySet } from '@/features/policy-sets/types'
 import { listRoleTemplates } from '@/features/role-templates/api'
 import type { RoleTemplate } from '@/features/role-templates/types'
 import {
-  createInvitation,
-  listInvitations,
+  createMember,
   listMembers,
   listTeams,
   removeMember,
-  revokeInvitation,
   updateMember,
   updateTeam,
 } from '@/features/teams/api'
 import {
   ASSIGNABLE_ROLES,
   ROLE_LABELS,
-  type Invitation,
   type Member,
 } from '@/features/teams/types'
 import { ApiError } from '@/lib/http'
@@ -91,11 +88,11 @@ export function TeamPage() {
   const user = useAuthStore((s) => s.user)
   const isAdmin = user?.role === 'team_admin' || user?.role === 'system'
 
-  const [inviteOpen, setInviteOpen] = useState(false)
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState<Role>('member')
-  const [inviteLink, setInviteLink] = useState<string | null>(null)
-  const [inviteError, setInviteError] = useState<string | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
+  const [addEmail, setAddEmail] = useState('')
+  const [addName, setAddName] = useState('')
+  const [addRole, setAddRole] = useState<Role>('member')
+  const [addError, setAddError] = useState<string | null>(null)
 
   const [limitsOpen, setLimitsOpen] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<Member | null>(null)
@@ -107,12 +104,6 @@ export function TeamPage() {
     queryKey: ['members', team?.id],
     queryFn: () => listMembers(team!.id),
     enabled: !!team,
-  })
-
-  const invitationsQuery = useQuery({
-    queryKey: ['invitations', team?.id],
-    queryFn: () => listInvitations(team!.id),
-    enabled: !!team && isAdmin,
   })
 
   const roleTemplatesQuery = useQuery({
@@ -164,45 +155,32 @@ export function TeamPage() {
     },
   })
 
-  const revokeInvitationMutation = useMutation({
-    mutationFn: (invitationId: string) =>
-      revokeInvitation(team!.id, invitationId),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ['invitations', team?.id] }),
-  })
-
-  const inviteMutation = useMutation({
-    mutationFn: () => createInvitation(team!.id, inviteEmail, inviteRole),
-    onSuccess: (data) => {
-      setInviteLink(`${window.location.origin}/invite?token=${data.token}`)
-      setInviteError(null)
-      queryClient.invalidateQueries({ queryKey: ['invitations', team?.id] })
+  const addMemberMutation = useMutation({
+    mutationFn: () =>
+      createMember(team!.id, { email: addEmail, name: addName, role: addRole }),
+    onSuccess: () => {
+      invalidate()
+      setAddOpen(false)
     },
     onError: (err) => {
-      setInviteError(
+      setAddError(
         err instanceof ApiError ? err.message : '操作失败，请稍后重试',
       )
     },
   })
 
-  const openInvite = () => {
-    setInviteEmail('')
-    setInviteRole('member')
-    setInviteLink(null)
-    setInviteError(null)
-    setInviteOpen(true)
+  const openAdd = () => {
+    setAddEmail('')
+    setAddName('')
+    setAddRole('member')
+    setAddError(null)
+    setAddOpen(true)
   }
 
-  const handleInvite = (e: FormEvent) => {
+  const handleAdd = (e: FormEvent) => {
     e.preventDefault()
-    setInviteLink(null)
-    inviteMutation.mutate()
-  }
-
-  const copyLink = async () => {
-    if (inviteLink) {
-      await navigator.clipboard.writeText(inviteLink)
-    }
+    setAddError(null)
+    addMemberMutation.mutate()
   }
 
   if (teamsQuery.isLoading) {
@@ -218,7 +196,6 @@ export function TeamPage() {
   }
 
   const members: Member[] = membersQuery.data ?? []
-  const invitations: Invitation[] = invitationsQuery.data ?? []
   const roleTemplates: RoleTemplate[] = roleTemplatesQuery.data ?? []
   const policySets: PolicySet[] = policySetsQuery.data ?? []
 
@@ -236,7 +213,7 @@ export function TeamPage() {
             <Button variant="outline" onClick={openLimits}>
               团队使用限额
             </Button>
-            <Button onClick={openInvite}>邀请成员</Button>
+            <Button onClick={openAdd}>添加成员</Button>
           </div>
         )}
       </div>
@@ -246,43 +223,6 @@ export function TeamPage() {
           <CardTitle>成员</CardTitle>
         </CardHeader>
         <CardContent>
-          {isAdmin && invitations.length > 0 && (
-            <div className="mb-4 space-y-2">
-              <p className="text-sm font-medium">已发出的邀请</p>
-              <ul className="space-y-1">
-                {invitations.map((invitation) => (
-                  <li
-                    key={invitation.id}
-                    className="flex items-center justify-between rounded-md border border-input px-3 py-2 text-sm"
-                  >
-                    <span>
-                      {invitation.email}
-                      <span className="ml-2 text-muted-foreground">
-                        {ROLE_LABELS[invitation.role]} ·{' '}
-                        {invitation.status === 'pending'
-                          ? '待接受'
-                          : invitation.status === 'accepted'
-                            ? '已加入'
-                            : '已撤销'}
-                      </span>
-                    </span>
-                    {invitation.status === 'pending' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          revokeInvitationMutation.mutate(invitation.id)
-                        }
-                      >
-                        撤销
-                      </Button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -374,62 +314,62 @@ export function TeamPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>邀请成员</DialogTitle>
+            <DialogTitle>添加成员</DialogTitle>
             <DialogDescription>
-              生成邀请链接并发送给成员，对方凭链接注册后即加入团队
+              填写成员信息，提交后即加入团队
             </DialogDescription>
           </DialogHeader>
-          <form className="space-y-4" onSubmit={handleInvite}>
+          <form className="space-y-4" onSubmit={handleAdd}>
             <div>
               <label className="mb-1 block text-sm text-muted-foreground">
-                成员邮箱
+                邮箱
               </label>
               <Input
                 type="email"
                 placeholder="成员邮箱"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
+                value={addEmail}
+                onChange={(e) => setAddEmail(e.target.value)}
                 required
               />
             </div>
             <div>
               <label className="mb-1 block text-sm text-muted-foreground">
-                成员角色
+                用户名
+              </label>
+              <Input
+                placeholder="成员用户名"
+                value={addName}
+                onChange={(e) => setAddName(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                角色
               </label>
               <RoleSelect
-                value={inviteRole}
-                onChange={(role) => setInviteRole(role)}
+                value={addRole}
+                onChange={(role) => setAddRole(role)}
               />
             </div>
 
-            {inviteError && (
-              <p className="text-sm text-red-500">{inviteError}</p>
-            )}
-
-            {inviteLink && (
-              <div className="flex items-center gap-2 rounded-md border border-input bg-muted/50 p-2">
-                <span className="flex-1 truncate text-sm text-muted-foreground">
-                  {inviteLink}
-                </span>
-                <Button variant="outline" size="sm" onClick={copyLink}>
-                  复制
-                </Button>
-              </div>
+            {addError && (
+              <p className="text-sm text-red-500">{addError}</p>
             )}
 
             <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setInviteOpen(false)}
+                onClick={() => setAddOpen(false)}
               >
                 取消
               </Button>
-              <Button type="submit" disabled={inviteMutation.isPending}>
-                {inviteMutation.isPending ? '生成中…' : '生成邀请链接'}
+              <Button type="submit" disabled={addMemberMutation.isPending}>
+                {addMemberMutation.isPending ? '添加中…' : '添加成员'}
               </Button>
             </DialogFooter>
           </form>

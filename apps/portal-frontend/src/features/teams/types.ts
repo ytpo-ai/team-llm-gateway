@@ -23,22 +23,6 @@ export interface Member {
   roleTemplateId: string | null
 }
 
-export type InvitationStatus = 'pending' | 'accepted' | 'revoked'
-
-export interface Invitation {
-  id: string
-  email: string
-  role: Role
-  status: InvitationStatus
-  expiresAt: string
-  createdAt?: string
-}
-
-export interface InvitationResult {
-  invitation: Invitation
-  token: string
-}
-
 export const ROLE_LABELS: Record<Role, string> = {
   system: '系统管理员',
   team_admin: '团队管理员',
