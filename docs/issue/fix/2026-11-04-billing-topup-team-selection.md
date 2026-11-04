@@ -13,6 +13,7 @@
 1. 后端 `BillingService.listAccounts()` 硬编码按 `user.teamId` 过滤，`system` 也仅能读到本团队账户（`billing.service.ts`）。
 2. `RechargeQuotaDto` / `AdjustQuotaDto` 仅接受 `userId`（成员）作为目标，缺少 `teamId` 字段，无法指定其它团队。
 3. 前端弹窗仅渲染「团队账户 + 当前团队成员」，无团队选择器。
+4. **存量账号角色错位（数据问题）**：注册接口在 REQ-003（`19552ca`，11-02）前创建 `team_admin`，之后才改为「首个注册者 → `system`」。存量首个注册账号（如 `admin@limountain.dev`，10-28 注册）仍为 `team_admin`，导致团队选择器（`isSystem` 门控）对其不显示。
 
 ## 3. 修复动作
 
@@ -32,6 +33,12 @@
   - 引入 `listTeams()`，`system` 弹窗新增「团队」选择器，切换团队时重置目标账户。
   - 「目标账户」按所选团队过滤成员；提交携带 `teamId`。
   - `system` 余额卡片遍历全部团队（含无账户团队显示 0）；成员卡片追加团队名。
+
+### 数据修复（存量账号角色迁移）
+
+- 将首个注册账号 `admin@limountain.dev` 由 `team_admin` 升级为 `system`（一次性 DB 更新）。
+- 迁移后需**重新登录**以刷新 JWT 中的 `role`。
+- 备注：REQ-003 注册角色变更未做存量迁移，其它环境若存在 11-02 前注册的「首个账号」需同步迁移（或补充幂等迁移脚本，本 fix 未新增）。
 
 ## 4. 验证结果
 
