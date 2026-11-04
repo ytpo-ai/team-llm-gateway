@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import {
   Card,
   CardContent,
@@ -6,6 +7,13 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   listQuotaAccounts,
   listQuotaTransactions,
@@ -126,8 +134,18 @@ function TransactionTable({
   )
 }
 
+type Scope = 'all' | 'team' | 'member'
+
+interface BalanceCard {
+  key: string
+  description: string
+  balance: number
+}
+
 export function BillingPage() {
   const user = useAuthStore((s) => s.user)
+  const [scope, setScope] = useState<Scope>('all')
+  const [memberId, setMemberId] = useState<string>('')
 
   const accountsQuery = useQuery({
     queryKey: ['billing', 'accounts'],
@@ -157,6 +175,51 @@ export function BillingPage() {
   const currencyConfig = currencyQuery.data ?? null
   const teamBalanceMap = new Map(teamAccounts.map((a) => [a.teamId, a]))
 
+  // 余额卡片：团队 + 成员统一为一个 3 列网格，按筛选范围展示
+  const teamCards: BalanceCard[] = isSystem
+    ? teams.map((team) => ({
+        key: `team-${team.id}`,
+        description: `${team.name} · 团队额度余额`,
+        balance: teamBalanceMap.get(team.id)?.balance ?? 0,
+      }))
+    : teamAccount
+      ? [
+          {
+            key: `team-${teamAccount.id}`,
+            description: '团队额度余额',
+            balance: teamAccount.balance,
+          },
+        ]
+      : []
+
+  const visibleMemberAccounts =
+    scope === 'member'
+      ? memberAccounts.filter((a) => a.userId === memberId)
+      : scope === 'team'
+        ? []
+        : memberAccounts
+
+  const visibleCards: BalanceCard[] = [
+    ...(scope === 'all' || scope === 'team' ? teamCards : []),
+    ...visibleMemberAccounts.map((account) => ({
+      key: account.id,
+      description: `成员额度 · ${account.label ?? account.userId}${
+        isSystem && account.teamName ? ` · ${account.teamName}` : ''
+      }`,
+      balance: account.balance,
+    })),
+  ]
+
+  const allTransactions = transactionsQuery.data ?? []
+  const filteredTransactions =
+    scope === 'all'
+      ? allTransactions
+      : scope === 'team'
+        ? allTransactions.filter((t) => t.accountType === 'team')
+        : allTransactions.filter(
+            (t) => t.accountType === 'member' && t.userId === memberId,
+          )
+
   return (
     <div className="space-y-6">
       <div>
@@ -166,79 +229,67 @@ export function BillingPage() {
         </p>
       </div>
 
-      <div className="space-y-4">
-        <div>
-          <h2 className="mb-2 text-xs font-medium tracking-wide text-muted-foreground">
-            团队余额
-          </h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {isSystem ? (
-              teams.map((team) => {
-                const balance = teamBalanceMap.get(team.id)?.balance ?? 0
-                return (
-                  <Card key={team.id}>
-                    <CardHeader>
-                      <CardDescription>{team.name} · 团队额度余额</CardDescription>
-                      <CardTitle className="text-2xl">
-                        {accountsQuery.isLoading ? '…' : fmtNum.format(balance)}
-                      </CardTitle>
-                      {formatCurrencyAmount(balance, currencyConfig) && (
-                        <p className="text-sm text-muted-foreground">
-                          ≈ {formatCurrencyAmount(balance, currencyConfig)}
-                        </p>
-                      )}
-                    </CardHeader>
-                  </Card>
-                )
-              })
-            ) : (
-              <Card>
-                <CardHeader>
-                  <CardDescription>团队额度余额</CardDescription>
-                  <CardTitle className="text-2xl">
-                    {accountsQuery.isLoading
-                      ? '…'
-                      : fmtNum.format(teamAccount?.balance ?? 0)}
-                  </CardTitle>
-                  {teamAccount &&
-                    formatCurrencyAmount(teamAccount.balance, currencyConfig) && (
-                      <p className="text-sm text-muted-foreground">
-                        ≈ {formatCurrencyAmount(teamAccount.balance, currencyConfig)}
-                      </p>
-                    )}
-                </CardHeader>
-              </Card>
-            )}
-          </div>
-        </div>
-        {memberAccounts.length > 0 && (
-          <div>
-            <h2 className="mb-2 text-xs font-medium tracking-wide text-muted-foreground">
-              成员余额
-            </h2>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {memberAccounts.map((account) => (
-                <Card key={account.id}>
-                  <CardHeader>
-                    <CardDescription>
-                      成员额度 · {account.label ?? account.userId}
-                      {isSystem && account.teamName ? ` · ${account.teamName}` : ''}
-                    </CardDescription>
-                    <CardTitle className="text-2xl">
-                      {fmtNum.format(account.balance)}
-                    </CardTitle>
-                    {formatCurrencyAmount(account.balance, currencyConfig) && (
-                      <p className="text-sm text-muted-foreground">
-                        ≈ {formatCurrencyAmount(account.balance, currencyConfig)}
-                      </p>
-                    )}
-                  </CardHeader>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
+      <div className="flex flex-wrap items-center gap-3">
+        <Select
+          value={scope}
+          onValueChange={(v) => setScope(v as Scope)}
+        >
+          <SelectTrigger className="w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全员</SelectItem>
+            <SelectItem value="team">只看团队</SelectItem>
+            <SelectItem value="member">某个成员</SelectItem>
+          </SelectContent>
+        </Select>
+        {scope === 'member' &&
+          (memberAccounts.length > 0 ? (
+            <Select value={memberId} onValueChange={setMemberId}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="选择成员" />
+              </SelectTrigger>
+              <SelectContent>
+                {memberAccounts.map((account) => (
+                  <SelectItem
+                    key={account.id}
+                    value={account.userId ?? account.id}
+                  >
+                    {account.label ?? account.userId}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <span className="text-sm text-muted-foreground">
+              暂无成员账户
+            </span>
+          ))}
       </div>
+
+      {accountsQuery.isLoading ? (
+        <div className="py-6 text-sm text-muted-foreground">加载中…</div>
+      ) : visibleCards.length === 0 ? (
+        <div className="py-6 text-sm text-muted-foreground">暂无余额数据</div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {visibleCards.map((card) => (
+            <Card key={card.key}>
+              <CardHeader>
+                <CardDescription>{card.description}</CardDescription>
+                <CardTitle className="text-2xl">
+                  {fmtNum.format(card.balance)}
+                </CardTitle>
+                {formatCurrencyAmount(card.balance, currencyConfig) && (
+                  <p className="text-sm text-muted-foreground">
+                    ≈ {formatCurrencyAmount(card.balance, currencyConfig)}
+                  </p>
+                )}
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -250,7 +301,7 @@ export function BillingPage() {
             <div className="py-6 text-sm text-muted-foreground">加载中…</div>
           ) : (
             <TransactionTable
-              items={transactionsQuery.data ?? []}
+              items={filteredTransactions}
               config={currencyConfig}
             />
           )}
