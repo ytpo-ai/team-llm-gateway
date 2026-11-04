@@ -8,7 +8,7 @@
 | 所属 plan | `docs/plan/OFFICIAL_CHANNEL_DUAL_FORMAT_PLAN.md` |
 | 需求管理 ID | — |
 | 分支 | `feat/official-channel-dual-format` |
-| 状态 | `in-review` |
+| 状态 | `done` |
 
 ## 2. 需求描述
 
@@ -43,5 +43,5 @@
 
 ## 5. 状态跟踪
 - [x] 开发中
-- [ ] 待验收
-- [ ] 已交付
+- [x] 待验收
+- [x] 已交付

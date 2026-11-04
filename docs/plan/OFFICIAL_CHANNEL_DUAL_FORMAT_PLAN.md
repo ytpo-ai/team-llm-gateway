@@ -5,7 +5,7 @@
 > - 上游决策：`docs/technical/SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-13、§5.2）
 > - 上游 plan：`docs/plan/OFFICIAL_CHANNEL_PRESET_PLAN.md`（本 plan 在其基础上演进）
 > - 定稿时间：2026-11-04
-> - 状态：`in-progress`
+> - 状态：`done`
 
 ---
 
@@ -43,8 +43,8 @@
 
 ## 5. 里程碑
 
-1. ⬜ REQ-009 后端：预置 `formats` + 目录刷新 + `from-preset` 扩展。
-2. ⬜ REQ-010 前端：统一添加入口 + 开启弹窗 + 编辑表单 `presetKey` + 模型页选择器调整。
+1. ✅ REQ-009 后端：预置 `formats` + 目录刷新 + `from-preset` 扩展。
+2. ✅ REQ-010 前端：统一添加入口 + 开启弹窗 + 编辑表单 `presetKey` + 模型页选择器调整。
 
 ## 6. 待决事项与风险
 
