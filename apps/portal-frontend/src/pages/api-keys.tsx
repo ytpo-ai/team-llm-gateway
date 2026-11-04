@@ -367,17 +367,23 @@ export function ApiKeysPage() {
                         {policySetName(key.policySetId)}
                       </td>
                       <td className="py-2 pr-4">
-                        <div>{formatExpiry(key.expiresAt)}</div>
-                        {key.expiresAt && (
-                          <div
-                            className={`text-xs ${
-                              new Date(key.expiresAt).getTime() <= now
-                                ? 'text-red-500'
-                                : 'text-muted-foreground'
-                            }`}
-                          >
-                            {countdownText(key.expiresAt, now)}
-                          </div>
+                        {key.status === 'active' ? (
+                          <>
+                            <div>{formatExpiry(key.expiresAt)}</div>
+                            {key.expiresAt && (
+                              <div
+                                className={`text-xs ${
+                                  new Date(key.expiresAt).getTime() <= now
+                                    ? 'text-red-500'
+                                    : 'text-muted-foreground'
+                                }`}
+                              >
+                                {countdownText(key.expiresAt, now)}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
                         )}
                       </td>
                       <td className="py-2 pr-4 text-muted-foreground">
