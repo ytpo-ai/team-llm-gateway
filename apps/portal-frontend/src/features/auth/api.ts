@@ -40,3 +40,13 @@ export function refresh(refreshToken: string): Promise<TokenPair> {
 export function getProfile(): Promise<User> {
   return request<User>('/auth/profile')
 }
+
+export function changePassword(input: {
+  oldPassword: string
+  newPassword: string
+}): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>('/auth/change-password', {
+    method: 'POST',
+    body: input,
+  })
+}

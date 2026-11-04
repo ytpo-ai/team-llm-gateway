@@ -19,6 +19,7 @@ export interface UpdateUserInput {
   status?: UserStatus;
   teamId?: Types.ObjectId;
   roleTemplateId?: Types.ObjectId | null;
+  passwordHash?: string | null;
 }
 
 @Injectable()

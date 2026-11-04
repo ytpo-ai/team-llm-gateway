@@ -116,6 +116,44 @@ describe('TeamsService', () => {
     });
   });
 
+  describe('listMembers', () => {
+    it('should exclude system admin from member list', async () => {
+      teamModel.findOne.mockReturnValue({ exec: vi.fn().mockResolvedValue(team) });
+      const systemId = new Types.ObjectId();
+      usersService.listByTeam.mockResolvedValue([
+        {
+          _id: userId,
+          tenantId,
+          teamId,
+          email: null,
+          name: '团队管理员',
+          role: Role.TEAM_ADMIN,
+          status: UserStatus.ACTIVE,
+          roleTemplateId: null,
+        },
+        {
+          _id: systemId,
+          tenantId,
+          teamId,
+          email: 'admin@example.com',
+          name: '系统管理员',
+          role: Role.SYSTEM,
+          status: UserStatus.ACTIVE,
+          roleTemplateId: null,
+        },
+      ]);
+
+      const result = await service.listMembers(
+        String(tenantId),
+        String(teamId),
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].role).toBe(Role.TEAM_ADMIN);
+      expect(result[0].id).toBe(String(userId));
+    });
+  });
+
   describe('createInvitation', () => {
     it('should create pending invitation and return a raw token', async () => {
       teamModel.findOne.mockReturnValue({ exec: vi.fn().mockResolvedValue(team) });

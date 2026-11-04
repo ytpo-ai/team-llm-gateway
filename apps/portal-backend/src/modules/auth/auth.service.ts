@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
@@ -13,6 +14,7 @@ import { TeamsService } from '../teams/teams.service.js';
 import { UserStatus, type UserDocument } from '../users/schemas/user.schema.js';
 import { UsersService } from '../users/users.service.js';
 import { AcceptInviteDto } from './dto/accept-invite.dto.js';
+import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RefreshTokenDto } from './dto/refresh-token.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
@@ -152,6 +154,23 @@ export class AuthService {
       throw new UnauthorizedException('用户不存在');
     }
     return this.toPublicUser(user);
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('用户不存在');
+    }
+    if (!user.passwordHash) {
+      throw new BadRequestException('该账号未设置密码，无法修改');
+    }
+    const valid = await bcrypt.compare(dto.oldPassword, user.passwordHash);
+    if (!valid) {
+      throw new UnauthorizedException('旧密码错误');
+    }
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    await this.usersService.updateById(userId, { passwordHash });
+    return { success: true };
   }
 
   private async resolveTeamId(

@@ -15,13 +15,24 @@ import {
   SlidersHorizontal,
   Sparkles,
   Sun,
+  User,
   Users,
   Wallet,
   type LucideIcon,
 } from 'lucide-react'
+import { useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useTheme } from '@/components/theme/theme-provider'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { ChangePasswordDialog } from '@/features/auth/components/change-password-dialog'
 import { useAuthStore } from '@/features/auth/store'
 import { cn } from '@/lib/utils'
 
@@ -42,6 +53,7 @@ export function AppLayout() {
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
   const navigate = useNavigate()
+  const [passwordOpen, setPasswordOpen] = useState(false)
 
   const handleLogout = () => {
     logout()
@@ -81,13 +93,13 @@ export function AppLayout() {
       ],
     },
     {
-      title: '系统设置',
+      title: '系统管理',
       items: [
         ...(isTeamManager
           ? [{ label: '系统设置', to: '/settings', icon: Settings }]
           : []),
         ...(isTeamManager
-          ? [{ label: '额度充值 / 调整', to: '/quota-topup', icon: CreditCard }]
+          ? [{ label: '额度管理', to: '/quota-topup', icon: CreditCard }]
           : []),
         ...(isSystem
           ? [{ label: '租户管理', to: '/admin/tenants', icon: Building2 }]
@@ -117,7 +129,7 @@ export function AppLayout() {
       <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-border bg-card">
         <div className="flex h-14 shrink-0 items-center border-b border-border px-4">
           <Link to="/" className="text-lg font-semibold tracking-tight">
-            Portal
+            LLM-Gateway
           </Link>
         </div>
         <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
@@ -161,19 +173,32 @@ export function AppLayout() {
             >
               {theme === 'dark' ? <Sun /> : <Moon />}
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleLogout}
-              aria-label="退出登录"
-            >
-              <LogOut />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="gap-2">
+                  <User className="h-4 w-4" />
+                  <span className="max-w-40 truncate">{user?.name}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>{user?.name}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setPasswordOpen(true)}>
+                  <KeyRound />
+                  修改密码
+                </DropdownMenuItem>
+                <DropdownMenuItem variant="destructive" onClick={handleLogout}>
+                  <LogOut />
+                  退出登录
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
         <main className="container mx-auto p-6">
           <Outlet />
         </main>
+        <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
       </div>
     </div>
   )

@@ -1,4 +1,8 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -246,6 +250,71 @@ describe('AuthService', () => {
 
       await expect(
         service.refresh({ refreshToken: 'invalid' }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('changePassword', () => {
+    it('should update password when old password is valid', async () => {
+      const oldPassword = 'old-password';
+      const newPassword = 'new-password';
+      usersService.findById.mockResolvedValue({
+        ...baseUser,
+        passwordHash: await bcrypt.hash(oldPassword, 4),
+      });
+      usersService.updateById.mockResolvedValue({});
+
+      const result = await service.changePassword(String(userId), {
+        oldPassword,
+        newPassword,
+      });
+
+      expect(result).toEqual({ success: true });
+      expect(usersService.updateById).toHaveBeenCalledWith(
+        String(userId),
+        expect.objectContaining({ passwordHash: expect.any(String) }),
+      );
+      const updatedHash = usersService.updateById.mock.calls[0][1].passwordHash;
+      expect(await bcrypt.compare(newPassword, updatedHash)).toBe(true);
+      expect(await bcrypt.compare(oldPassword, updatedHash)).toBe(false);
+    });
+
+    it('should throw UnauthorizedException for wrong old password', async () => {
+      usersService.findById.mockResolvedValue({
+        ...baseUser,
+        passwordHash: await bcrypt.hash('another-password', 4),
+      });
+
+      await expect(
+        service.changePassword(String(userId), {
+          oldPassword: 'old-password',
+          newPassword: 'new-password',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should throw BadRequestException when user has no password', async () => {
+      usersService.findById.mockResolvedValue({
+        ...baseUser,
+        passwordHash: null,
+      });
+
+      await expect(
+        service.changePassword(String(userId), {
+          oldPassword: 'old-password',
+          newPassword: 'new-password',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw UnauthorizedException when user not found', async () => {
+      usersService.findById.mockResolvedValue(null);
+
+      await expect(
+        service.changePassword(String(userId), {
+          oldPassword: 'old-password',
+          newPassword: 'new-password',
+        }),
       ).rejects.toThrow(UnauthorizedException);
     });
   });

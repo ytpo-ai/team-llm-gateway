@@ -122,7 +122,9 @@ export class TeamsService {
   async listMembers(tenantId: string, teamId: string) {
     await this.findTeamInTenant(tenantId, teamId);
     const users = await this.usersService.listByTeam(tenantId, teamId);
-    return users.map((user) => this.toMemberView(user));
+    return users
+      .filter((user) => user.role !== Role.SYSTEM)
+      .map((user) => this.toMemberView(user));
   }
 
   async createMember(
