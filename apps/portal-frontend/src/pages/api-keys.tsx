@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,6 +64,31 @@ import { ApiError } from '@/lib/http'
 function formatDate(value: string | null): string {
   if (!value) return '永久'
   return new Date(value).toLocaleDateString()
+}
+
+function pad(n: number): string {
+  return String(n).padStart(2, '0')
+}
+
+function formatExpiry(value: string | null): string {
+  if (!value) return '永久'
+  const d = new Date(value)
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function countdownText(value: string | null, now: number): string {
+  if (!value) return ''
+  const remaining = new Date(value).getTime() - now
+  if (remaining <= 0) return '已过期'
+  const totalMinutes = Math.floor(remaining / 60000)
+  const days = Math.floor(totalMinutes / (24 * 60))
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60)
+  const minutes = totalMinutes % 60
+  const parts: string[] = []
+  if (days > 0) parts.push(`${days}天`)
+  if (hours > 0) parts.push(`${hours}小时`)
+  if (minutes > 0) parts.push(`${minutes}分钟`)
+  return `剩 ${parts.length ? parts.join('') : '<1分钟'}`
 }
 
 type ExpiryUnit = 'hour' | 'day' | 'month' | 'never'
@@ -149,6 +174,12 @@ export function ApiKeysPage() {
   const [action, setAction] = useState<KeyAction>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30000)
+    return () => clearInterval(timer)
+  }, [])
 
   const keysQuery = useQuery({ queryKey: ['api-keys'], queryFn: () => listApiKeys() })
 
@@ -335,8 +366,19 @@ export function ApiKeysPage() {
                       <td className="py-2 pr-4 text-muted-foreground">
                         {policySetName(key.policySetId)}
                       </td>
-                      <td className="py-2 pr-4 text-muted-foreground">
-                        {formatDate(key.expiresAt)}
+                      <td className="py-2 pr-4">
+                        <div>{formatExpiry(key.expiresAt)}</div>
+                        {key.expiresAt && (
+                          <div
+                            className={`text-xs ${
+                              new Date(key.expiresAt).getTime() <= now
+                                ? 'text-red-500'
+                                : 'text-muted-foreground'
+                            }`}
+                          >
+                            {countdownText(key.expiresAt, now)}
+                          </div>
+                        )}
                       </td>
                       <td className="py-2 pr-4 text-muted-foreground">
                         {key.lastUsedAt ? formatDate(key.lastUsedAt) : '—'}
