@@ -141,7 +141,7 @@ export class BillingService {
     };
     if (user.role === Role.MEMBER) {
       filter.userId = new Types.ObjectId(user.id);
-    } else if (user.role === Role.TEAM_ADMIN) {
+    } else if (user.teamId) {
       filter.teamId = new Types.ObjectId(user.teamId);
     }
 
@@ -173,7 +173,7 @@ export class BillingService {
     };
     if (user.role === Role.MEMBER) {
       filter.userId = new Types.ObjectId(user.id);
-    } else if (user.role === Role.TEAM_ADMIN) {
+    } else if (user.teamId) {
       filter.teamId = new Types.ObjectId(user.teamId);
     }
     if (query.type) filter.type = query.type;

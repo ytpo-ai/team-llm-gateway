@@ -28,8 +28,6 @@ import type {
 } from '@/features/billing/types'
 import { getCurrency } from '@/features/system/api'
 import type { CurrencyConfig } from '@/features/system/types'
-import { listTeams } from '@/features/teams/api'
-import type { Team } from '@/features/teams/types'
 import { useAuthStore } from '@/features/auth/store'
 
 const fmtNum = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 })
@@ -164,21 +162,13 @@ export function BillingPage() {
     queryKey: ['system', 'currency'],
     queryFn: getCurrency,
   })
-  const teamsQuery = useQuery({
-    queryKey: ['teams'],
-    queryFn: listTeams,
-  })
 
   const isSystem = user?.role === 'system'
 
   const accounts: QuotaAccount[] = accountsQuery.data ?? []
-  const teams: Team[] = teamsQuery.data ?? []
   const teamAccounts = accounts.filter((a) => a.type === 'team')
   const memberAccounts = accounts.filter((a) => a.type === 'member')
-  const teamAccount =
-    teamAccounts.find((a) => a.teamId === user?.teamId) ?? teamAccounts[0]
   const currencyConfig = currencyQuery.data ?? null
-  const teamBalanceMap = new Map(teamAccounts.map((a) => [a.teamId, a]))
 
   const txAccountType =
     filter === 'team' ? 'team' : filter === 'all' ? undefined : 'member'
@@ -204,21 +194,13 @@ export function BillingPage() {
   const hasNext = offset + PAGE_SIZE < total
 
   // 余额卡片：团队 + 成员统一为一个 3 列网格，按筛选范围展示
-  const teamCards: BalanceCard[] = isSystem
-    ? teams.map((team) => ({
-        key: `team-${team.id}`,
-        description: `${team.name} · 团队额度余额`,
-        balance: teamBalanceMap.get(team.id)?.balance ?? 0,
-      }))
-    : teamAccount
-      ? [
-          {
-            key: `team-${teamAccount.id}`,
-            description: '团队额度余额',
-            balance: teamAccount.balance,
-          },
-        ]
-      : []
+  const teamCards: BalanceCard[] = teamAccounts.map((account) => ({
+    key: `team-${account.id}`,
+    description: account.teamName
+      ? `${account.teamName} · 团队额度余额`
+      : '团队额度余额',
+    balance: account.balance,
+  }))
 
   const visibleMemberAccounts =
     filter === 'all'

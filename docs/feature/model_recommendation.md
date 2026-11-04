@@ -22,6 +22,7 @@
 |------|------------|-------------|-----|
 | [MODEL_RECOMMENDATION](../plan/MODEL_RECOMMENDATION_PLAN.md) | [REQ-001 后端推荐引擎](../requirement/MODEL_RECOMMENDATION_REQ-001_BACKEND_RECOMMENDATION.md) | [开发记录](../development/MODEL_RECOMMENDATION_REQ-001_DEVELOPMENT.md) | — |
 | 同上 | [REQ-002 前端选型建议页](../requirement/MODEL_RECOMMENDATION_REQ-002_FRONTEND_RECOMMENDATION.md) | [开发记录](../development/MODEL_RECOMMENDATION_REQ-002_DEVELOPMENT.md) | — |
+| [TEAM_CONTEXT_SWITCH](../plan/TEAM_CONTEXT_SWITCH_PLAN.md) | [REQ-004 团队选择器与上下文切换](../requirement/TEAM_MEMBER_REQ-004_TEAM_SELECTOR.md) | [开发记录](../development/TEAM_MEMBER_REQ-004_DEVELOPMENT.md) | — |
 
 ## 3. 相关文档
 - 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（§8、D-02）、`docs/technical/db_schema/MODEL_PROVIDER_SCHEMA.MD`

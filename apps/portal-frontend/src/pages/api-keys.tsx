@@ -58,6 +58,7 @@ import { useAuthStore } from '@/features/auth/store'
 import { listPolicySets } from '@/features/policy-sets/api'
 import type { PolicySet } from '@/features/policy-sets/types'
 import { listMembers } from '@/features/teams/api'
+import { useTeamContextStore } from '@/features/teams/store'
 import type { Member } from '@/features/teams/types'
 import { ApiError } from '@/lib/http'
 
@@ -188,10 +189,11 @@ export function ApiKeysPage() {
     queryFn: listPolicySets,
   })
 
+  const selectedTeamId = useTeamContextStore((s) => s.selectedTeamId)
   const membersQuery = useQuery({
-    queryKey: ['team-members', user?.teamId],
-    queryFn: () => listMembers(user!.teamId!),
-    enabled: isTeamAdmin && Boolean(user?.teamId),
+    queryKey: ['team-members', selectedTeamId],
+    queryFn: () => listMembers(selectedTeamId!),
+    enabled: isTeamAdmin && Boolean(selectedTeamId),
   })
   const members: Member[] = membersQuery.data ?? []
   const policySets: PolicySet[] = policySetsQuery.data ?? []

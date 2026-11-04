@@ -26,6 +26,7 @@
 | 同上 | [REQ-002 后端转发层](../requirement/USAGE_METERING_REQ-002_BACKEND_PROXY.md) | [开发记录](../development/USAGE_METERING_REQ-002_DEVELOPMENT.md) | [listModels 排除僵尸模型](../issue/fix/2026-11-04-provider-disable-cascade.md) |
 | 同上 | [REQ-003 前端用量看板](../requirement/USAGE_METERING_REQ-003_FRONTEND_DASHBOARD.md) | [开发记录](../development/USAGE_METERING_REQ-003_DEVELOPMENT.md) | — |
 | [TEAM_MANAGEMENT_OPTIMIZATION](../plan/TEAM_MANAGEMENT_OPTIMIZATION_PLAN.md) | [REQ-003 系统管理员+菜单](../requirement/TEAM_MANAGEMENT_REQ-003_SYSTEM_ADMIN_MENU.md) | [开发记录](../development/TEAM_MANAGEMENT_REQ-003_DEVELOPMENT.md) | — |
+| [TEAM_CONTEXT_SWITCH](../plan/TEAM_CONTEXT_SWITCH_PLAN.md) | [REQ-004 团队选择器与上下文切换](../requirement/TEAM_MEMBER_REQ-004_TEAM_SELECTOR.md) | [开发记录](../development/TEAM_MEMBER_REQ-004_DEVELOPMENT.md) | — |
 
 ## 3. 相关文档
 - 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-06、§7.1、D-05）、`docs/technical/db_schema/USAGE_METERING_SCHEMA.MD`

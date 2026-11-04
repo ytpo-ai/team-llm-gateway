@@ -27,6 +27,7 @@
 | [API_KEY_MEMBER_BINDING](../plan/API_KEY_MEMBER_BINDING_PLAN.md) | [REQ-003 后端成员绑定与聚合](../requirement/API_KEY_REQ-003_BACKEND_MEMBER_BINDING.md) | [开发记录](../development/API_KEY_REQ-003_DEVELOPMENT.md) | — |
 | 同上 | [REQ-004 前端成员绑定与展示](../requirement/API_KEY_REQ-004_FRONTEND_MEMBER_BINDING.md) | [开发记录](../development/API_KEY_REQ-004_DEVELOPMENT.md) | — |
 | [BILLING_QUOTA_POLICY](../plan/BILLING_QUOTA_POLICY_PLAN.md) | [REQ-006 策略数据模型](../requirement/BILLING_QUOTA_REQ-006_POLICY_MODEL.md)、[REQ-008 策略管理 UI](../requirement/BILLING_QUOTA_REQ-008_POLICY_UI.md) | [REQ-006](../development/BILLING_QUOTA_REQ-006_DEVELOPMENT.md)、[REQ-008](../development/BILLING_QUOTA_REQ-008_DEVELOPMENT.md) | — |
+| [TEAM_CONTEXT_SWITCH](../plan/TEAM_CONTEXT_SWITCH_PLAN.md) | [REQ-004 团队选择器与上下文切换](../requirement/TEAM_MEMBER_REQ-004_TEAM_SELECTOR.md) | [开发记录](../development/TEAM_MEMBER_REQ-004_DEVELOPMENT.md) | — |
 
 ## 3. 相关文档
 - 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-06/09、§7.1）、`docs/technical/db_schema/API_KEY_SCHEMA.MD`

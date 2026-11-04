@@ -23,6 +23,7 @@
 | 同上 | [REQ-002 CRUD 页面迁移](../requirement/PORTAL_UI_REQ-002_CRUD_PAGE_MIGRATION.md) | [开发记录](../development/PORTAL_UI_REQ-002_DEVELOPMENT.md) | — |
 | 同上 | [REQ-003 日志页 select 统一与文档清理](../requirement/PORTAL_UI_REQ-003_LOG_SELECT_DOCS.md) | [开发记录](../development/PORTAL_UI_REQ-003_DEVELOPMENT.md) | — |
 | [SYSTEM_ADMIN_ACCOUNT_MENU](../plan/SYSTEM_ADMIN_ACCOUNT_MENU_PLAN.md) | [REQ-003 账号与菜单优化（用户菜单/分组改名）](../requirement/SYSTEM_ADMIN_REQ-003_ACCOUNT_MENU.md) | [开发记录](../development/SYSTEM_ADMIN_REQ-003_DEVELOPMENT.md) | — |
+| [TEAM_CONTEXT_SWITCH](../plan/TEAM_CONTEXT_SWITCH_PLAN.md) | [REQ-004 团队选择器与上下文切换（导航栏选择器）](../requirement/TEAM_MEMBER_REQ-004_TEAM_SELECTOR.md) | [开发记录](../development/TEAM_MEMBER_REQ-004_DEVELOPMENT.md) | — |
 
 ## 3. 相关文档
 - 规范：`docs/rules/UI.md`

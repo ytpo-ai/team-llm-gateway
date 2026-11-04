@@ -1,4 +1,5 @@
 import { useAuthStore } from '@/features/auth/store'
+import { useTeamContextStore } from '@/features/teams/store'
 
 const BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
@@ -44,7 +45,11 @@ async function doFetch<T>(
 ): Promise<T> {
   const headers = new Headers(options.headers)
   if (options.body !== undefined) headers.set('Content-Type', 'application/json')
-  if (token) headers.set('Authorization', `Bearer ${token}`)
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+    const selectedTeamId = useTeamContextStore.getState().selectedTeamId
+    if (selectedTeamId) headers.set('X-Team-Id', selectedTeamId)
+  }
 
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,

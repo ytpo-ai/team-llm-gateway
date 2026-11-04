@@ -342,6 +342,13 @@ export class TeamsService {
     };
   }
 
+  async findTeamInTenantOrNull(
+    tenantId: string,
+    teamId: string,
+  ): Promise<TeamDocument | null> {
+    return this.teamModel.findOne({ _id: teamId, tenantId }).exec();
+  }
+
   private async findTeamInTenant(
     tenantId: string,
     teamId: string,

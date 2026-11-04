@@ -215,7 +215,7 @@ describe('BillingService', () => {
       expect(filter.teamId).toEqual(teamId);
     });
 
-    it('should list accounts across all teams for system', async () => {
+    it('should list accounts for the selected team for system', async () => {
       quotaAccountModel.find.mockReturnValue({
         exec: vi.fn().mockResolvedValue([makeAccount()]),
       });
@@ -229,7 +229,7 @@ describe('BillingService', () => {
 
       const filter = quotaAccountModel.find.mock.calls[0][0];
       expect(filter.userId).toBeUndefined();
-      expect(filter.teamId).toBeUndefined();
+      expect(filter.teamId).toEqual(teamId);
     });
   });
 
@@ -300,7 +300,7 @@ describe('BillingService', () => {
       expect(filter.teamId).toEqual(teamId);
     });
 
-    it('should list transactions across all teams for system', async () => {
+    it('should list transactions for the selected team for system', async () => {
       mockTransactionFind([]);
       mockLabelAndTeamLookup();
 
@@ -308,7 +308,7 @@ describe('BillingService', () => {
 
       const filter = quotaTransactionModel.find.mock.calls[0][0];
       expect(filter.userId).toBeUndefined();
-      expect(filter.teamId).toBeUndefined();
+      expect(filter.teamId).toEqual(teamId);
     });
 
     it('should enrich member transactions with label and team name', async () => {

@@ -20,7 +20,8 @@ import {
   Wallet,
   type LucideIcon,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useTheme } from '@/components/theme/theme-provider'
 import { Button } from '@/components/ui/button'
@@ -32,8 +33,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { ChangePasswordDialog } from '@/features/auth/components/change-password-dialog'
 import { useAuthStore } from '@/features/auth/store'
+import { listTeams } from '@/features/teams/api'
+import { useTeamContextStore } from '@/features/teams/store'
 import { cn } from '@/lib/utils'
 
 interface NavItem {
@@ -55,6 +65,12 @@ export function AppLayout() {
   const navigate = useNavigate()
   const [passwordOpen, setPasswordOpen] = useState(false)
 
+  const queryClient = useQueryClient()
+  const selectedTeamId = useTeamContextStore((s) => s.selectedTeamId)
+  const setSelectedTeamId = useTeamContextStore((s) => s.setSelectedTeamId)
+  const teamsQuery = useQuery({ queryKey: ['teams'], queryFn: listTeams })
+  const teams = teamsQuery.data ?? []
+
   const handleLogout = () => {
     logout()
     navigate('/login', { replace: true })
@@ -71,6 +87,29 @@ export function AppLayout() {
   const isTeamManager =
     user?.role === 'team_admin' || user?.role === 'system'
   const isSystem = user?.role === 'system'
+
+  // 默认选中团队：system 默认最先创建的团队（listTeams 已按 createdAt 升序）并支持切换；非 system 固定为本人团队
+  useEffect(() => {
+    const data = teamsQuery.data ?? []
+    if (data.length === 0) return
+    const target = isSystem
+      ? data.some((t) => t.id === selectedTeamId)
+        ? selectedTeamId
+        : data[0].id
+      : (user?.teamId ?? data[0].id)
+    if (selectedTeamId !== target) {
+      setSelectedTeamId(target)
+    }
+  }, [teamsQuery.data, selectedTeamId, isSystem, user?.teamId, setSelectedTeamId])
+
+  const showTeamSelector = isSystem && teams.length > 1
+
+  const handleTeamChange = (id: string) => {
+    if (id !== selectedTeamId) {
+      setSelectedTeamId(id)
+      queryClient.invalidateQueries()
+    }
+  }
 
   const sections: NavSection[] = [
     {
@@ -165,6 +204,23 @@ export function AppLayout() {
       <div className="pl-64">
         <header className="sticky top-0 z-50 flex h-14 items-center justify-end border-b border-border px-6">
           <div className="flex items-center gap-2">
+            {showTeamSelector && (
+              <Select
+                value={selectedTeamId ?? ''}
+                onValueChange={handleTeamChange}
+              >
+                <SelectTrigger className="w-44" aria-label="选择团队">
+                  <SelectValue placeholder="选择团队" />
+                </SelectTrigger>
+                <SelectContent>
+                  {teams.map((team) => (
+                    <SelectItem key={team.id} value={team.id}>
+                      {team.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Button
               variant="ghost"
               size="icon"

@@ -47,6 +47,7 @@ import {
   updateMember,
   updateTeam,
 } from '@/features/teams/api'
+import { useTeamContextStore } from '@/features/teams/store'
 import {
   ASSIGNABLE_ROLES,
   ROLE_LABELS,
@@ -97,8 +98,10 @@ export function TeamPage() {
   const [limitsOpen, setLimitsOpen] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<Member | null>(null)
 
+  const selectedTeamId = useTeamContextStore((s) => s.selectedTeamId)
   const teamsQuery = useQuery({ queryKey: ['teams'], queryFn: listTeams })
-  const team = teamsQuery.data?.[0]
+  const teams = teamsQuery.data ?? []
+  const team = teams.find((t) => t.id === selectedTeamId) ?? teams[0]
 
   const membersQuery = useQuery({
     queryKey: ['members', team?.id],
