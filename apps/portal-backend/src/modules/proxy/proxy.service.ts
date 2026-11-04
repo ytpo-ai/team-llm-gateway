@@ -454,6 +454,7 @@ export class ProxyService {
         userId: ctx.userId,
         cost: prepared.multiplier * totalTokens,
         referenceId: prepared.requestId,
+        totalTokens,
       });
     }
   }

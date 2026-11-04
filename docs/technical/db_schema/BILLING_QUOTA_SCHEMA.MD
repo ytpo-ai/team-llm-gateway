@@ -48,6 +48,7 @@
 | `shortfall` | boolean | 可选、默认 `false` | 扣减是否因余额不足被截断 |
 | `referenceId` | string | 可选 | 关联标识（`requestId` / 充值单号） |
 | `description` | string | 可选 | 备注 |
+| `totalTokens` | number | 可选、默认 `null` | 本次用量 Token 数（仅 `deduction`/`usage` 流水写入；充值/调整为 `null`） |
 | `createdAt` | Date | 自动 | 创建时间 |
 
 **索引**：

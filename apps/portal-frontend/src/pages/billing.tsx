@@ -112,6 +112,11 @@ function TransactionTable({
                 }`}
               >
                 {fmtAmount(item.amount)}
+                {item.totalTokens != null && item.totalTokens > 0 && (
+                  <span className="block text-xs text-muted-foreground">
+                    {fmtNum.format(item.totalTokens)} Token
+                  </span>
+                )}
                 {amountCurrency && (
                   <span className="block text-xs text-muted-foreground">
                     {amountCurrency}

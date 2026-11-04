@@ -29,6 +29,7 @@ export interface QuotaTransaction {
   shortfall: boolean
   referenceId: string | null
   description: string | null
+  totalTokens: number | null
   createdAt?: string
 }
 

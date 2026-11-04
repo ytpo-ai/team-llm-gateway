@@ -81,6 +81,9 @@ export class QuotaTransaction {
   @Prop({ type: String, default: null })
   description: string | null;
 
+  @Prop({ type: Number, default: null })
+  totalTokens: number | null;
+
   createdAt?: Date;
   updatedAt?: Date;
 }

@@ -247,6 +247,7 @@ describe('BillingService', () => {
       shortfall: false,
       referenceId: null,
       description: null,
+      totalTokens: null,
       createdAt: new Date(),
       ...overrides,
     });
@@ -342,6 +343,18 @@ describe('BillingService', () => {
       expect(result.items[0].teamName).toBe('Team A');
     });
 
+    it('should map totalTokens from deduction transactions', async () => {
+      mockTransactionFind([makeTx({ totalTokens: 9876 })]);
+      mockLabelAndTeamLookup();
+
+      const result = await service.listTransactions(
+        makeUser({ role: Role.TEAM_ADMIN }),
+        {},
+      );
+
+      expect(result.items[0].totalTokens).toBe(9876);
+    });
+
     it('should filter by accountType and userId when provided', async () => {
       mockTransactionFind([]);
       mockLabelAndTeamLookup();
@@ -381,6 +394,7 @@ describe('BillingService', () => {
         type: QuotaTransactionType.DEDUCTION,
         source: QuotaTransactionSource.USAGE,
         shortfall: false,
+        totalTokens: 1234,
       });
 
       const result = await service.deduct({
@@ -388,10 +402,13 @@ describe('BillingService', () => {
         teamId: String(teamId),
         userId: String(userId),
         cost: 100,
+        totalTokens: 1234,
       });
 
       expect(result.amount).toBe(-100);
       expect(result.accountType).toBe(QuotaAccountType.MEMBER);
+      expect(result.totalTokens).toBe(1234);
+      expect(quotaTransactionModel.create.mock.calls[0][0].totalTokens).toBe(1234);
     });
 
     it('should fall back to team account when member has no account', async () => {

@@ -50,6 +50,7 @@ export interface QuotaTransactionView {
   shortfall: boolean;
   referenceId: string | null;
   description: string | null;
+  totalTokens: number | null;
   createdAt?: Date;
 }
 
@@ -67,6 +68,7 @@ export interface DeductInput {
   cost: number;
   referenceId?: string;
   description?: string;
+  totalTokens?: number;
 }
 
 const DEFAULT_TRANSACTION_LIMIT = 20;
@@ -223,6 +225,7 @@ export class BillingService {
       shortfall: row.shortfall,
       referenceId: row.referenceId,
       description: row.description,
+      totalTokens: row.totalTokens ?? null,
       createdAt: row.createdAt,
     }));
 
@@ -276,6 +279,7 @@ export class BillingService {
       shortfall: deducted < cost,
       referenceId: input.referenceId ?? null,
       description: input.description ?? null,
+      totalTokens: input.totalTokens ?? null,
     });
 
     return {
@@ -292,6 +296,7 @@ export class BillingService {
       shortfall: doc.shortfall,
       referenceId: doc.referenceId,
       description: doc.description,
+      totalTokens: doc.totalTokens ?? null,
       createdAt: doc.createdAt,
     };
   }
