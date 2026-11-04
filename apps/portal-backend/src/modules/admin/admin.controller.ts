@@ -33,6 +33,12 @@ export class AdminController {
     return this.adminService.listTenants(query);
   }
 
+  @Get('teams')
+  @ApiOperation({ summary: '全部团队列表（system，跨租户）' })
+  listTeams() {
+    return this.adminService.listAllTeams();
+  }
+
   @Post('tenants')
   @ApiOperation({ summary: '创建租户（system，含默认团队）' })
   createTenant(@Body() dto: CreateTenantDto) {

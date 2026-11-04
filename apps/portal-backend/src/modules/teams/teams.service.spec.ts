@@ -118,7 +118,7 @@ describe('TeamsService', () => {
 
   describe('listMembers', () => {
     it('should exclude system admin from member list', async () => {
-      teamModel.findOne.mockReturnValue({ exec: vi.fn().mockResolvedValue(team) });
+      teamModel.findById.mockReturnValue({ exec: vi.fn().mockResolvedValue(team) });
       const systemId = new Types.ObjectId();
       usersService.listByTeam.mockResolvedValue([
         {
@@ -144,13 +144,59 @@ describe('TeamsService', () => {
       ]);
 
       const result = await service.listMembers(
-        String(tenantId),
+        {
+          id: 'u1',
+          email: 'a@b.com',
+          tenantId: String(tenantId),
+          teamId: String(teamId),
+          role: Role.TEAM_ADMIN,
+        },
         String(teamId),
       );
 
       expect(result).toHaveLength(1);
       expect(result[0].role).toBe(Role.TEAM_ADMIN);
       expect(result[0].id).toBe(String(userId));
+    });
+
+    it('should allow system to list members of another tenant team', async () => {
+      const otherTenantId = new Types.ObjectId();
+      const otherTeamId = new Types.ObjectId();
+      teamModel.findById.mockReturnValue({
+        exec: vi.fn().mockResolvedValue({
+          _id: otherTeamId,
+          tenantId: otherTenantId,
+        }),
+      });
+      usersService.listByTeam.mockResolvedValue([
+        {
+          _id: userId,
+          tenantId: otherTenantId,
+          teamId: otherTeamId,
+          email: null,
+          name: '成员',
+          role: Role.MEMBER,
+          status: UserStatus.ACTIVE,
+          roleTemplateId: null,
+        },
+      ]);
+
+      const result = await service.listMembers(
+        {
+          id: 'sys1',
+          email: 'a@b.com',
+          tenantId: String(tenantId),
+          teamId: String(teamId),
+          role: Role.SYSTEM,
+        },
+        String(otherTeamId),
+      );
+
+      expect(usersService.listByTeam).toHaveBeenCalledWith(
+        String(otherTenantId),
+        String(otherTeamId),
+      );
+      expect(result).toHaveLength(1);
     });
   });
 

@@ -18,6 +18,13 @@ export interface TenantPage {
   offset: number
 }
 
+export interface AdminTeam {
+  id: string
+  name: string
+  tenantId: string
+  status: string
+}
+
 export interface AdminOverview {
   from: string
   to: string

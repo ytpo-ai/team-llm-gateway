@@ -38,6 +38,7 @@ describe('BillingService', () => {
   const teamModel = {
     findOne: vi.fn(),
     find: vi.fn(),
+    findById: vi.fn(),
   };
 
   const makeUser = (overrides: Partial<AuthUser> = {}): AuthUser => ({
@@ -80,6 +81,9 @@ describe('BillingService', () => {
   describe('recharge', () => {
     it('should deposit into team account and record a transaction', async () => {
       const account = makeAccount();
+      teamModel.findById.mockReturnValue({
+        exec: vi.fn().mockResolvedValue({ _id: teamId, tenantId }),
+      });
       quotaAccountModel.findOne.mockReturnValue({
         exec: vi.fn().mockResolvedValue(account),
       });
@@ -116,7 +120,7 @@ describe('BillingService', () => {
     it('should let system recharge another team account', async () => {
       const otherTeamId = new Types.ObjectId();
       const account = makeAccount({ teamId: otherTeamId });
-      teamModel.findOne.mockReturnValue({
+      teamModel.findById.mockReturnValue({
         exec: vi.fn().mockResolvedValue({ _id: otherTeamId, tenantId }),
       });
       quotaAccountModel.findOne.mockReturnValue({
@@ -157,6 +161,9 @@ describe('BillingService', () => {
   describe('adjust', () => {
     it('should clamp balance to zero on negative adjustment', async () => {
       const account = makeAccount({ balance: 100 });
+      teamModel.findById.mockReturnValue({
+        exec: vi.fn().mockResolvedValue({ _id: teamId, tenantId }),
+      });
       quotaAccountModel.findOne.mockReturnValue({
         exec: vi.fn().mockResolvedValue(account),
       });

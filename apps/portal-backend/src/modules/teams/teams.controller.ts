@@ -71,10 +71,10 @@ export class TeamsController {
   @Get(':teamId/members')
   @ApiOperation({ summary: '成员列表' })
   members(
-    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser() user: AuthUser,
     @Param('teamId') teamId: string,
   ) {
-    return this.teamsService.listMembers(tenantId, teamId);
+    return this.teamsService.listMembers(user, teamId);
   }
 
   @Post(':teamId/members')

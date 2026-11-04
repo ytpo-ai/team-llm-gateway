@@ -16,10 +16,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { listAllTeams } from '@/features/admin/api'
 import { adjustQuota, rechargeQuota } from '@/features/billing/api'
 import { useAuthStore } from '@/features/auth/store'
 import { listMembers, listTeams } from '@/features/teams/api'
-import type { Member, Team } from '@/features/teams/types'
+import type { Member } from '@/features/teams/types'
 
 // 充值单位：百万点数，1 百万点数 = 100 万点
 const POINTS_PER_MILLION = 1_000_000
@@ -48,13 +49,13 @@ export function QuotaTopupPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const teamsQuery = useQuery({
-    queryKey: ['teams'],
-    queryFn: listTeams,
-  })
-
-  const teams: Team[] = teamsQuery.data ?? []
   const isSystem = user?.role === 'system'
+
+  const teamsQuery = useQuery({
+    queryKey: isSystem ? ['admin', 'teams'] : ['teams'],
+    queryFn: () => (isSystem ? listAllTeams() : listTeams()),
+  })
+  const teams = teamsQuery.data ?? []
 
   // 缺省团队：优先当前用户所在团队，其次首个团队
   const defaultTeamId =

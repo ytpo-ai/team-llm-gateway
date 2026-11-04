@@ -7,7 +7,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Role } from '../../common/enums/role.enum.js';
 import { ApiKey } from '../api-keys/schemas/api-key.schema.js';
-import { Team } from '../teams/schemas/team.schema.js';
+import { Team, TeamStatus } from '../teams/schemas/team.schema.js';
 import { DEFAULT_TEAM_NAME } from '../teams/teams.service.js';
 import {
   Tenant,
@@ -104,6 +104,18 @@ export class AdminService {
     const tenant = await this.findTenant(id);
     const view = await this.toTenantView(tenant);
     return { ...view, config: tenant.config ?? {} };
+  }
+
+  async listAllTeams(): Promise<
+    { id: string; name: string; tenantId: string; status: TeamStatus }[]
+  > {
+    const teams = await this.teamModel.find({}).sort({ createdAt: 1 }).exec();
+    return teams.map((team) => ({
+      id: String(team._id),
+      name: team.name,
+      tenantId: String(team.tenantId),
+      status: team.status,
+    }));
   }
 
   async createTenant(code: string, name: string): Promise<TenantView> {

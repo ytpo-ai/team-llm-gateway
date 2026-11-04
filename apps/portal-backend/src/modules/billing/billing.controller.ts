@@ -61,8 +61,8 @@ export class BillingController {
   ) {
     const result = await this.billingService.recharge(user, dto);
     await this.auditService.log({
-      tenantId: user.tenantId,
-      teamId: user.teamId,
+      tenantId: result.tenantId,
+      teamId: result.teamId,
       actorUserId: user.id,
       action: AuditAction.RECHARGE,
       resourceType: AuditResourceType.BILLING,
@@ -86,8 +86,8 @@ export class BillingController {
   ) {
     const result = await this.billingService.adjust(user, dto);
     await this.auditService.log({
-      tenantId: user.tenantId,
-      teamId: user.teamId,
+      tenantId: result.tenantId,
+      teamId: result.teamId,
       actorUserId: user.id,
       action: AuditAction.ADJUST,
       resourceType: AuditResourceType.BILLING,

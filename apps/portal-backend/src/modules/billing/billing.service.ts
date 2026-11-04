@@ -27,6 +27,7 @@ import {
 export interface QuotaAccountView {
   id: string;
   type: QuotaAccountType;
+  tenantId: string;
   teamId: string;
   teamName: string | null;
   userId: string | null;
@@ -85,15 +86,11 @@ export class BillingService {
   ) {}
 
   async recharge(user: AuthUser, dto: RechargeQuotaDto): Promise<QuotaAccountView> {
-    const teamId = await this.resolveTargetTeamId(user, dto.teamId);
-    const account = await this.resolveTargetAccount(
-      user.tenantId,
-      teamId,
-      dto.userId,
-    );
+    const { teamId, tenantId } = await this.resolveTargetTeam(user, dto.teamId);
+    const account = await this.resolveTargetAccount(tenantId, teamId, dto.userId);
     const updated = await this.applyDelta(account, dto.amount);
     await this.quotaTransactionModel.create({
-      tenantId: new Types.ObjectId(user.tenantId),
+      tenantId: new Types.ObjectId(tenantId),
       teamId: new Types.ObjectId(teamId),
       userId: account.userId,
       accountId: account._id,
@@ -110,15 +107,11 @@ export class BillingService {
   }
 
   async adjust(user: AuthUser, dto: AdjustQuotaDto): Promise<QuotaAccountView> {
-    const teamId = await this.resolveTargetTeamId(user, dto.teamId);
-    const account = await this.resolveTargetAccount(
-      user.tenantId,
-      teamId,
-      dto.userId,
-    );
+    const { teamId, tenantId } = await this.resolveTargetTeam(user, dto.teamId);
+    const account = await this.resolveTargetAccount(tenantId, teamId, dto.userId);
     const updated = await this.applyDelta(account, dto.amount);
     await this.quotaTransactionModel.create({
-      tenantId: new Types.ObjectId(user.tenantId),
+      tenantId: new Types.ObjectId(tenantId),
       teamId: new Types.ObjectId(teamId),
       userId: account.userId,
       accountId: account._id,
@@ -311,23 +304,21 @@ export class BillingService {
       : this.getOrCreateTeamAccount(tenantId, teamId);
   }
 
-  private async resolveTargetTeamId(
+  private async resolveTargetTeam(
     user: AuthUser,
     requestedTeamId?: string,
-  ): Promise<string> {
-    if (!requestedTeamId || requestedTeamId === user.teamId) {
-      return user.teamId;
-    }
-    if (user.role !== Role.SYSTEM) {
+  ): Promise<{ teamId: string; tenantId: string }> {
+    let teamId = requestedTeamId;
+    if (!teamId || teamId === user.teamId) {
+      teamId = user.teamId;
+    } else if (user.role !== Role.SYSTEM) {
       throw new ForbiddenException('无权操作其他团队的额度');
     }
-    const team = await this.teamModel
-      .findOne({ _id: requestedTeamId, tenantId: user.tenantId })
-      .exec();
+    const team = await this.teamModel.findById(teamId).exec();
     if (!team) {
       throw new NotFoundException('团队不存在');
     }
-    return requestedTeamId;
+    return { teamId: String(team._id), tenantId: String(team.tenantId) };
   }
 
   private async resolveSpendableAccount(
@@ -445,6 +436,7 @@ export class BillingService {
     return {
       id: String(account._id),
       type: account.type,
+      tenantId: String(account.tenantId),
       teamId: String(account.teamId),
       teamName,
       userId: account.userId ? String(account.userId) : null,

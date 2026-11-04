@@ -9,6 +9,7 @@ import * as bcrypt from 'bcryptjs';
 import { createHash, randomBytes } from 'node:crypto';
 import { Model, Types } from 'mongoose';
 import { Role } from '../../common/enums/role.enum.js';
+import type { AuthUser } from '../auth/decorators/current-user.decorator.js';
 import {
   UserDocument,
   UserStatus,
@@ -119,12 +120,19 @@ export class TeamsService {
     return this.toTeamView(team);
   }
 
-  async listMembers(tenantId: string, teamId: string) {
-    await this.findTeamInTenant(tenantId, teamId);
+  async listMembers(user: AuthUser, teamId: string) {
+    const team = await this.teamModel.findById(teamId).exec();
+    if (!team) {
+      throw new NotFoundException('团队不存在');
+    }
+    if (user.role !== Role.SYSTEM && String(team.tenantId) !== user.tenantId) {
+      throw new NotFoundException('团队不存在');
+    }
+    const tenantId = String(team.tenantId);
     const users = await this.usersService.listByTeam(tenantId, teamId);
     return users
-      .filter((user) => user.role !== Role.SYSTEM)
-      .map((user) => this.toMemberView(user));
+      .filter((member) => member.role !== Role.SYSTEM)
+      .map((member) => this.toMemberView(member));
   }
 
   async createMember(

@@ -1,6 +1,7 @@
 import { request } from '@/lib/http'
 import type {
   AdminOverview,
+  AdminTeam,
   Tenant,
   TenantPage,
   TenantStatus,
@@ -45,6 +46,10 @@ export function updateTenantStatus(
 
 export function getOverview(): Promise<AdminOverview> {
   return request<AdminOverview>('/admin/overview')
+}
+
+export function listAllTeams(): Promise<AdminTeam[]> {
+  return request<AdminTeam[]>('/admin/teams')
 }
 
 export function getUsageBreakdown(): Promise<TenantUsageBreakdown> {
