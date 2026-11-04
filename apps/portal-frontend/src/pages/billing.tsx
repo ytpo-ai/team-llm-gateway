@@ -37,8 +37,8 @@ import type {
 } from '@/features/billing/types'
 import { getCurrency } from '@/features/system/api'
 import type { CurrencyConfig } from '@/features/system/types'
-import { listTeams } from '@/features/teams/api'
-import type { Team } from '@/features/teams/types'
+import { listMembers, listTeams } from '@/features/teams/api'
+import type { Member, Team } from '@/features/teams/types'
 import { useAuthStore } from '@/features/auth/store'
 
 const fmtNum = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 })
@@ -152,7 +152,7 @@ const emptyForm: TopupFormState = {
   mode: 'recharge',
   amount: '',
   teamId: '',
-  target: '',
+  target: 'team',
   description: '',
 }
 
@@ -180,6 +180,11 @@ export function BillingPage() {
   const teamsQuery = useQuery({
     queryKey: ['teams'],
     queryFn: listTeams,
+  })
+  const membersQuery = useQuery({
+    queryKey: ['team-members', form.teamId],
+    queryFn: () => listMembers(form.teamId),
+    enabled: Boolean(form.teamId),
   })
 
   const canManage = user?.role === 'team_admin' || user?.role === 'system'
@@ -211,15 +216,14 @@ export function BillingPage() {
 
   const accounts: QuotaAccount[] = accountsQuery.data ?? []
   const teams: Team[] = teamsQuery.data ?? []
+  const members: Member[] = membersQuery.data ?? []
   const teamAccounts = accounts.filter((a) => a.type === 'team')
   const memberAccounts = accounts.filter((a) => a.type === 'member')
   const teamAccount =
     teamAccounts.find((a) => a.teamId === user?.teamId) ?? teamAccounts[0]
   const currencyConfig = currencyQuery.data ?? null
   const teamBalanceMap = new Map(teamAccounts.map((a) => [a.teamId, a]))
-  const selectedTeamMemberAccounts = memberAccounts.filter(
-    (a) => a.teamId === form.teamId,
-  )
+  const memberOptions = members.filter((m) => m.role === 'member')
 
   const openTopup = () => {
     const defaultTeamId =
@@ -244,7 +248,7 @@ export function BillingPage() {
     const payload = {
       amount,
       teamId: form.teamId || undefined,
-      userId: form.target || undefined,
+      userId: form.target === 'team' ? undefined : form.target,
       description: form.description || undefined,
     }
     if (form.mode === 'recharge') {
@@ -385,7 +389,7 @@ export function BillingPage() {
                   <Select
                     value={form.teamId}
                     onValueChange={(v) =>
-                      setForm((f) => ({ ...f, teamId: v, target: '' }))
+                      setForm((f) => ({ ...f, teamId: v, target: 'team' }))
                     }
                   >
                     <SelectTrigger>
@@ -413,10 +417,10 @@ export function BillingPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">团队账户</SelectItem>
-                    {selectedTeamMemberAccounts.map((a) => (
-                      <SelectItem key={a.id} value={a.userId ?? ''}>
-                        {a.label ?? a.userId}
+                    <SelectItem value="team">团队账户</SelectItem>
+                    {memberOptions.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
