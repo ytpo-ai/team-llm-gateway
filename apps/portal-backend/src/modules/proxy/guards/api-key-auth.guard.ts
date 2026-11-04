@@ -20,12 +20,15 @@ export class ApiKeyAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
     const authorization = request.headers.authorization;
+    const xApiKey = request.headers['x-api-key'];
 
-    if (!authorization?.startsWith('Bearer ')) {
-      throw new UnauthorizedException('缺少 API Key');
+    let key = '';
+    if (authorization?.startsWith('Bearer ')) {
+      key = authorization.slice('Bearer '.length).trim();
+    } else if (typeof xApiKey === 'string' && xApiKey.trim()) {
+      key = xApiKey.trim();
     }
 
-    const key = authorization.slice('Bearer '.length).trim();
     if (!key) {
       throw new UnauthorizedException('缺少 API Key');
     }

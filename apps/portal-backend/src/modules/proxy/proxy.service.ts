@@ -30,6 +30,13 @@ import { ConcurrencyService } from './concurrency.service.js';
 import { RateLimitService } from './rate-limit.service.js';
 import { resolveAdapter } from './adapters/adapter.factory.js';
 import {
+  anthropicError,
+  anthropicToOpenAI,
+  OpenAIAnthropicStreamTransformer,
+  openAIToAnthropic,
+} from './adapters/anthropic-protocol.js';
+import {
+  asString,
   parseJsonObject,
   type AdapterRequest,
   type UpstreamAdapter,
@@ -70,11 +77,22 @@ export class ProxyService {
   ) {}
 
   async listModels(ctx: ApiKeyContext) {
+    const activeProviders = await this.providerModel
+      .find({
+        tenantId: ctx.tenantId,
+        teamId: ctx.teamId,
+        status: ProviderStatus.ACTIVE,
+      })
+      .select('_id')
+      .exec();
+    const activeProviderIds = activeProviders.map((p) => p._id);
+
     const models = await this.modelModel
       .find({
         tenantId: ctx.tenantId,
         teamId: ctx.teamId,
         status: ModelStatus.ACTIVE,
+        providerId: { $in: activeProviderIds },
       })
       .sort({ createdAt: -1 })
       .exec();
@@ -168,6 +186,97 @@ export class ProxyService {
     } finally {
       res.end();
       await this.recordUsage(ctx, prepared, transformer.getUsage());
+      prepared.releaseConcurrency();
+    }
+  }
+
+  async messages(
+    ctx: ApiKeyContext,
+    body: Record<string, unknown>,
+    res: ExpressResponse,
+  ): Promise<unknown> {
+    const prepared = await this.prepare(ctx, anthropicToOpenAI(body));
+
+    try {
+      const upstreamRes = await this.requestUpstream(prepared);
+      const text = await upstreamRes.text();
+
+      if (upstreamRes.ok) {
+        const openaiJson = prepared.adapter.parseResponse(text, prepared.modelId);
+        await this.recordUsage(
+          ctx,
+          prepared,
+          (openaiJson as { usage?: UpstreamUsage }).usage,
+        );
+        res.status(upstreamRes.status);
+        return openAIToAnthropic(openaiJson, prepared.modelId);
+      }
+
+      await this.recordError(ctx, prepared, upstreamRes.status);
+      res.status(upstreamRes.status);
+      const detail = parseJsonObject(text) ?? {};
+      return anthropicError(
+        asString((detail as Record<string, unknown>).message, text),
+      );
+    } finally {
+      prepared.releaseConcurrency();
+    }
+  }
+
+  async streamMessages(
+    ctx: ApiKeyContext,
+    body: Record<string, unknown>,
+    res: ExpressResponse,
+  ): Promise<void> {
+    const prepared = await this.prepare(ctx, anthropicToOpenAI(body));
+
+    const upstreamRes = await this.requestUpstream(prepared);
+    if (!upstreamRes.ok || !upstreamRes.body) {
+      const text = await upstreamRes.text();
+      await this.recordError(ctx, prepared, upstreamRes.status);
+      prepared.releaseConcurrency();
+      const detail = parseJsonObject(text) ?? {};
+      res
+        .status(upstreamRes.status)
+        .json(
+          anthropicError(
+            asString((detail as Record<string, unknown>).message, text),
+          ),
+        );
+      return;
+    }
+
+    res.status(200);
+    res.setHeader('content-type', 'text/event-stream');
+    res.setHeader('cache-control', 'no-cache');
+    res.setHeader('connection', 'keep-alive');
+
+    const openaiTransformer = prepared.adapter.createStreamTransformer();
+    const anthropicTransformer = new OpenAIAnthropicStreamTransformer();
+    const reader = upstreamRes.body.getReader();
+    const decoder = new TextDecoder();
+
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        const openaiSse = openaiTransformer.push(chunk);
+        if (openaiSse) {
+          const anthropicSse = anthropicTransformer.push(openaiSse);
+          if (anthropicSse) res.write(anthropicSse);
+        }
+      }
+      const openaiTail = openaiTransformer.finish();
+      if (openaiTail) {
+        const anthropicSse = anthropicTransformer.push(openaiTail);
+        if (anthropicSse) res.write(anthropicSse);
+      }
+      const anthropicTail = anthropicTransformer.finish();
+      if (anthropicTail) res.write(anthropicTail);
+    } finally {
+      res.end();
+      await this.recordUsage(ctx, prepared, openaiTransformer.getUsage());
       prepared.releaseConcurrency();
     }
   }

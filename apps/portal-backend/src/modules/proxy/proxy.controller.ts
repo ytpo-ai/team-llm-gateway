@@ -38,4 +38,18 @@ export class ProxyController {
     }
     return this.proxyService.chatCompletions(ctx, body, res);
   }
+
+  @Post('messages')
+  @ApiOperation({ summary: 'Anthropic 兼容 Messages 转发（支持 SSE 流式）' })
+  async messages(
+    @ApiKeyContextParam() ctx: ApiKeyContext,
+    @Body() body: Record<string, unknown>,
+    @Res({ passthrough: true }) res: ExpressResponse,
+  ) {
+    if (body.stream) {
+      await this.proxyService.streamMessages(ctx, body, res);
+      return undefined;
+    }
+    return this.proxyService.messages(ctx, body, res);
+  }
 }
