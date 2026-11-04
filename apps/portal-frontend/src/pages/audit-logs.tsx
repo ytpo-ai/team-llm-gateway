@@ -25,6 +25,8 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   create: '创建',
   update: '更新',
   disable: '禁用',
+  enable: '启用',
+  delete: '删除',
   revoke: '吊销',
   rotate: '轮换',
   recharge: '充值',

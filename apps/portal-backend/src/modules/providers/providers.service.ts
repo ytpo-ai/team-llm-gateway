@@ -166,7 +166,7 @@ export class ProvidersService {
     return this.toView(provider);
   }
 
-  async remove(
+  async disable(
     tenantId: string,
     teamId: string,
     id: string,
@@ -179,6 +179,37 @@ export class ProvidersService {
       teamId,
       String(provider._id),
     );
+    return this.toView(provider);
+  }
+
+  async enable(
+    tenantId: string,
+    teamId: string,
+    id: string,
+  ): Promise<ProviderView> {
+    const provider = await this.findInTeam(tenantId, teamId, id);
+    provider.status = ProviderStatus.ACTIVE;
+    await provider.save();
+    await this.modelsService.enableByProvider(
+      tenantId,
+      teamId,
+      String(provider._id),
+    );
+    return this.toView(provider);
+  }
+
+  async remove(
+    tenantId: string,
+    teamId: string,
+    id: string,
+  ): Promise<ProviderView> {
+    const provider = await this.findInTeam(tenantId, teamId, id);
+    await this.modelsService.deleteByProvider(
+      tenantId,
+      teamId,
+      String(provider._id),
+    );
+    await this.providerModel.deleteOne({ _id: provider._id }).exec();
     return this.toView(provider);
   }
 

@@ -18,6 +18,8 @@ describe('ModelsService', () => {
     find: vi.fn(),
     findOne: vi.fn(),
     updateMany: vi.fn(),
+    deleteOne: vi.fn(),
+    deleteMany: vi.fn(),
   };
 
   const providerModel = {
@@ -129,16 +131,45 @@ describe('ModelsService', () => {
   });
 
   describe('remove', () => {
+    it('should hard-delete', async () => {
+      const model = makeModel();
+      modelModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(model),
+      });
+      modelModel.deleteOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue({ deletedCount: 1 }),
+      });
+
+      const result = await service.remove(tenantId, teamId, String(modelId));
+
+      expect(result.status).toBe(ModelStatus.ACTIVE);
+      expect(modelModel.deleteOne).toHaveBeenCalledWith({ _id: model._id });
+    });
+  });
+
+  describe('disable / enable', () => {
     it('should soft-disable', async () => {
       const model = makeModel();
       modelModel.findOne.mockReturnValue({
         exec: vi.fn().mockResolvedValue(model),
       });
 
-      const result = await service.remove(tenantId, teamId, String(modelId));
+      const result = await service.disable(tenantId, teamId, String(modelId));
 
       expect(model.status).toBe(ModelStatus.DISABLED);
       expect(result.status).toBe(ModelStatus.DISABLED);
+    });
+
+    it('should enable', async () => {
+      const model = makeModel({ status: ModelStatus.DISABLED });
+      modelModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(model),
+      });
+
+      const result = await service.enable(tenantId, teamId, String(modelId));
+
+      expect(model.status).toBe(ModelStatus.ACTIVE);
+      expect(result.status).toBe(ModelStatus.ACTIVE);
     });
   });
 
@@ -160,6 +191,48 @@ describe('ModelsService', () => {
       expect(filter.status).toBe(ModelStatus.ACTIVE);
       const update = modelModel.updateMany.mock.calls[0][1];
       expect(update).toEqual({ $set: { status: ModelStatus.DISABLED } });
+    });
+  });
+
+  describe('enableByProvider', () => {
+    it('should enable disabled models of the provider and return count', async () => {
+      modelModel.updateMany.mockReturnValue({
+        exec: vi.fn().mockResolvedValue({ modifiedCount: 3 }),
+      });
+
+      const count = await service.enableByProvider(
+        tenantId,
+        teamId,
+        String(providerId),
+      );
+
+      expect(count).toBe(3);
+      const filter = modelModel.updateMany.mock.calls[0][0];
+      expect(String(filter.providerId)).toBe(String(providerId));
+      expect(filter.status).toBe(ModelStatus.DISABLED);
+      expect(modelModel.updateMany.mock.calls[0][1]).toEqual({
+        $set: { status: ModelStatus.ACTIVE },
+      });
+    });
+  });
+
+  describe('deleteByProvider', () => {
+    it('should delete all models of the provider and return count', async () => {
+      modelModel.deleteMany.mockReturnValue({
+        exec: vi.fn().mockResolvedValue({ deletedCount: 4 }),
+      });
+
+      const count = await service.deleteByProvider(
+        tenantId,
+        teamId,
+        String(providerId),
+      );
+
+      expect(count).toBe(4);
+      const filter = modelModel.deleteMany.mock.calls[0][0];
+      expect(String(filter.providerId)).toBe(String(providerId));
+      expect(filter.tenantId).toBe(tenantId);
+      expect(filter.teamId).toBe(teamId);
     });
   });
 

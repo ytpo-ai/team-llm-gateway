@@ -172,10 +172,23 @@ export class ModelsService {
     return this.toView(model);
   }
 
-  async remove(tenantId: string, teamId: string, id: string): Promise<ModelView> {
+  async disable(tenantId: string, teamId: string, id: string): Promise<ModelView> {
     const model = await this.findInTeam(tenantId, teamId, id);
     model.status = ModelStatus.DISABLED;
     await model.save();
+    return this.toView(model);
+  }
+
+  async enable(tenantId: string, teamId: string, id: string): Promise<ModelView> {
+    const model = await this.findInTeam(tenantId, teamId, id);
+    model.status = ModelStatus.ACTIVE;
+    await model.save();
+    return this.toView(model);
+  }
+
+  async remove(tenantId: string, teamId: string, id: string): Promise<ModelView> {
+    const model = await this.findInTeam(tenantId, teamId, id);
+    await this.modelModel.deleteOne({ _id: model._id }).exec();
     return this.toView(model);
   }
 
@@ -196,6 +209,40 @@ export class ModelsService {
       )
       .exec();
     return result.modifiedCount;
+  }
+
+  async enableByProvider(
+    tenantId: string,
+    teamId: string,
+    providerId: string,
+  ): Promise<number> {
+    const result = await this.modelModel
+      .updateMany(
+        {
+          tenantId,
+          teamId,
+          providerId: new Types.ObjectId(providerId),
+          status: ModelStatus.DISABLED,
+        },
+        { $set: { status: ModelStatus.ACTIVE } },
+      )
+      .exec();
+    return result.modifiedCount;
+  }
+
+  async deleteByProvider(
+    tenantId: string,
+    teamId: string,
+    providerId: string,
+  ): Promise<number> {
+    const result = await this.modelModel
+      .deleteMany({
+        tenantId,
+        teamId,
+        providerId: new Types.ObjectId(providerId),
+      })
+      .exec();
+    return result.deletedCount;
   }
 
   private async assertProviderInTeam(

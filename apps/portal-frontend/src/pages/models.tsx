@@ -37,9 +37,11 @@ import { useAuthStore } from '@/features/auth/store'
 import {
   bulkCreateModels,
   createModel,
+  deleteModel,
+  disableModel,
+  enableModel,
   listModels,
   listOfficialPresets,
-  removeModel,
   updateModel,
 } from '@/features/models/api'
 import type { Model, ModelInput, ModelPatch } from '@/features/models/types'
@@ -92,7 +94,10 @@ export function ModelsPage() {
   const [form, setForm] = useState<FormState>(emptyForm)
   const [editing, setEditing] = useState<Model | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [removeTarget, setRemoveTarget] = useState<Model | null>(null)
+  const [confirm, setConfirm] = useState<{
+    model: Model
+    kind: 'disable' | 'delete'
+  } | null>(null)
 
   const [importOpen, setImportOpen] = useState(false)
   const [presetKey, setPresetKey] = useState<string>('')
@@ -209,11 +214,24 @@ export function ModelsPage() {
     },
   })
 
-  const removeMutation = useMutation({
-    mutationFn: (id: string) => removeModel(id),
+  const disableMutation = useMutation({
+    mutationFn: (id: string) => disableModel(id),
     onSuccess: () => {
       invalidate()
-      setRemoveTarget(null)
+      setConfirm(null)
+    },
+  })
+
+  const enableMutation = useMutation({
+    mutationFn: (id: string) => enableModel(id),
+    onSuccess: () => invalidate(),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteModel(id),
+    onSuccess: () => {
+      invalidate()
+      setConfirm(null)
     },
   })
 
@@ -311,14 +329,48 @@ export function ModelsPage() {
                             >
                               编辑
                             </Button>
-                            {model.status === 'active' && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setRemoveTarget(model)}
-                              >
-                                删除
-                              </Button>
+                            {model.status === 'active' ? (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() =>
+                                    setConfirm({ model, kind: 'disable' })
+                                  }
+                                >
+                                  禁用
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive"
+                                  onClick={() =>
+                                    setConfirm({ model, kind: 'delete' })
+                                  }
+                                >
+                                  删除
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => enableMutation.mutate(model.id)}
+                                >
+                                  启用
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive"
+                                  onClick={() =>
+                                    setConfirm({ model, kind: 'delete' })
+                                  }
+                                >
+                                  删除
+                                </Button>
+                              </>
                             )}
                           </div>
                         </td>
@@ -549,26 +601,39 @@ export function ModelsPage() {
       </Sheet>
 
       <AlertDialog
-        open={removeTarget !== null}
-        onOpenChange={(open) => !open && setRemoveTarget(null)}
+        open={confirm !== null}
+        onOpenChange={(open) => !open && setConfirm(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>删除模型</AlertDialogTitle>
+            <AlertDialogTitle>
+              {confirm?.kind === 'disable' ? '禁用模型' : '删除模型'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              确定要删除模型「{removeTarget?.modelId}」吗？
+              {confirm?.kind === 'disable'
+                ? `确定要禁用模型「${confirm.model.modelId}」吗？可随时重新启用。`
+                : `确定要删除模型「${confirm?.model.modelId}」吗？此操作不可恢复。`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={removeMutation.isPending}
-              onClick={() =>
-                removeTarget && removeMutation.mutate(removeTarget.id)
+              className={
+                confirm?.kind === 'delete'
+                  ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                  : ''
               }
+              disabled={disableMutation.isPending || deleteMutation.isPending}
+              onClick={() => {
+                if (!confirm) return
+                if (confirm.kind === 'disable') {
+                  disableMutation.mutate(confirm.model.id)
+                } else {
+                  deleteMutation.mutate(confirm.model.id)
+                }
+              }}
             >
-              删除
+              {confirm?.kind === 'disable' ? '禁用' : '删除'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

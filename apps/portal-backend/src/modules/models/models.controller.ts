@@ -132,10 +132,58 @@ export class ModelsController {
     return this.modelsService.update(tenantId, teamId, id, dto);
   }
 
+  @Post(':id/disable')
+  @UseGuards(RolesGuard)
+  @Roles(Role.TEAM_ADMIN)
+  @ApiOperation({ summary: '禁用模型（软禁用，可恢复）' })
+  async disable(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Req() req: Request,
+  ) {
+    const result = await this.modelsService.disable(user.tenantId, user.teamId, id);
+    await this.auditService.log({
+      tenantId: user.tenantId,
+      teamId: user.teamId,
+      actorUserId: user.id,
+      action: AuditAction.DISABLE,
+      resourceType: AuditResourceType.MODEL,
+      resourceId: result.id,
+      summary: `禁用模型（${result.modelId}）`,
+      ip: req.ip ?? null,
+      userAgent: req.headers['user-agent'] ?? null,
+    });
+    return result;
+  }
+
+  @Post(':id/enable')
+  @UseGuards(RolesGuard)
+  @Roles(Role.TEAM_ADMIN)
+  @ApiOperation({ summary: '启用模型' })
+  async enable(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Req() req: Request,
+  ) {
+    const result = await this.modelsService.enable(user.tenantId, user.teamId, id);
+    await this.auditService.log({
+      tenantId: user.tenantId,
+      teamId: user.teamId,
+      actorUserId: user.id,
+      action: AuditAction.ENABLE,
+      resourceType: AuditResourceType.MODEL,
+      resourceId: result.id,
+      summary: `启用模型（${result.modelId}）`,
+      ip: req.ip ?? null,
+      userAgent: req.headers['user-agent'] ?? null,
+    });
+    return result;
+  }
+
   @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles(Role.TEAM_ADMIN)
-  @ApiOperation({ summary: '删除模型（软禁用）' })
+  @ApiOperation({ summary: '删除模型（硬删除）' })
   async remove(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
@@ -146,10 +194,10 @@ export class ModelsController {
       tenantId: user.tenantId,
       teamId: user.teamId,
       actorUserId: user.id,
-      action: AuditAction.DISABLE,
+      action: AuditAction.DELETE,
       resourceType: AuditResourceType.MODEL,
       resourceId: result.id,
-      summary: `禁用模型（${result.modelId}）`,
+      summary: `删除模型（${result.modelId}）`,
       ip: req.ip ?? null,
       userAgent: req.headers['user-agent'] ?? null,
     });

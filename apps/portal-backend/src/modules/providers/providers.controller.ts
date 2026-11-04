@@ -137,8 +137,60 @@ export class ProvidersController {
     return this.providersService.update(tenantId, teamId, id, dto);
   }
 
+  @Post(':id/disable')
+  @ApiOperation({ summary: '禁用上游渠道（软禁用，可恢复，级联禁用其下模型）' })
+  async disable(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Req() req: Request,
+  ) {
+    const result = await this.providersService.disable(
+      user.tenantId,
+      user.teamId,
+      id,
+    );
+    await this.auditService.log({
+      tenantId: user.tenantId,
+      teamId: user.teamId,
+      actorUserId: user.id,
+      action: AuditAction.DISABLE,
+      resourceType: AuditResourceType.PROVIDER,
+      resourceId: result.id,
+      summary: `禁用上游渠道（${result.name}）`,
+      ip: req.ip ?? null,
+      userAgent: req.headers['user-agent'] ?? null,
+    });
+    return result;
+  }
+
+  @Post(':id/enable')
+  @ApiOperation({ summary: '启用上游渠道（级联启用其下模型）' })
+  async enable(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Req() req: Request,
+  ) {
+    const result = await this.providersService.enable(
+      user.tenantId,
+      user.teamId,
+      id,
+    );
+    await this.auditService.log({
+      tenantId: user.tenantId,
+      teamId: user.teamId,
+      actorUserId: user.id,
+      action: AuditAction.ENABLE,
+      resourceType: AuditResourceType.PROVIDER,
+      resourceId: result.id,
+      summary: `启用上游渠道（${result.name}）`,
+      ip: req.ip ?? null,
+      userAgent: req.headers['user-agent'] ?? null,
+    });
+    return result;
+  }
+
   @Delete(':id')
-  @ApiOperation({ summary: '删除上游渠道（软禁用）' })
+  @ApiOperation({ summary: '删除上游渠道（硬删除，级联删除其下模型）' })
   async remove(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
@@ -153,10 +205,10 @@ export class ProvidersController {
       tenantId: user.tenantId,
       teamId: user.teamId,
       actorUserId: user.id,
-      action: AuditAction.DISABLE,
+      action: AuditAction.DELETE,
       resourceType: AuditResourceType.PROVIDER,
       resourceId: result.id,
-      summary: `禁用上游渠道（${result.name}）`,
+      summary: `删除上游渠道（${result.name}）`,
       ip: req.ip ?? null,
       userAgent: req.headers['user-agent'] ?? null,
     });

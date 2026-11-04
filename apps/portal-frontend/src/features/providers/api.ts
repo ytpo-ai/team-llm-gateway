@@ -32,7 +32,15 @@ export function updateProvider(
   return request<Provider>(`/providers/${id}`, { method: 'PATCH', body: patch })
 }
 
-export function removeProvider(id: string): Promise<Provider> {
+export function disableProvider(id: string): Promise<Provider> {
+  return request<Provider>(`/providers/${id}/disable`, { method: 'POST' })
+}
+
+export function enableProvider(id: string): Promise<Provider> {
+  return request<Provider>(`/providers/${id}/enable`, { method: 'POST' })
+}
+
+export function deleteProvider(id: string): Promise<Provider> {
   return request<Provider>(`/providers/${id}`, { method: 'DELETE' })
 }
 

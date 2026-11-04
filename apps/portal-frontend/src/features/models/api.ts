@@ -49,6 +49,14 @@ export function updateModel(id: string, patch: ModelPatch): Promise<Model> {
   return request<Model>(`/models/${id}`, { method: 'PATCH', body: patch })
 }
 
-export function removeModel(id: string): Promise<Model> {
+export function disableModel(id: string): Promise<Model> {
+  return request<Model>(`/models/${id}/disable`, { method: 'POST' })
+}
+
+export function enableModel(id: string): Promise<Model> {
+  return request<Model>(`/models/${id}/enable`, { method: 'POST' })
+}
+
+export function deleteModel(id: string): Promise<Model> {
   return request<Model>(`/models/${id}`, { method: 'DELETE' })
 }

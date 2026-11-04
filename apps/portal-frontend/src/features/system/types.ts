@@ -2,6 +2,8 @@ export type AuditAction =
   | 'create'
   | 'update'
   | 'disable'
+  | 'enable'
+  | 'delete'
   | 'revoke'
   | 'rotate'
   | 'recharge'

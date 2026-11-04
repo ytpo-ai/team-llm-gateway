@@ -7,6 +7,8 @@ export enum AuditAction {
   CREATE = 'create',
   UPDATE = 'update',
   DISABLE = 'disable',
+  ENABLE = 'enable',
+  DELETE = 'delete',
   REVOKE = 'revoke',
   ROTATE = 'rotate',
   RECHARGE = 'recharge',

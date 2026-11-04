@@ -19,6 +19,7 @@ describe('ProvidersService', () => {
     create: vi.fn(),
     find: vi.fn(),
     findOne: vi.fn(),
+    deleteOne: vi.fn(),
   };
 
   const configService = {
@@ -30,6 +31,8 @@ describe('ProvidersService', () => {
     bulkCreate: vi.fn(),
     list: vi.fn(),
     disableByProvider: vi.fn(),
+    enableByProvider: vi.fn(),
+    deleteByProvider: vi.fn(),
   };
 
   const makeProvider = (overrides: Record<string, unknown> = {}) => ({
@@ -294,18 +297,61 @@ describe('ProvidersService', () => {
   });
 
   describe('remove', () => {
-    it('should soft-disable and cascade-disable its models', async () => {
+    it('should hard-delete provider and cascade-delete its models', async () => {
+      const provider = makeProvider();
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(provider),
+      });
+      providerModel.deleteOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue({ deletedCount: 1 }),
+      });
+      modelsService.deleteByProvider.mockResolvedValue(2);
+
+      const result = await service.remove(tenantId, teamId, String(providerId));
+
+      expect(result.status).toBe(ProviderStatus.ACTIVE);
+      expect(modelsService.deleteByProvider).toHaveBeenCalledWith(
+        tenantId,
+        teamId,
+        String(providerId),
+      );
+      expect(providerModel.deleteOne).toHaveBeenCalledWith({ _id: provider._id });
+    });
+  });
+
+  describe('disable', () => {
+    it('should soft-disable provider and cascade-disable its models', async () => {
       const provider = makeProvider();
       providerModel.findOne.mockReturnValue({
         exec: vi.fn().mockResolvedValue(provider),
       });
       modelsService.disableByProvider.mockResolvedValue(2);
 
-      const result = await service.remove(tenantId, teamId, String(providerId));
+      const result = await service.disable(tenantId, teamId, String(providerId));
 
       expect(provider.status).toBe(ProviderStatus.DISABLED);
       expect(result.status).toBe(ProviderStatus.DISABLED);
       expect(modelsService.disableByProvider).toHaveBeenCalledWith(
+        tenantId,
+        teamId,
+        String(providerId),
+      );
+    });
+  });
+
+  describe('enable', () => {
+    it('should enable provider and cascade-enable its models', async () => {
+      const provider = makeProvider({ status: ProviderStatus.DISABLED });
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(provider),
+      });
+      modelsService.enableByProvider.mockResolvedValue(2);
+
+      const result = await service.enable(tenantId, teamId, String(providerId));
+
+      expect(provider.status).toBe(ProviderStatus.ACTIVE);
+      expect(result.status).toBe(ProviderStatus.ACTIVE);
+      expect(modelsService.enableByProvider).toHaveBeenCalledWith(
         tenantId,
         teamId,
         String(providerId),

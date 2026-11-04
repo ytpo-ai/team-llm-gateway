@@ -47,8 +47,10 @@ import type { OfficialProviderPreset } from '@/features/models/types'
 import {
   createProvider,
   createProviderFromPreset,
+  deleteProvider,
+  disableProvider,
+  enableProvider,
   listProviders,
-  removeProvider,
   testProvider,
   updateProvider,
 } from '@/features/providers/api'
@@ -96,7 +98,10 @@ export function ProvidersPage() {
   const [form, setForm] = useState<FormState>(emptyForm)
   const [editing, setEditing] = useState<Provider | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [removeTarget, setRemoveTarget] = useState<Provider | null>(null)
+  const [confirm, setConfirm] = useState<{
+    provider: Provider
+    kind: 'disable' | 'delete'
+  } | null>(null)
   const [probeResults, setProbeResults] = useState<
     Record<string, ProviderProbeResult>
   >({})
@@ -226,11 +231,24 @@ export function ProvidersPage() {
     },
   })
 
-  const removeMutation = useMutation({
-    mutationFn: (id: string) => removeProvider(id),
+  const disableMutation = useMutation({
+    mutationFn: (id: string) => disableProvider(id),
     onSuccess: () => {
       invalidate()
-      setRemoveTarget(null)
+      setConfirm(null)
+    },
+  })
+
+  const enableProviderMutation = useMutation({
+    mutationFn: (id: string) => enableProvider(id),
+    onSuccess: () => invalidate(),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteProvider(id),
+    onSuccess: () => {
+      invalidate()
+      setConfirm(null)
     },
   })
 
@@ -490,14 +508,50 @@ export function ProvidersPage() {
                           >
                             编辑
                           </Button>
-                          {provider.status === 'active' && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setRemoveTarget(provider)}
-                            >
-                              删除
-                            </Button>
+                          {provider.status === 'active' ? (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  setConfirm({ provider, kind: 'disable' })
+                                }
+                              >
+                                禁用
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive"
+                                onClick={() =>
+                                  setConfirm({ provider, kind: 'delete' })
+                                }
+                              >
+                                删除
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  enableProviderMutation.mutate(provider.id)
+                                }
+                              >
+                                启用
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive"
+                                onClick={() =>
+                                  setConfirm({ provider, kind: 'delete' })
+                                }
+                              >
+                                删除
+                              </Button>
+                            </>
                           )}
                         </div>
                       </td>
@@ -714,26 +768,39 @@ export function ProvidersPage() {
       </Dialog>
 
       <AlertDialog
-        open={removeTarget !== null}
-        onOpenChange={(open) => !open && setRemoveTarget(null)}
+        open={confirm !== null}
+        onOpenChange={(open) => !open && setConfirm(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>删除渠道</AlertDialogTitle>
+            <AlertDialogTitle>
+              {confirm?.kind === 'disable' ? '禁用渠道' : '删除渠道'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              确定要删除上游渠道「{removeTarget?.name}」吗？删除后该渠道下关联的模型将不可用。
+              {confirm?.kind === 'disable'
+                ? `确定要禁用上游渠道「${confirm.provider.name}」吗？禁用后该渠道及其下模型将不可用，可随时重新启用。`
+                : `确定要删除上游渠道「${confirm?.provider.name}」吗？将永久删除该渠道及其下所有模型，此操作不可恢复。`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={removeMutation.isPending}
-              onClick={() =>
-                removeTarget && removeMutation.mutate(removeTarget.id)
+              className={
+                confirm?.kind === 'delete'
+                  ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                  : ''
               }
+              disabled={disableMutation.isPending || deleteMutation.isPending}
+              onClick={() => {
+                if (!confirm) return
+                if (confirm.kind === 'disable') {
+                  disableMutation.mutate(confirm.provider.id)
+                } else {
+                  deleteMutation.mutate(confirm.provider.id)
+                }
+              }}
             >
-              删除
+              {confirm?.kind === 'disable' ? '禁用' : '删除'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
