@@ -66,18 +66,61 @@ function formatDate(value: string | null): string {
   return new Date(value).toLocaleDateString()
 }
 
+type ExpiryUnit = 'hour' | 'day' | 'month' | 'never'
+
+const HOUR_MS = 60 * 60 * 1000
+const DAY_MS = 24 * HOUR_MS
+
+function computeExpiry(value: number, unit: ExpiryUnit): Date {
+  const now = new Date()
+  if (unit === 'hour') return new Date(now.getTime() + value * HOUR_MS)
+  if (unit === 'day') return new Date(now.getTime() + value * DAY_MS)
+  const d = new Date(now)
+  d.setMonth(d.getMonth() + value)
+  return d
+}
+
+function resolveExpiry(form: FormState): string | null {
+  if (form.expiresUnit === 'never') return null
+  const value = Number(form.expiresValue)
+  if (!Number.isInteger(value) || value <= 0) return null
+  return computeExpiry(value, form.expiresUnit).toISOString()
+}
+
+function durationFromExpiry(expiresAt: string | null): {
+  expiresValue: string
+  expiresUnit: ExpiryUnit
+} {
+  if (!expiresAt) return { expiresValue: '', expiresUnit: 'never' }
+  const remaining = new Date(expiresAt).getTime() - Date.now()
+  if (remaining <= 0) return { expiresValue: '1', expiresUnit: 'hour' }
+  const days = remaining / DAY_MS
+  if (days >= 30) {
+    return { expiresValue: String(Math.ceil(days / 30)), expiresUnit: 'month' }
+  }
+  if (days >= 1) {
+    return { expiresValue: String(Math.ceil(days)), expiresUnit: 'day' }
+  }
+  return {
+    expiresValue: String(Math.max(1, Math.ceil(remaining / HOUR_MS))),
+    expiresUnit: 'hour',
+  }
+}
+
 interface FormState {
   userId: string
   name: string
   policySetId: string
-  expiresAt: string
+  expiresValue: string
+  expiresUnit: ExpiryUnit
 }
 
 const emptyForm: FormState = {
   userId: '',
   name: '',
   policySetId: '',
-  expiresAt: '',
+  expiresValue: '',
+  expiresUnit: 'never',
 }
 
 function toForm(key: ApiKey): FormState {
@@ -85,7 +128,7 @@ function toForm(key: ApiKey): FormState {
     userId: key.userId,
     name: key.name ?? '',
     policySetId: key.policySetId ?? '',
-    expiresAt: key.expiresAt ? key.expiresAt.slice(0, 10) : '',
+    ...durationFromExpiry(key.expiresAt),
   }
 }
 
@@ -141,11 +184,12 @@ export function ApiKeysPage() {
 
   const submitMutation = useMutation({
     mutationFn: () => {
+      const expiresAt = resolveExpiry(form)
       if (editing) {
         const patch: ApiKeyPatch = {
           userId: form.userId || undefined,
           name: form.name.trim() || null,
-          expiresAt: form.expiresAt || null,
+          expiresAt,
           policySetId: form.policySetId || null,
         }
         return updateApiKey(editing.id, patch)
@@ -153,7 +197,7 @@ export function ApiKeysPage() {
       const input: ApiKeyInput = {
         userId: form.userId || undefined,
         name: form.name.trim() || undefined,
-        expiresAt: form.expiresAt || undefined,
+        expiresAt: expiresAt ?? undefined,
         policySetId: form.policySetId || undefined,
       }
       return createApiKey(input)
@@ -191,6 +235,13 @@ export function ApiKeysPage() {
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     setError(null)
+    if (form.expiresUnit !== 'never') {
+      const value = Number(form.expiresValue)
+      if (!Number.isInteger(value) || value <= 0) {
+        setError('请输入有效的限时值（正整数）')
+        return
+      }
+    }
     submitMutation.mutate()
   }
 
@@ -402,13 +453,38 @@ export function ApiKeysPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm text-muted-foreground">
-                过期时间（留空永久）
+                过期时间
               </label>
-              <Input
-                type="date"
-                value={form.expiresAt}
-                onChange={(e) => setForm({ ...form, expiresAt: e.target.value })}
-              />
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder={
+                    form.expiresUnit === 'never' ? '永久有效' : '限时值'
+                  }
+                  value={form.expiresValue}
+                  disabled={form.expiresUnit === 'never'}
+                  onChange={(e) =>
+                    setForm({ ...form, expiresValue: e.target.value })
+                  }
+                />
+                <Select
+                  value={form.expiresUnit}
+                  onValueChange={(v) =>
+                    setForm({ ...form, expiresUnit: v as ExpiryUnit })
+                  }
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="never">永久</SelectItem>
+                    <SelectItem value="hour">小时</SelectItem>
+                    <SelectItem value="day">天</SelectItem>
+                    <SelectItem value="month">月</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {error && <p className="text-sm text-red-500">{error}</p>}
