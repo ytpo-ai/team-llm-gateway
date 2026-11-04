@@ -2,18 +2,18 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
 interface TeamContextState {
-  selectedTeamId: string | null
-  setSelectedTeamId: (id: string | null) => void
+  selectedTenantId: string | null
+  setSelectedTenantId: (id: string | null) => void
 }
 
 export const useTeamContextStore = create<TeamContextState>()(
   persist(
     (set) => ({
-      selectedTeamId: null,
-      setSelectedTeamId: (id) => set({ selectedTeamId: id }),
+      selectedTenantId: null,
+      setSelectedTenantId: (id) => set({ selectedTenantId: id }),
     }),
     {
-      name: 'portal-team-context',
+      name: 'portal-tenant-context',
       storage: createJSONStorage(() => localStorage),
     },
   ),

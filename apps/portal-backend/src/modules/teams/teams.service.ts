@@ -342,11 +342,10 @@ export class TeamsService {
     };
   }
 
-  async findTeamInTenantOrNull(
+  async findFirstTeamForTenantOrNull(
     tenantId: string,
-    teamId: string,
   ): Promise<TeamDocument | null> {
-    return this.teamModel.findOne({ _id: teamId, tenantId }).exec();
+    return this.teamModel.findOne({ tenantId }).sort({ createdAt: 1 }).exec();
   }
 
   private async findTeamInTenant(

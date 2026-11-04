@@ -20,4 +20,8 @@ export class TenantService {
     }
     return this.tenantModel.create({ code: DEFAULT_TENANT_CODE, name });
   }
+
+  async findByIdOrNull(id: string): Promise<TenantDocument | null> {
+    return this.tenantModel.findById(id).exec();
+  }
 }

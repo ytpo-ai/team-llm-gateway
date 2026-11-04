@@ -42,7 +42,7 @@ import {
 } from '@/components/ui/select'
 import { ChangePasswordDialog } from '@/features/auth/components/change-password-dialog'
 import { useAuthStore } from '@/features/auth/store'
-import { listTeams } from '@/features/teams/api'
+import { listTenants } from '@/features/admin/api'
 import { useTeamContextStore } from '@/features/teams/store'
 import { cn } from '@/lib/utils'
 
@@ -65,11 +65,19 @@ export function AppLayout() {
   const navigate = useNavigate()
   const [passwordOpen, setPasswordOpen] = useState(false)
 
+  const isTeamManager =
+    user?.role === 'team_admin' || user?.role === 'system'
+  const isSystem = user?.role === 'system'
+
   const queryClient = useQueryClient()
-  const selectedTeamId = useTeamContextStore((s) => s.selectedTeamId)
-  const setSelectedTeamId = useTeamContextStore((s) => s.setSelectedTeamId)
-  const teamsQuery = useQuery({ queryKey: ['teams'], queryFn: listTeams })
-  const teams = teamsQuery.data ?? []
+  const selectedTenantId = useTeamContextStore((s) => s.selectedTenantId)
+  const setSelectedTenantId = useTeamContextStore((s) => s.setSelectedTenantId)
+  const tenantsQuery = useQuery({
+    queryKey: ['admin', 'tenants', 'all'],
+    queryFn: () => listTenants({ limit: 200 }),
+    enabled: isSystem,
+  })
+  const tenants = tenantsQuery.data?.items ?? []
 
   const handleLogout = () => {
     logout()
@@ -84,29 +92,25 @@ export function AppLayout() {
         : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
     )
 
-  const isTeamManager =
-    user?.role === 'team_admin' || user?.role === 'system'
-  const isSystem = user?.role === 'system'
-
-  // 默认选中团队：system 默认最先创建的团队（listTeams 已按 createdAt 升序）并支持切换；非 system 固定为本人团队
+  // 客户团队（租户）选择：system 默认选中最早创建的租户；非 system 不启用
   useEffect(() => {
-    const data = teamsQuery.data ?? []
+    if (!isSystem) return
+    const data = tenantsQuery.data?.items ?? []
     if (data.length === 0) return
-    const target = isSystem
-      ? data.some((t) => t.id === selectedTeamId)
-        ? selectedTeamId
-        : data[0].id
-      : (user?.teamId ?? data[0].id)
-    if (selectedTeamId !== target) {
-      setSelectedTeamId(target)
+    const valid = data.some((t) => t.id === selectedTenantId)
+    if (!selectedTenantId || !valid) {
+      const sorted = [...data].sort((a, b) =>
+        (a.createdAt ?? '').localeCompare(b.createdAt ?? ''),
+      )
+      setSelectedTenantId(sorted[0].id)
     }
-  }, [teamsQuery.data, selectedTeamId, isSystem, user?.teamId, setSelectedTeamId])
+  }, [tenantsQuery.data, selectedTenantId, isSystem, setSelectedTenantId])
 
-  const showTeamSelector = isSystem && teams.length > 1
+  const showTenantSelector = isSystem && tenants.length > 1
 
-  const handleTeamChange = (id: string) => {
-    if (id !== selectedTeamId) {
-      setSelectedTeamId(id)
+  const handleTenantChange = (id: string) => {
+    if (id !== selectedTenantId) {
+      setSelectedTenantId(id)
       queryClient.invalidateQueries()
     }
   }
@@ -204,18 +208,18 @@ export function AppLayout() {
       <div className="pl-64">
         <header className="sticky top-0 z-50 flex h-14 items-center justify-end border-b border-border px-6">
           <div className="flex items-center gap-2">
-            {showTeamSelector && (
+            {showTenantSelector && (
               <Select
-                value={selectedTeamId ?? ''}
-                onValueChange={handleTeamChange}
+                value={selectedTenantId ?? ''}
+                onValueChange={handleTenantChange}
               >
-                <SelectTrigger className="w-44" aria-label="选择团队">
-                  <SelectValue placeholder="选择团队" />
+                <SelectTrigger className="w-44" aria-label="选择客户团队">
+                  <SelectValue placeholder="选择客户团队" />
                 </SelectTrigger>
                 <SelectContent>
-                  {teams.map((team) => (
-                    <SelectItem key={team.id} value={team.id}>
-                      {team.name}
+                  {tenants.map((tenant) => (
+                    <SelectItem key={tenant.id} value={tenant.id}>
+                      {tenant.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

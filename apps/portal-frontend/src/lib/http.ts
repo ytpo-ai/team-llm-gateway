@@ -47,8 +47,8 @@ async function doFetch<T>(
   if (options.body !== undefined) headers.set('Content-Type', 'application/json')
   if (token) {
     headers.set('Authorization', `Bearer ${token}`)
-    const selectedTeamId = useTeamContextStore.getState().selectedTeamId
-    if (selectedTeamId) headers.set('X-Team-Id', selectedTeamId)
+    const selectedTenantId = useTeamContextStore.getState().selectedTenantId
+    if (selectedTenantId) headers.set('X-Tenant-Id', selectedTenantId)
   }
 
   const res = await fetch(`${BASE_URL}${path}`, {
