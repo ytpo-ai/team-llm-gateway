@@ -16,6 +16,8 @@ export class ApiError extends Error {
 interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown
   auth?: boolean
+  /** 是否注入客户团队（租户）上下文头 X-Tenant-Id，默认 true；系统管理类请求传 false 以不随切换 */
+  tenant?: boolean
 }
 
 async function readError(res: Response): Promise<ApiError> {
@@ -47,8 +49,10 @@ async function doFetch<T>(
   if (options.body !== undefined) headers.set('Content-Type', 'application/json')
   if (token) {
     headers.set('Authorization', `Bearer ${token}`)
-    const selectedTenantId = useTeamContextStore.getState().selectedTenantId
-    if (selectedTenantId) headers.set('X-Tenant-Id', selectedTenantId)
+    if (options.tenant !== false) {
+      const selectedTenantId = useTeamContextStore.getState().selectedTenantId
+      if (selectedTenantId) headers.set('X-Tenant-Id', selectedTenantId)
+    }
   }
 
   const res = await fetch(`${BASE_URL}${path}`, {

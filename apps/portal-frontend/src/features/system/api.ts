@@ -8,7 +8,7 @@ import type {
 } from './types'
 
 export function listSettings(): Promise<SystemSetting[]> {
-  return request<SystemSetting[]>('/system/settings')
+  return request<SystemSetting[]>('/system/settings', { tenant: false })
 }
 
 export function updateSettings(
@@ -17,19 +17,26 @@ export function updateSettings(
   return request<SystemSetting[]>('/system/settings', {
     method: 'PUT',
     body: { settings },
+    tenant: false,
   })
 }
 
-export function getCurrency(): Promise<CurrencyConfig | null> {
-  return request<CurrencyConfig | null>('/system/currency')
+export function getCurrency(
+  options: { tenant?: boolean } = {},
+): Promise<CurrencyConfig | null> {
+  return request<CurrencyConfig | null>('/system/currency', {
+    tenant: options.tenant,
+  })
 }
 
 export function updateCurrency(
   config: CurrencyConfig,
+  options: { tenant?: boolean } = {},
 ): Promise<CurrencyConfig> {
   return request<CurrencyConfig>('/system/currency', {
     method: 'PUT',
     body: config,
+    tenant: options.tenant,
   })
 }
 

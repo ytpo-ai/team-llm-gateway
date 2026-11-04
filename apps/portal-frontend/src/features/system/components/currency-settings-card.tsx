@@ -187,17 +187,18 @@ function CurrencyEditorForm({
 export function CurrencySettingsCard() {
   const queryClient = useQueryClient()
   const currencyQuery = useQuery({
-    queryKey: ['system', 'currency'],
-    queryFn: getCurrency,
+    queryKey: ['system', 'currency', 'own'],
+    queryFn: () => getCurrency({ tenant: false }),
   })
 
   const [message, setMessage] = useState<string | null>(null)
   const [serverError, setServerError] = useState<string | null>(null)
 
   const mutation = useMutation({
-    mutationFn: updateCurrency,
+    mutationFn: (config: CurrencyConfig) =>
+      updateCurrency(config, { tenant: false }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['system', 'currency'] })
+      queryClient.invalidateQueries({ queryKey: ['system', 'currency', 'own'] })
       setMessage('已保存')
       setServerError(null)
     },

@@ -160,7 +160,7 @@ export function BillingPage() {
   })
   const currencyQuery = useQuery({
     queryKey: ['system', 'currency'],
-    queryFn: getCurrency,
+    queryFn: () => getCurrency(),
   })
 
   const isSystem = user?.role === 'system'
