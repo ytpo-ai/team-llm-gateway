@@ -68,3 +68,9 @@ pnpm test          # 全仓测试
 - 参考调研：`docs/technical/LLM_API_GATEWAY_COMPARISON.MD`
 - 功能索引：`docs/feature/INDEX.md`
 - 开发协议：`AGENTS.md`
+
+## 开源协议
+
+本项目基于 [MIT 许可证](./LICENSE) 开源，可自由使用、修改与分发（含商用）。
+
+参与贡献前请阅读 [贡献指南](./CONTRIBUTING.md)。
