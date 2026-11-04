@@ -32,6 +32,13 @@ export interface QuotaTransaction {
   createdAt?: string
 }
 
+export interface QuotaTransactionPage {
+  items: QuotaTransaction[]
+  total: number
+  limit: number
+  offset: number
+}
+
 export interface RechargeInput {
   amount: number
   teamId?: string

@@ -53,6 +53,13 @@ export interface QuotaTransactionView {
   createdAt?: Date;
 }
 
+export interface QuotaTransactionPage {
+  items: QuotaTransactionView[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface DeductInput {
   tenantId: string;
   teamId: string;
@@ -62,7 +69,7 @@ export interface DeductInput {
   description?: string;
 }
 
-const TRANSACTION_LIMIT = 100;
+const DEFAULT_TRANSACTION_LIMIT = 20;
 
 @Injectable()
 export class BillingService {
@@ -158,7 +165,7 @@ export class BillingService {
   async listTransactions(
     user: AuthUser,
     query: ListTransactionsQueryDto,
-  ): Promise<QuotaTransactionView[]> {
+  ): Promise<QuotaTransactionPage> {
     const filter: Record<string, unknown> = {
       tenantId: new Types.ObjectId(user.tenantId),
     };
@@ -168,6 +175,8 @@ export class BillingService {
       filter.teamId = new Types.ObjectId(user.teamId);
     }
     if (query.type) filter.type = query.type;
+    if (query.accountType) filter.accountType = query.accountType;
+    if (query.userId) filter.userId = new Types.ObjectId(query.userId);
     if (query.from || query.to) {
       filter.createdAt = {
         ...(query.from ? { $gte: new Date(query.from) } : {}),
@@ -175,11 +184,18 @@ export class BillingService {
       };
     }
 
-    const rows = await this.quotaTransactionModel
-      .find(filter)
-      .sort({ createdAt: -1 })
-      .limit(TRANSACTION_LIMIT)
-      .exec();
+    const limit = query.limit ?? DEFAULT_TRANSACTION_LIMIT;
+    const offset = query.offset ?? 0;
+
+    const [rows, total] = await Promise.all([
+      this.quotaTransactionModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(offset)
+        .limit(limit)
+        .exec(),
+      this.quotaTransactionModel.countDocuments(filter).exec(),
+    ]);
 
     const memberIds = rows
       .filter((r) => r.accountType === QuotaAccountType.MEMBER && r.userId)
@@ -190,7 +206,7 @@ export class BillingService {
       this.buildTeamNameMap(teamIds),
     ]);
 
-    return rows.map((row) => ({
+    const items: QuotaTransactionView[] = rows.map((row) => ({
       id: String(row._id),
       accountId: String(row.accountId),
       accountType: row.accountType,
@@ -209,6 +225,8 @@ export class BillingService {
       description: row.description,
       createdAt: row.createdAt,
     }));
+
+    return { items, total, limit, offset };
   }
 
   async getSpendableBalance(

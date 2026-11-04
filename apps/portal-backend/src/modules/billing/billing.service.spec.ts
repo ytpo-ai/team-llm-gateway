@@ -30,6 +30,7 @@ describe('BillingService', () => {
   const quotaTransactionModel = {
     find: vi.fn(),
     create: vi.fn(),
+    countDocuments: vi.fn(),
   };
   const userModel = {
     find: vi.fn(),
@@ -253,8 +254,12 @@ describe('BillingService', () => {
     const mockTransactionFind = (rows: unknown[]) => {
       quotaTransactionModel.find.mockReturnValue({
         sort: vi.fn().mockReturnThis(),
+        skip: vi.fn().mockReturnThis(),
         limit: vi.fn().mockReturnThis(),
         exec: vi.fn().mockResolvedValue(rows),
+      });
+      quotaTransactionModel.countDocuments.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(rows.length),
       });
     };
 
@@ -319,8 +324,9 @@ describe('BillingService', () => {
         {},
       );
 
-      expect(result[0].label).toBe('Alice');
-      expect(result[0].teamName).toBe('Team A');
+      expect(result.items[0].label).toBe('Alice');
+      expect(result.items[0].teamName).toBe('Team A');
+      expect(result.total).toBe(1);
     });
 
     it('should leave label null for team account transactions', async () => {
@@ -332,8 +338,22 @@ describe('BillingService', () => {
         {},
       );
 
-      expect(result[0].label).toBeNull();
-      expect(result[0].teamName).toBe('Team A');
+      expect(result.items[0].label).toBeNull();
+      expect(result.items[0].teamName).toBe('Team A');
+    });
+
+    it('should filter by accountType and userId when provided', async () => {
+      mockTransactionFind([]);
+      mockLabelAndTeamLookup();
+
+      await service.listTransactions(makeUser({ role: Role.TEAM_ADMIN }), {
+        accountType: QuotaAccountType.MEMBER,
+        userId: String(userId),
+      });
+
+      const filter = quotaTransactionModel.find.mock.calls[0][0];
+      expect(filter.accountType).toBe(QuotaAccountType.MEMBER);
+      expect(filter.userId).toEqual(userId);
     });
   });
 

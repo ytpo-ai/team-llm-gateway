@@ -1,5 +1,6 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
+import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
@@ -10,7 +11,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -30,6 +33,8 @@ import type { Team } from '@/features/teams/types'
 import { useAuthStore } from '@/features/auth/store'
 
 const fmtNum = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 })
+
+const PAGE_SIZE = 20
 
 function fmtAmount(value: number): string {
   return `${value < 0 ? '-' : ''}${fmtNum.format(Math.abs(value))}`
@@ -134,8 +139,6 @@ function TransactionTable({
   )
 }
 
-type Scope = 'all' | 'team' | 'member'
-
 interface BalanceCard {
   key: string
   description: string
@@ -144,16 +147,13 @@ interface BalanceCard {
 
 export function BillingPage() {
   const user = useAuthStore((s) => s.user)
-  const [scope, setScope] = useState<Scope>('all')
-  const [memberId, setMemberId] = useState<string>('')
+  // 筛选：'all' | 'team' | 成员 userId
+  const [filter, setFilter] = useState<string>('all')
+  const [offset, setOffset] = useState(0)
 
   const accountsQuery = useQuery({
     queryKey: ['billing', 'accounts'],
     queryFn: listQuotaAccounts,
-  })
-  const transactionsQuery = useQuery({
-    queryKey: ['billing', 'transactions'],
-    queryFn: () => listQuotaTransactions(),
   })
   const currencyQuery = useQuery({
     queryKey: ['system', 'currency'],
@@ -175,6 +175,29 @@ export function BillingPage() {
   const currencyConfig = currencyQuery.data ?? null
   const teamBalanceMap = new Map(teamAccounts.map((a) => [a.teamId, a]))
 
+  const txAccountType =
+    filter === 'team' ? 'team' : filter === 'all' ? undefined : 'member'
+  const txUserId =
+    filter === 'all' || filter === 'team' ? undefined : filter
+
+  const transactionsQuery = useQuery({
+    queryKey: ['billing', 'transactions', txAccountType, txUserId, offset],
+    queryFn: () =>
+      listQuotaTransactions({
+        accountType: txAccountType,
+        userId: txUserId,
+        limit: PAGE_SIZE,
+        offset,
+      }),
+    placeholderData: keepPreviousData,
+  })
+
+  const txData = transactionsQuery.data
+  const txItems = txData?.items ?? []
+  const total = txData?.total ?? 0
+  const hasPrev = offset > 0
+  const hasNext = offset + PAGE_SIZE < total
+
   // 余额卡片：团队 + 成员统一为一个 3 列网格，按筛选范围展示
   const teamCards: BalanceCard[] = isSystem
     ? teams.map((team) => ({
@@ -193,14 +216,14 @@ export function BillingPage() {
       : []
 
   const visibleMemberAccounts =
-    scope === 'member'
-      ? memberAccounts.filter((a) => a.userId === memberId)
-      : scope === 'team'
+    filter === 'all'
+      ? memberAccounts
+      : filter === 'team'
         ? []
-        : memberAccounts
+        : memberAccounts.filter((a) => a.userId === filter)
 
   const visibleCards: BalanceCard[] = [
-    ...(scope === 'all' || scope === 'team' ? teamCards : []),
+    ...(filter === 'all' || filter === 'team' ? teamCards : []),
     ...visibleMemberAccounts.map((account) => ({
       key: account.id,
       description: `成员额度 · ${account.label ?? account.userId}${
@@ -209,16 +232,6 @@ export function BillingPage() {
       balance: account.balance,
     })),
   ]
-
-  const allTransactions = transactionsQuery.data ?? []
-  const filteredTransactions =
-    scope === 'all'
-      ? allTransactions
-      : scope === 'team'
-        ? allTransactions.filter((t) => t.accountType === 'team')
-        : allTransactions.filter(
-            (t) => t.accountType === 'member' && t.userId === memberId,
-          )
 
   return (
     <div className="space-y-6">
@@ -231,25 +244,21 @@ export function BillingPage() {
 
       <div className="flex flex-wrap items-center gap-3">
         <Select
-          value={scope}
-          onValueChange={(v) => setScope(v as Scope)}
+          value={filter}
+          onValueChange={(v) => {
+            setFilter(v)
+            setOffset(0)
+          }}
         >
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-56">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">全员</SelectItem>
             <SelectItem value="team">只看团队</SelectItem>
-            <SelectItem value="member">某个成员</SelectItem>
-          </SelectContent>
-        </Select>
-        {scope === 'member' &&
-          (memberAccounts.length > 0 ? (
-            <Select value={memberId} onValueChange={setMemberId}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="选择成员" />
-              </SelectTrigger>
-              <SelectContent>
+            {memberAccounts.length > 0 && (
+              <SelectGroup>
+                <SelectLabel>成员</SelectLabel>
                 {memberAccounts.map((account) => (
                   <SelectItem
                     key={account.id}
@@ -258,13 +267,10 @@ export function BillingPage() {
                     {account.label ?? account.userId}
                   </SelectItem>
                 ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <span className="text-sm text-muted-foreground">
-              暂无成员账户
-            </span>
-          ))}
+              </SelectGroup>
+            )}
+          </SelectContent>
+        </Select>
       </div>
 
       {accountsQuery.isLoading ? (
@@ -294,17 +300,38 @@ export function BillingPage() {
       <Card>
         <CardHeader>
           <CardTitle>额度流水</CardTitle>
-          <CardDescription>最近 100 条额度变动记录</CardDescription>
+          <CardDescription>共 {total} 条</CardDescription>
         </CardHeader>
         <CardContent>
           {transactionsQuery.isLoading ? (
             <div className="py-6 text-sm text-muted-foreground">加载中…</div>
           ) : (
-            <TransactionTable
-              items={filteredTransactions}
-              config={currencyConfig}
-            />
+            <TransactionTable items={txItems} config={currencyConfig} />
           )}
+
+          <div className="mt-4 flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">
+              第 {Math.floor(offset / PAGE_SIZE) + 1} 页
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!hasPrev}
+                onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))}
+              >
+                上一页
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!hasNext}
+                onClick={() => setOffset((o) => o + PAGE_SIZE)}
+              >
+                下一页
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

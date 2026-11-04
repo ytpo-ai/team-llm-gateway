@@ -2,7 +2,8 @@ import { request } from '@/lib/http'
 import type {
   AdjustInput,
   QuotaAccount,
-  QuotaTransaction,
+  QuotaAccountType,
+  QuotaTransactionPage,
   QuotaTransactionType,
   RechargeInput,
 } from './types'
@@ -13,11 +14,24 @@ export function listQuotaAccounts(): Promise<QuotaAccount[]> {
 
 export function listQuotaTransactions(options: {
   type?: QuotaTransactionType
-} = {}): Promise<QuotaTransaction[]> {
+  accountType?: QuotaAccountType
+  userId?: string
+  from?: string
+  to?: string
+  limit?: number
+  offset?: number
+} = {}): Promise<QuotaTransactionPage> {
   const search = new URLSearchParams()
   if (options.type) search.set('type', options.type)
-  const qs = search.toString()
-  return request<QuotaTransaction[]>(`/billing/transactions${qs ? `?${qs}` : ''}`)
+  if (options.accountType) search.set('accountType', options.accountType)
+  if (options.userId) search.set('userId', options.userId)
+  if (options.from) search.set('from', options.from)
+  if (options.to) search.set('to', options.to)
+  search.set('limit', String(options.limit ?? 20))
+  search.set('offset', String(options.offset ?? 0))
+  return request<QuotaTransactionPage>(
+    `/billing/transactions?${search.toString()}`,
+  )
 }
 
 export function rechargeQuota(input: RechargeInput): Promise<QuotaAccount> {
