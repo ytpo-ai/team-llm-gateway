@@ -28,7 +28,7 @@ describe('ProxyService', () => {
   const providerId = new Types.ObjectId();
 
   const modelModel = { find: vi.fn(), findOne: vi.fn() };
-  const providerModel = { findOne: vi.fn() };
+  const providerModel = { find: vi.fn(), findOne: vi.fn() };
   const apiKeyModel = { updateOne: vi.fn() };
   const usageService = { record: vi.fn() };
   const billingService = { getSpendableBalance: vi.fn(), deduct: vi.fn() };
@@ -144,6 +144,10 @@ describe('ProxyService', () => {
 
   describe('listModels', () => {
     it('should filter by key policy set modelWhitelist', async () => {
+      providerModel.find.mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        exec: vi.fn().mockResolvedValue([{ _id: providerId }]),
+      });
       modelModel.find.mockReturnValue({
         sort: vi.fn().mockReturnThis(),
         exec: vi.fn().mockResolvedValue([
@@ -162,6 +166,28 @@ describe('ProxyService', () => {
       expect(result.object).toBe('list');
       expect(result.data).toHaveLength(1);
       expect(result.data[0].id).toBe('gpt-4o-mini');
+    });
+
+    it('should exclude models whose provider is disabled', async () => {
+      providerModel.find.mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        exec: vi.fn().mockResolvedValue([{ _id: providerId }]),
+      });
+      modelModel.find.mockReturnValue({
+        sort: vi.fn().mockReturnThis(),
+        exec: vi.fn().mockResolvedValue([makeModel()]),
+      });
+      quotaLimitService.resolve.mockResolvedValue({
+        team: null,
+        role: null,
+        key: null,
+      });
+
+      await service.listModels(makeContext());
+
+      const modelFilter = modelModel.find.mock.calls[0][0];
+      expect(modelFilter.status).toBe(ModelStatus.ACTIVE);
+      expect(modelFilter.providerId).toEqual({ $in: [providerId] });
     });
   });
 

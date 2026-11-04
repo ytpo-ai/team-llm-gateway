@@ -29,6 +29,7 @@ describe('ProvidersService', () => {
     getOfficialPresets: vi.fn(),
     bulkCreate: vi.fn(),
     list: vi.fn(),
+    disableByProvider: vi.fn(),
   };
 
   const makeProvider = (overrides: Record<string, unknown> = {}) => ({
@@ -293,16 +294,22 @@ describe('ProvidersService', () => {
   });
 
   describe('remove', () => {
-    it('should soft-disable', async () => {
+    it('should soft-disable and cascade-disable its models', async () => {
       const provider = makeProvider();
       providerModel.findOne.mockReturnValue({
         exec: vi.fn().mockResolvedValue(provider),
       });
+      modelsService.disableByProvider.mockResolvedValue(2);
 
       const result = await service.remove(tenantId, teamId, String(providerId));
 
       expect(provider.status).toBe(ProviderStatus.DISABLED);
       expect(result.status).toBe(ProviderStatus.DISABLED);
+      expect(modelsService.disableByProvider).toHaveBeenCalledWith(
+        tenantId,
+        teamId,
+        String(providerId),
+      );
     });
   });
 

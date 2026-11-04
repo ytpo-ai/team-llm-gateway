@@ -179,6 +179,25 @@ export class ModelsService {
     return this.toView(model);
   }
 
+  async disableByProvider(
+    tenantId: string,
+    teamId: string,
+    providerId: string,
+  ): Promise<number> {
+    const result = await this.modelModel
+      .updateMany(
+        {
+          tenantId,
+          teamId,
+          providerId: new Types.ObjectId(providerId),
+          status: ModelStatus.ACTIVE,
+        },
+        { $set: { status: ModelStatus.DISABLED } },
+      )
+      .exec();
+    return result.modifiedCount;
+  }
+
   private async assertProviderInTeam(
     tenantId: string,
     teamId: string,

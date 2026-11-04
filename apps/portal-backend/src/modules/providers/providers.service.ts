@@ -174,6 +174,11 @@ export class ProvidersService {
     const provider = await this.findInTeam(tenantId, teamId, id);
     provider.status = ProviderStatus.DISABLED;
     await provider.save();
+    await this.modelsService.disableByProvider(
+      tenantId,
+      teamId,
+      String(provider._id),
+    );
     return this.toView(provider);
   }
 

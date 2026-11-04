@@ -17,6 +17,7 @@ describe('ModelsService', () => {
     create: vi.fn(),
     find: vi.fn(),
     findOne: vi.fn(),
+    updateMany: vi.fn(),
   };
 
   const providerModel = {
@@ -138,6 +139,27 @@ describe('ModelsService', () => {
 
       expect(model.status).toBe(ModelStatus.DISABLED);
       expect(result.status).toBe(ModelStatus.DISABLED);
+    });
+  });
+
+  describe('disableByProvider', () => {
+    it('should disable active models of the provider and return count', async () => {
+      modelModel.updateMany.mockReturnValue({
+        exec: vi.fn().mockResolvedValue({ modifiedCount: 2 }),
+      });
+
+      const count = await service.disableByProvider(
+        tenantId,
+        teamId,
+        String(providerId),
+      );
+
+      expect(count).toBe(2);
+      const filter = modelModel.updateMany.mock.calls[0][0];
+      expect(String(filter.providerId)).toBe(String(providerId));
+      expect(filter.status).toBe(ModelStatus.ACTIVE);
+      const update = modelModel.updateMany.mock.calls[0][1];
+      expect(update).toEqual({ $set: { status: ModelStatus.DISABLED } });
     });
   });
 
