@@ -1,12 +1,16 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter.js';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // OpenAI 兼容转发请求体较大（system prompt + 工具定义 + 上下文），
+  // Express 默认 JSON 上限仅 100kb，需放宽避免 413 Payload Too Large。
+  app.useBodyParser('json', { limit: '50mb' });
   const configService = app.get(ConfigService);
 
   app.enableCors();
