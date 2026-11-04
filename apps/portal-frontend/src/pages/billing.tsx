@@ -43,8 +43,8 @@ import { useAuthStore } from '@/features/auth/store'
 
 const fmtNum = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 })
 
-// 1 百万 Token（按基准倍率 1，即 GPT-4o）= 100 万点（cost = multiplier × tokens）
-const POINTS_PER_MILLION_TOKENS = 1_000_000
+// 充值单位：百万点数，1 百万点数 = 100 万点
+const POINTS_PER_MILLION = 1_000_000
 
 function fmtAmount(value: number): string {
   return `${value < 0 ? '-' : ''}${fmtNum.format(Math.abs(value))}`
@@ -242,12 +242,12 @@ export function BillingPage() {
     e.preventDefault()
     setMessage(null)
     setError(null)
-    const millionTokens = Number.parseFloat(form.amount)
-    if (!Number.isFinite(millionTokens) || millionTokens === 0) {
+    const millionPoints = Number.parseFloat(form.amount)
+    if (!Number.isFinite(millionPoints) || millionPoints === 0) {
       setError('请输入非零额度')
       return
     }
-    const amount = Math.round(millionTokens * POINTS_PER_MILLION_TOKENS)
+    const amount = Math.round(millionPoints * POINTS_PER_MILLION)
     const payload = {
       amount,
       teamId: form.teamId || undefined,
@@ -431,12 +431,12 @@ export function BillingPage() {
               </div>
               <div>
                 <label className="mb-1 block text-sm text-muted-foreground">
-                  额度（百万 Token）
+                  额度（百万点数）
                 </label>
                 <Input
                   type="number"
                   step="any"
-                  placeholder="如 1 = 100 万 Token"
+                  placeholder="如 1 = 100 万点"
                   value={form.amount}
                   onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
                 />
