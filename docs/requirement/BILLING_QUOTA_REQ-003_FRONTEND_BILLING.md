@@ -36,7 +36,7 @@
 | 类型 | 文档 |
 |---|---|
 | development | `docs/development/BILLING_QUOTA_REQ-003_DEVELOPMENT.md` |
-| fix | — |
+| fix | `docs/issue/fix/2026-11-04-billing-topup-team-selection.md`（充值/调整弹窗支持选择团队） |
 
 ## 5. 状态跟踪
 - [x] 开发中

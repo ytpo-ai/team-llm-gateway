@@ -85,12 +85,14 @@ interface DeductInput {
 ```ts
 interface TopupInput {
   amount: number;      // > 0
+  teamId?: string;     // 目标团队（system 可指定任意团队，team_admin 仅本团队）
   userId?: string;     // 缺省 = 团队账户；指定 = 成员账户
   description?: string;
 }
 
 interface AdjustInput {
   amount: number;      // 可正可负（正=加额度，负=减额度）
+  teamId?: string;     // 目标团队（同上）
   userId?: string;
   description?: string;
 }
@@ -98,6 +100,7 @@ interface AdjustInput {
 
 - `recharge`（`source: recharge`，`type: recharge`）：`amount > 0` 入账。
 - `adjust`（`source: manual`，`type: adjustment`）：正负调整，减额时按 `min 0` 截断。
+- 目标团队解析：`teamId ?? user.teamId`；`system` 可跨团队（需团队属于本租户），`team_admin` 仅限本团队。
 
 ## 6. 状态流转
 

@@ -21,9 +21,9 @@
 
 | Plan | Requirement | Development | Fix |
 |------|------------|-------------|-----|
-| [BILLING_QUOTA](../plan/BILLING_QUOTA_PLAN.md) | [REQ-001 后端计费](../requirement/BILLING_QUOTA_REQ-001_BACKEND_BILLING.md) | [开发记录](../development/BILLING_QUOTA_REQ-001_DEVELOPMENT.md) | — |
+| [BILLING_QUOTA](../plan/BILLING_QUOTA_PLAN.md) | [REQ-001 后端计费](../requirement/BILLING_QUOTA_REQ-001_BACKEND_BILLING.md) | [开发记录](../development/BILLING_QUOTA_REQ-001_DEVELOPMENT.md) | [fix 充值/调整弹窗选团队](../issue/fix/2026-11-04-billing-topup-team-selection.md) |
 | 同上 | [REQ-002 转发层联动](../requirement/BILLING_QUOTA_REQ-002_BACKEND_PROXY_ENFORCEMENT.md) | [开发记录](../development/BILLING_QUOTA_REQ-002_DEVELOPMENT.md) | — |
-| 同上 | [REQ-003 前端额度看板](../requirement/BILLING_QUOTA_REQ-003_FRONTEND_BILLING.md) | [开发记录](../development/BILLING_QUOTA_REQ-003_DEVELOPMENT.md) | — |
+| 同上 | [REQ-003 前端额度看板](../requirement/BILLING_QUOTA_REQ-003_FRONTEND_BILLING.md) | [开发记录](../development/BILLING_QUOTA_REQ-003_DEVELOPMENT.md) | [fix 充值/调整弹窗选团队](../issue/fix/2026-11-04-billing-topup-team-selection.md) |
 | [TEAM_MANAGEMENT_OPTIMIZATION](../plan/TEAM_MANAGEMENT_OPTIMIZATION_PLAN.md) | [REQ-002 三级限额模型](../requirement/TEAM_MANAGEMENT_REQ-002_QUOTA_LIMIT.md) | [开发记录](../development/TEAM_MANAGEMENT_REQ-002_DEVELOPMENT.md) | — |
 | [API_KEY_MEMBER_BINDING](../plan/API_KEY_MEMBER_BINDING_PLAN.md) | [REQ-003 后端成员绑定与聚合](../requirement/API_KEY_REQ-003_BACKEND_MEMBER_BINDING.md) | [开发记录](../development/API_KEY_REQ-003_DEVELOPMENT.md) | — |
 | [BILLING_QUOTA_CURRENCY_RATE](../plan/BILLING_QUOTA_CURRENCY_RATE_PLAN.md) | [REQ-004 后端货币汇率](../requirement/BILLING_QUOTA_REQ-004_BACKEND_CURRENCY.md) | [开发记录](../development/BILLING_QUOTA_REQ-004_DEVELOPMENT.md) | — |
