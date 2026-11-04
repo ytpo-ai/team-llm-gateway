@@ -223,7 +223,6 @@ export function BillingPage() {
     teamAccounts.find((a) => a.teamId === user?.teamId) ?? teamAccounts[0]
   const currencyConfig = currencyQuery.data ?? null
   const teamBalanceMap = new Map(teamAccounts.map((a) => [a.teamId, a]))
-  const memberOptions = members.filter((m) => m.role === 'member')
 
   const openTopup = () => {
     const defaultTeamId =
@@ -418,7 +417,7 @@ export function BillingPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="team">团队账户</SelectItem>
-                    {memberOptions.map((m) => (
+                    {members.map((m) => (
                       <SelectItem key={m.id} value={m.id}>
                         {m.name}
                       </SelectItem>
