@@ -32,6 +32,8 @@
 | 同上 | [REQ-006 Gemini OAuth](../requirement/OFFICIAL_API_REQ-006_GEMINI_OAUTH.md) | [开发记录](../development/OFFICIAL_API_REQ-006_DEVELOPMENT.md) | — |
 | [OFFICIAL_CHANNEL_PRESET](../plan/OFFICIAL_CHANNEL_PRESET_PLAN.md) | [REQ-007 后端预置+一键开启](../requirement/OFFICIAL_API_REQ-007_BACKEND_CHANNEL_PRESET.md) | [开发记录](../development/OFFICIAL_API_REQ-007_DEVELOPMENT.md) | — |
 | 同上 | [REQ-008 前端官方直连卡片区](../requirement/OFFICIAL_API_REQ-008_FRONTEND_OFFICIAL_CHANNEL.md) | [开发记录](../development/OFFICIAL_API_REQ-008_DEVELOPMENT.md) | — |
+| [OFFICIAL_CHANNEL_DUAL_FORMAT](../plan/OFFICIAL_CHANNEL_DUAL_FORMAT_PLAN.md) | [REQ-009 后端 formats+双格式](../requirement/OFFICIAL_API_REQ-009_BACKEND_DUAL_FORMAT.md) | [开发记录](../development/OFFICIAL_API_REQ-009_DEVELOPMENT.md) | — |
+| 同上 | [REQ-010 前端统一添加入口](../requirement/OFFICIAL_API_REQ-010_FRONTEND_UNIFIED_ADD.md) | [开发记录](../development/OFFICIAL_API_REQ-010_DEVELOPMENT.md) | — |
 
 ## 3. 相关文档
 - 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（§3、ADR-09/10、D-05）、`docs/technical/db_schema/MODEL_PROVIDER_SCHEMA.MD`
