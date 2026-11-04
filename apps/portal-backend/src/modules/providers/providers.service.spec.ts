@@ -111,16 +111,24 @@ describe('ProvidersService', () => {
 
   describe('createFromPreset', () => {
     const preset = {
-      key: 'openai',
-      type: ProviderType.OPENAI_COMPATIBLE,
-      label: 'OpenAI',
-      baseUrl: 'https://api.openai.com/v1',
+      key: 'deepseek',
+      label: 'DeepSeek',
+      formats: [
+        {
+          type: ProviderType.OPENAI_COMPATIBLE,
+          baseUrl: 'https://api.deepseek.com',
+        },
+        {
+          type: ProviderType.ANTHROPIC,
+          baseUrl: 'https://api.deepseek.com/anthropic',
+        },
+      ],
       models: [
         {
-          modelId: 'gpt-4o-mini',
-          displayName: 'GPT-4o mini',
+          modelId: 'deepseek-flash',
+          displayName: 'DeepSeek Flash',
           capabilities: ['chat'],
-          multiplier: 0.3,
+          multiplier: 0.1,
         },
       ],
     };
@@ -140,27 +148,72 @@ describe('ProvidersService', () => {
       }));
 
       const result = await service.createFromPreset(tenantId, teamId, {
-        presetKey: 'openai',
+        presetKey: 'deepseek',
         apiKey: 'sk-live-1234567890abcd',
       });
 
-      expect(result.provider.name).toBe('OpenAI');
-      expect(result.provider.presetKey).toBe('openai');
+      expect(result.provider.name).toBe('DeepSeek');
+      expect(result.provider.presetKey).toBe('deepseek');
       const createArg = providerModel.create.mock.calls[0][0];
-      expect(createArg.baseUrl).toBe('https://api.openai.com/v1');
+      expect(createArg.baseUrl).toBe('https://api.deepseek.com');
       expect(createArg.type).toBe(ProviderType.OPENAI_COMPATIBLE);
       expect(modelsService.bulkCreate).toHaveBeenCalledWith(tenantId, teamId, {
         providerId: result.provider.id,
         models: [
           {
-            modelId: 'gpt-4o-mini',
-            displayName: 'GPT-4o mini',
-            multiplier: 0.3,
+            modelId: 'deepseek-flash',
+            displayName: 'DeepSeek Flash',
+            multiplier: 0.1,
             capabilities: ['chat'],
             aliases: [],
           },
         ],
       });
+    });
+
+    it('selects the requested format type and baseUrl', async () => {
+      modelsService.getOfficialPresets.mockResolvedValue([preset]);
+      modelsService.bulkCreate.mockResolvedValue({ created: [], skipped: [] });
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(null),
+      });
+      providerModel.create.mockImplementation(async (input: any) => ({
+        ...makeProvider(),
+        ...input,
+      }));
+
+      await service.createFromPreset(tenantId, teamId, {
+        presetKey: 'deepseek',
+        apiKey: 'sk-x',
+        format: ProviderType.ANTHROPIC,
+      });
+
+      const createArg = providerModel.create.mock.calls[0][0];
+      expect(createArg.type).toBe(ProviderType.ANTHROPIC);
+      expect(createArg.baseUrl).toBe('https://api.deepseek.com/anthropic');
+    });
+
+    it('overrides baseUrl while keeping the format type', async () => {
+      modelsService.getOfficialPresets.mockResolvedValue([preset]);
+      modelsService.bulkCreate.mockResolvedValue({ created: [], skipped: [] });
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(null),
+      });
+      providerModel.create.mockImplementation(async (input: any) => ({
+        ...makeProvider(),
+        ...input,
+      }));
+
+      await service.createFromPreset(tenantId, teamId, {
+        presetKey: 'deepseek',
+        apiKey: 'sk-x',
+        format: ProviderType.OPENAI_COMPATIBLE,
+        baseUrl: 'https://custom.example.com/v1',
+      });
+
+      const createArg = providerModel.create.mock.calls[0][0];
+      expect(createArg.type).toBe(ProviderType.OPENAI_COMPATIBLE);
+      expect(createArg.baseUrl).toBe('https://custom.example.com/v1');
     });
 
     it('throws NotFound when preset key missing', async () => {
@@ -189,12 +242,12 @@ describe('ProvidersService', () => {
       }));
 
       const result = await service.createFromPreset(tenantId, teamId, {
-        presetKey: 'openai',
+        presetKey: 'deepseek',
         apiKey: 'sk-live-1234567890abcd',
-        name: 'OpenAI 公司主账号',
+        name: 'DeepSeek 公司主账号',
       });
 
-      expect(result.provider.name).toBe('OpenAI 公司主账号');
+      expect(result.provider.name).toBe('DeepSeek 公司主账号');
     });
   });
 

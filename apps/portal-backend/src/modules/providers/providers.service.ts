@@ -110,11 +110,17 @@ export class ProvidersService {
       throw new NotFoundException('官方渠道预置不存在');
     }
 
+    const format =
+      preset.formats.find((f) => f.type === dto.format) ?? preset.formats[0];
+    if (!format) {
+      throw new NotFoundException('官方渠道预置未配置可用格式');
+    }
+
     const provider = await this.create(tenantId, teamId, {
       name: dto.name?.trim() || preset.label,
-      type: preset.type,
+      type: format.type,
       authType: ProviderAuthType.API_KEY,
-      baseUrl: preset.baseUrl,
+      baseUrl: dto.baseUrl?.trim() || format.baseUrl,
       apiKey: dto.apiKey,
       presetKey: preset.key,
     });

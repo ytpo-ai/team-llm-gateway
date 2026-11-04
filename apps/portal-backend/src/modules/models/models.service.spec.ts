@@ -195,7 +195,7 @@ describe('ModelsService', () => {
       const presets = await service.getOfficialPresets();
 
       expect(presets.length).toBeGreaterThan(0);
-      expect(presets[0]).toHaveProperty('type');
+      expect(presets[0]).toHaveProperty('formats');
       expect(presets[0]).toHaveProperty('models');
     });
 
@@ -215,7 +215,14 @@ describe('ModelsService', () => {
         vi.fn().mockResolvedValue(
           new Response(
             JSON.stringify([
-              { type: 'openai-compatible', label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', models: [] },
+              {
+                key: 'openai',
+                label: 'OpenAI',
+                formats: [
+                  { type: 'openai-compatible', baseUrl: 'https://api.openai.com/v1' },
+                ],
+                models: [],
+              },
             ]),
             { status: 200 },
           ),

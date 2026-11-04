@@ -44,7 +44,7 @@ import {
 } from '@/features/models/api'
 import type { Model, ModelInput, ModelPatch } from '@/features/models/types'
 import { listProviders } from '@/features/providers/api'
-import type { Provider, ProviderType } from '@/features/providers/types'
+import type { Provider } from '@/features/providers/types'
 import { ApiError } from '@/lib/http'
 
 interface FormState {
@@ -95,7 +95,7 @@ export function ModelsPage() {
   const [removeTarget, setRemoveTarget] = useState<Model | null>(null)
 
   const [importOpen, setImportOpen] = useState(false)
-  const [presetType, setPresetType] = useState<ProviderType>('openai-compatible')
+  const [presetKey, setPresetKey] = useState<string>('')
   const [importProviderId, setImportProviderId] = useState('')
   const [selectedModels, setSelectedModels] = useState<string[]>([])
   const [importResult, setImportResult] = useState<string | null>(null)
@@ -117,7 +117,7 @@ export function ModelsPage() {
     queryClient.invalidateQueries({ queryKey: ['models'] })
 
   const officialPresets = presetsQuery.data ?? []
-  const activePreset = officialPresets.find((p) => p.type === presetType)
+  const activePreset = officialPresets.find((p) => p.key === presetKey)
 
   const toggleModel = (modelId: string) => {
     setSelectedModels((prev) =>
@@ -128,7 +128,7 @@ export function ModelsPage() {
   }
 
   const openImport = () => {
-    setPresetType('openai-compatible')
+    setPresetKey(officialPresets[0]?.key ?? '')
     setImportProviderId('')
     setSelectedModels([])
     setImportResult(null)
@@ -448,18 +448,18 @@ export function ModelsPage() {
           <SheetHeader>
             <SheetTitle>官方预设导入</SheetTitle>
             <SheetDescription>
-              从官方预置目录一键导入模型（能力标签与默认倍率自动填充），需先有对应协议类型的上游渠道
+              从官方预置目录一键导入模型（能力标签与默认倍率自动填充），需先有对应的上游渠道
             </SheetDescription>
           </SheetHeader>
           <div className="flex flex-1 flex-col gap-4 overflow-y-auto">
             <div>
               <label className="mb-1 block text-sm text-muted-foreground">
-                官方协议类型
+                官方预置
               </label>
               <Select
-                value={presetType}
+                value={presetKey}
                 onValueChange={(v) => {
-                  setPresetType(v as ProviderType)
+                  setPresetKey(v)
                   setSelectedModels([])
                 }}
               >
@@ -468,7 +468,7 @@ export function ModelsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {officialPresets.map((preset) => (
-                    <SelectItem key={preset.type} value={preset.type}>
+                    <SelectItem key={preset.key} value={preset.key}>
                       {preset.label}
                     </SelectItem>
                   ))}

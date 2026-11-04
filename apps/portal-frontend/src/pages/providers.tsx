@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
@@ -66,12 +65,15 @@ import {
 } from '@/features/providers/types'
 import { ApiError } from '@/lib/http'
 
+const NONE_PRESET = '__none__'
+
 interface FormState {
   name: string
   type: ProviderType
   authType: ProviderAuthType
   baseUrl: string
   apiKey: string
+  presetKey: string
 }
 
 const emptyForm: FormState = {
@@ -80,6 +82,7 @@ const emptyForm: FormState = {
   authType: 'api-key',
   baseUrl: '',
   apiKey: '',
+  presetKey: '',
 }
 
 export function ProvidersPage() {
@@ -87,6 +90,7 @@ export function ProvidersPage() {
   const user = useAuthStore((s) => s.user)
   const isAdmin = user?.role === 'team_admin' || user?.role === 'system'
 
+  const [addOpen, setAddOpen] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
   const [form, setForm] = useState<FormState>(emptyForm)
   const [editing, setEditing] = useState<Provider | null>(null)
@@ -99,6 +103,8 @@ export function ProvidersPage() {
 
   const [enablePreset, setEnablePreset] =
     useState<OfficialProviderPreset | null>(null)
+  const [enableFormat, setEnableFormat] = useState<ProviderType>('openai-compatible')
+  const [enableUrl, setEnableUrl] = useState('')
   const [enableName, setEnableName] = useState('')
   const [enableKey, setEnableKey] = useState('')
   const [enableError, setEnableError] = useState<string | null>(null)
@@ -119,11 +125,19 @@ export function ProvidersPage() {
     queryClient.invalidateQueries({ queryKey: ['providers'] })
 
   const openEnable = (preset: OfficialProviderPreset) => {
+    const first = preset.formats[0]
     setEnablePreset(preset)
+    setEnableFormat(first?.type ?? 'openai-compatible')
+    setEnableUrl(first?.baseUrl ?? '')
     setEnableName('')
     setEnableKey('')
     setEnableError(null)
-    setEnableResult(null)
+  }
+
+  const selectEnableFormat = (type: ProviderType) => {
+    const format = enablePreset?.formats.find((f) => f.type === type)
+    setEnableFormat(type)
+    setEnableUrl(format?.baseUrl ?? '')
   }
 
   const enableMutation = useMutation({
@@ -133,6 +147,8 @@ export function ProvidersPage() {
         presetKey: enablePreset.key,
         apiKey: enableKey.trim(),
         name: enableName.trim() || undefined,
+        format: enableFormat,
+        baseUrl: enableUrl.trim() || undefined,
       })
     },
     onSuccess: (result) => {
@@ -143,6 +159,7 @@ export function ProvidersPage() {
             : ''),
       )
       setEnablePreset(null)
+      setAddOpen(false)
       setEnableName('')
       setEnableKey('')
       setEnableError(null)
@@ -183,6 +200,7 @@ export function ProvidersPage() {
           type: form.type,
           authType: form.authType,
           baseUrl: form.baseUrl.trim(),
+          presetKey: form.presetKey.trim(),
         }
         if (form.apiKey.trim()) patch.apiKey = form.apiKey.trim()
         return updateProvider(editing.id, patch)
@@ -228,6 +246,7 @@ export function ProvidersPage() {
       authType: provider.authType ?? 'api-key',
       baseUrl: provider.baseUrl,
       apiKey: '',
+      presetKey: provider.presetKey ?? '',
     })
     setError(null)
     setFormOpen(true)
@@ -244,14 +263,6 @@ export function ProvidersPage() {
   const providers: Provider[] = providersQuery.data ?? []
   const officialPresets: OfficialProviderPreset[] = presetsQuery.data ?? []
 
-  const providersByPreset: Record<string, Provider[]> = {}
-  for (const provider of providers) {
-    if (!provider.presetKey) continue
-    const list = providersByPreset[provider.presetKey] ?? []
-    providersByPreset[provider.presetKey] = list
-    list.push(provider)
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
@@ -261,66 +272,12 @@ export function ProvidersPage() {
             配置团队上游（OpenAI 兼容 / 直连），上游 key 加密存储、仅展示脱敏信息
           </p>
         </div>
-        <Button onClick={openCreate}>添加上游渠道</Button>
+        <Button onClick={() => setAddOpen(true)}>添加渠道</Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>官方直连</CardTitle>
-          <CardDescription>
-            内置主流 LLM 官方直连，默认未开启；填 Key 即可一键开启并自动导入官方模型
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {enableResult && (
-            <p className="text-sm text-green-600">{enableResult}</p>
-          )}
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {officialPresets.map((preset) => {
-              const enabled = providersByPreset[preset.key] ?? []
-              return (
-                <div
-                  key={preset.key}
-                  className="rounded-md border border-border p-3 text-sm"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">{preset.label}</span>
-                    <span
-                      className={`text-xs ${
-                        enabled.length
-                          ? 'text-green-600'
-                          : 'text-muted-foreground'
-                      }`}
-                    >
-                      {enabled.length ? `已开启 ${enabled.length} 个` : '未开启'}
-                    </span>
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {PROVIDER_TYPE_LABELS[preset.type]} · {preset.models.length}{' '}
-                    个官方模型
-                  </div>
-                  <div className="mt-1 truncate text-xs text-muted-foreground">
-                    {preset.baseUrl}
-                  </div>
-                  {enabled.length > 0 && (
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      {enabled.map((p) => p.name).join('、')}
-                    </div>
-                  )}
-                  <Button
-                    className="mt-3"
-                    size="sm"
-                    variant={enabled.length ? 'outline' : 'default'}
-                    onClick={() => openEnable(preset)}
-                  >
-                    {enabled.length ? '再添加一个' : '开启使用'}
-                  </Button>
-                </div>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
+      {enableResult && (
+        <p className="text-sm text-green-600">{enableResult}</p>
+      )}
 
       <Card>
         <CardHeader>
@@ -418,6 +375,67 @@ export function ProvidersPage() {
         </CardContent>
       </Card>
 
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>添加渠道</DialogTitle>
+            <DialogDescription>
+              手动配置自定义渠道，或从官方渠道快捷开启
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <button
+              type="button"
+              onClick={() => {
+                setAddOpen(false)
+                openCreate()
+              }}
+              className="flex w-full items-center justify-between rounded-md border border-dashed border-border p-3 text-left text-sm transition-colors hover:bg-accent"
+            >
+              <span>
+                <span className="font-medium">自定义渠道</span>
+                <span className="block text-xs text-muted-foreground">
+                  手动填写名称 / 协议 / Base URL / Key
+                </span>
+              </span>
+              <span className="text-lg text-muted-foreground">＋</span>
+            </button>
+
+            <div>
+              <div className="mb-2 text-sm font-medium">官方渠道</div>
+              <div className="grid gap-2">
+                {officialPresets.map((preset) => (
+                  <div
+                    key={preset.key}
+                    className="flex items-center justify-between rounded-md border border-border p-3 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium">{preset.label}</div>
+                      <div className="truncate text-xs text-muted-foreground">
+                        {preset.formats
+                          .map((f) => PROVIDER_TYPE_LABELS[f.type])
+                          .join(' / ')}{' '}
+                        · {preset.models.length} 个模型
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setAddOpen(false)
+                        openEnable(preset)
+                      }}
+                    >
+                      开启
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Sheet open={formOpen} onOpenChange={setFormOpen}>
         <SheetContent className="sm:max-w-md">
           <SheetHeader>
@@ -472,6 +490,34 @@ export function ProvidersPage() {
                 </SelectContent>
               </Select>
             </div>
+            {editing && (
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground">
+                  是否官方渠道
+                </label>
+                <Select
+                  value={form.presetKey || NONE_PRESET}
+                  onValueChange={(v) =>
+                    setForm({
+                      ...form,
+                      presetKey: v === NONE_PRESET ? '' : v,
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE_PRESET}>无（普通渠道）</SelectItem>
+                    {officialPresets.map((preset) => (
+                      <SelectItem key={preset.key} value={preset.key}>
+                        {preset.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             {form.type === 'gemini' && (
               <div>
                 <label className="mb-1 block text-sm text-muted-foreground">
@@ -560,10 +606,39 @@ export function ProvidersPage() {
           <DialogHeader>
             <DialogTitle>开启「{enablePreset?.label}」</DialogTitle>
             <DialogDescription>
-              填 Key 即可一键开启并自动导入官方模型
+              选择接入格式（可修改 URL），填 Key 即可一键开启并自动导入官方模型
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                接入格式
+              </label>
+              <Select
+                value={enableFormat}
+                onValueChange={(v) => selectEnableFormat(v as ProviderType)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {enablePreset?.formats.map((format) => (
+                    <SelectItem key={format.type} value={format.type}>
+                      {PROVIDER_TYPE_LABELS[format.type]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                Base URL
+              </label>
+              <Input
+                value={enableUrl}
+                onChange={(e) => setEnableUrl(e.target.value)}
+              />
+            </div>
             <div>
               <label className="mb-1 block text-sm text-muted-foreground">
                 API Key

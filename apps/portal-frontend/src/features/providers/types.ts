@@ -31,6 +31,7 @@ export interface ProviderPatch {
   baseUrl?: string
   apiKey?: string
   status?: ProviderStatus
+  presetKey?: string
 }
 
 export interface ProviderProbeResult {
@@ -43,6 +44,8 @@ export interface CreateProviderFromPresetInput {
   presetKey: string
   apiKey: string
   name?: string
+  format?: ProviderType
+  baseUrl?: string
 }
 
 export interface CreateProviderFromPresetResult {

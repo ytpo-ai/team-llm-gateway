@@ -7,20 +7,25 @@ export interface OfficialModelPreset {
   multiplier: number;
 }
 
+export interface OfficialFormatPreset {
+  type: ProviderType;
+  baseUrl: string;
+}
+
 export interface OfficialProviderPreset {
   key: string;
-  type: ProviderType;
   label: string;
-  baseUrl: string;
+  formats: OfficialFormatPreset[];
   models: OfficialModelPreset[];
 }
 
 export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   {
     key: 'openai',
-    type: ProviderType.OPENAI_COMPATIBLE,
     label: 'OpenAI',
-    baseUrl: 'https://api.openai.com/v1',
+    formats: [
+      { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://api.openai.com/v1' },
+    ],
     models: [
       {
         modelId: 'gpt-4o',
@@ -50,9 +55,11 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   },
   {
     key: 'anthropic',
-    type: ProviderType.ANTHROPIC,
     label: 'Anthropic Claude',
-    baseUrl: 'https://api.anthropic.com',
+    formats: [
+      { type: ProviderType.ANTHROPIC, baseUrl: 'https://api.anthropic.com' },
+      { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://api.anthropic.com/v1' },
+    ],
     models: [
       {
         modelId: 'claude-sonnet-4-20250514',
@@ -76,9 +83,11 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   },
   {
     key: 'gemini',
-    type: ProviderType.GEMINI,
     label: 'Google Gemini',
-    baseUrl: 'https://generativelanguage.googleapis.com',
+    formats: [
+      { type: ProviderType.GEMINI, baseUrl: 'https://generativelanguage.googleapis.com' },
+      { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai' },
+    ],
     models: [
       {
         modelId: 'gemini-2.0-flash',
@@ -102,19 +111,21 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   },
   {
     key: 'deepseek',
-    type: ProviderType.OPENAI_COMPATIBLE,
     label: 'DeepSeek',
-    baseUrl: 'https://api.deepseek.com/v1',
+    formats: [
+      { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://api.deepseek.com' },
+      { type: ProviderType.ANTHROPIC, baseUrl: 'https://api.deepseek.com/anthropic' },
+    ],
     models: [
       {
-        modelId: 'deepseek-chat',
-        displayName: 'DeepSeek Chat',
+        modelId: 'deepseek-flash',
+        displayName: 'DeepSeek Flash',
         capabilities: ['chat', 'code', 'long-context'],
         multiplier: 0.1,
       },
       {
-        modelId: 'deepseek-reasoner',
-        displayName: 'DeepSeek Reasoner',
+        modelId: 'deepseek-v4-pro',
+        displayName: 'DeepSeek V4 Pro',
         capabilities: ['chat', 'code', 'reasoning', 'long-context'],
         multiplier: 0.2,
       },
@@ -122,9 +133,10 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   },
   {
     key: 'moonshot',
-    type: ProviderType.OPENAI_COMPATIBLE,
     label: 'Moonshot Kimi',
-    baseUrl: 'https://api.moonshot.cn/v1',
+    formats: [
+      { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://api.moonshot.cn/v1' },
+    ],
     models: [
       {
         modelId: 'moonshot-v1-8k',
@@ -148,9 +160,10 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   },
   {
     key: 'qwen',
-    type: ProviderType.OPENAI_COMPATIBLE,
     label: '通义千问 Qwen',
-    baseUrl: 'https://maas.qianwenaiapi.com/compatible-mode/v1',
+    formats: [
+      { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://maas.qianwenaiapi.com/compatible-mode/v1' },
+    ],
     models: [
       {
         modelId: 'qwen-turbo',
@@ -174,9 +187,10 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   },
   {
     key: 'zhipu',
-    type: ProviderType.OPENAI_COMPATIBLE,
     label: '智谱 GLM',
-    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    formats: [
+      { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
+    ],
     models: [
       {
         modelId: 'glm-4-flash',
@@ -200,9 +214,10 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   },
   {
     key: 'minimax',
-    type: ProviderType.OPENAI_COMPATIBLE,
     label: 'MiniMax',
-    baseUrl: 'https://api.minimax.chat/v1',
+    formats: [
+      { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://api.minimax.chat/v1' },
+    ],
     models: [
       {
         modelId: 'MiniMax-Text-01',
@@ -214,9 +229,10 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   },
   {
     key: 'doubao',
-    type: ProviderType.OPENAI_COMPATIBLE,
     label: '豆包 Doubao',
-    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+    formats: [
+      { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://ark.cn-beijing.volces.com/api/v3' },
+    ],
     models: [
       {
         modelId: 'doubao-lite-32k',
@@ -234,9 +250,10 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   },
   {
     key: 'grok',
-    type: ProviderType.OPENAI_COMPATIBLE,
     label: 'xAI Grok',
-    baseUrl: 'https://api.x.ai/v1',
+    formats: [
+      { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://api.x.ai/v1' },
+    ],
     models: [
       {
         modelId: 'grok-2-1212',
@@ -248,9 +265,10 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   },
   {
     key: 'mistral',
-    type: ProviderType.OPENAI_COMPATIBLE,
     label: 'Mistral',
-    baseUrl: 'https://api.mistral.ai/v1',
+    formats: [
+      { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://api.mistral.ai/v1' },
+    ],
     models: [
       {
         modelId: 'mistral-small-latest',

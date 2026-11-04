@@ -21,11 +21,15 @@ export interface OfficialModelPreset {
   multiplier: number
 }
 
+export interface OfficialFormatPreset {
+  type: ProviderType
+  baseUrl: string
+}
+
 export interface OfficialProviderPreset {
   key: string
-  type: ProviderType
   label: string
-  baseUrl: string
+  formats: OfficialFormatPreset[]
   models: OfficialModelPreset[]
 }
 
