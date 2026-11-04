@@ -52,6 +52,7 @@ import type {
   ApiKey,
   ApiKeyInput,
   ApiKeyPatch,
+  ApiKeyResult,
 } from '@/features/api-keys/types'
 import { useAuthStore } from '@/features/auth/store'
 import { listPolicySets } from '@/features/policy-sets/api'
@@ -155,12 +156,15 @@ export function ApiKeysPage() {
         expiresAt: form.expiresAt || undefined,
         policySetId: form.policySetId || undefined,
       }
-      return createApiKey(input).then((r) => r.apiKey)
+      return createApiKey(input)
     },
-    onSuccess: () => {
+    onSuccess: (result: ApiKey | ApiKeyResult) => {
       resetForm()
       setFormOpen(false)
       invalidate()
+      if ('key' in result) {
+        setRevealed({ key: result.key, name: result.apiKey.name })
+      }
     },
     onError: (err) => {
       setError(err instanceof ApiError ? err.message : '操作失败，请稍后重试')
