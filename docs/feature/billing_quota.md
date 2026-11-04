@@ -6,6 +6,7 @@
 - 统一扣费引擎（唯一）：模型倍率 × token，含缓存计费、阶梯价。
 - 可插拔额度来源：首期充值额度 / 月结账单 / 赠送额度（兑换码、订阅后置）。
 - 额度账户：团队级 / 成员级；服务商角色可看全局额度池。
+- 限制策略化：团队/角色/key 三级「范围限制 + 用量限制」统一挂载 `PolicySet`，转发层取最严求值（token/request/concurrency/spend × 窗口 × block/warn）。
 - 落实 ADR-10「统一扣费引擎 + 可插拔额度来源」。
 
 ### 数据结构
@@ -14,7 +15,7 @@
 ### 核心逻辑
 - 统一扣费引擎（唯一）：`cost = multiplier × totalTokens`，`deduct()` 成员账户优先、团队账户兜底，原子扣减防负余额。
 - 可插拔额度来源（首发 `recharge`/`manual`）：`source` 标识渠道，`monthly`/`gift` 后置为插件（D-03）。
-- 转发层限额联动：`rateLimitPerMinute`（内存滑动窗口）+ `maxTokens`（累计 token 预算）+ 余额预检 → 转发后扣减（闭环 USAGE_METERING U-01）。
+- 转发层限额联动：策略求值引擎（`QuotaLimitService`）按团队/角色/key 三级策略集逐级取最严校验（token/request/concurrency/spend × 窗口 × block/warn）+ 余额预检 → 转发后扣减（闭环 USAGE_METERING U-01）。
 
 ## 2. 需求追溯
 

@@ -34,6 +34,8 @@ apikey 是下发给团队成员接入 LLM 的凭证。现状：`ApiKey` 虽已�
 | 成员聚合 | 成员速率以 `userId` 为键，天然聚合该成员所有已绑定 key；周期限额沿用 `sumTokens({ userId })` |
 | 视图 | `ApiKeyView` 增加 `userName`/`userEmail`（`list` 时批量填充） |
 
+> 演进说明：本 plan 的「速率拆分（member/key 两档）」实现，后续被 `docs/plan/BILLING_QUOTA_POLICY_PLAN.md` 的策略化（PolicySet）重构吸收——速率限制现由 `PolicySet` 的 `request/minute` 条目按 team/role/key 三级求值（成员级仍按 `userId` 聚合），`QuotaLimitService` 已重写为通用策略求值引擎。成员绑定（`userId` 签发/改绑 + `userName`/`userEmail`）部分保持不变。
+
 ## 4. Requirement 拆解
 
 | Requirement | 内容 | 主要涉及 feature | 验收条件 |

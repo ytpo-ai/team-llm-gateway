@@ -16,7 +16,7 @@
 - 上报：`UsageService.record()` 进程内方法，由 OpenAI 兼容转发层（`/v1/chat/completions`）在转发后调用。
 - 转发层：成员 key（`pk_`）鉴权 → 模型/上游解析 → 转发 → 采集 token → 落库（闭环 ADR-09 / M-01）。
 - 查询 API：`GET /usage/summary`、`/usage/trends`、`/usage/by-model`、`/usage/by-member`、`/usage/by-key`。
-- RBAC：`member` 仅本人，`team_admin`/`finance`/`viewer` 团队全量。
+- RBAC：`member` 仅本人，`team_admin`/`system` 团队全量。
 
 ## 2. 需求追溯
 
