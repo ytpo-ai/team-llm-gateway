@@ -232,6 +232,111 @@ describe('BillingService', () => {
     });
   });
 
+  describe('listTransactions', () => {
+    const makeTx = (overrides: Record<string, unknown> = {}) => ({
+      _id: new Types.ObjectId(),
+      accountId,
+      accountType: QuotaAccountType.TEAM,
+      userId: null,
+      teamId,
+      type: QuotaTransactionType.RECHARGE,
+      source: QuotaTransactionSource.RECHARGE,
+      amount: 100,
+      balanceAfter: 1100,
+      shortfall: false,
+      referenceId: null,
+      description: null,
+      createdAt: new Date(),
+      ...overrides,
+    });
+
+    const mockTransactionFind = (rows: unknown[]) => {
+      quotaTransactionModel.find.mockReturnValue({
+        sort: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        exec: vi.fn().mockResolvedValue(rows),
+      });
+    };
+
+    const mockLabelAndTeamLookup = () => {
+      userModel.find.mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        exec: vi
+          .fn()
+          .mockResolvedValue([
+            { _id: userId, name: 'Alice', email: 'alice@example.com' },
+          ]),
+      });
+      teamModel.find.mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        exec: vi.fn().mockResolvedValue([{ _id: teamId, name: 'Team A' }]),
+      });
+    };
+
+    it('should filter by userId for a regular member', async () => {
+      mockTransactionFind([]);
+      mockLabelAndTeamLookup();
+
+      await service.listTransactions(makeUser(), {});
+
+      const filter = quotaTransactionModel.find.mock.calls[0][0];
+      expect(filter.userId).toEqual(userId);
+    });
+
+    it('should filter by team for team_admin', async () => {
+      mockTransactionFind([]);
+      mockLabelAndTeamLookup();
+
+      await service.listTransactions(makeUser({ role: Role.TEAM_ADMIN }), {});
+
+      const filter = quotaTransactionModel.find.mock.calls[0][0];
+      expect(filter.userId).toBeUndefined();
+      expect(filter.teamId).toEqual(teamId);
+    });
+
+    it('should list transactions across all teams for system', async () => {
+      mockTransactionFind([]);
+      mockLabelAndTeamLookup();
+
+      await service.listTransactions(makeUser({ role: Role.SYSTEM }), {});
+
+      const filter = quotaTransactionModel.find.mock.calls[0][0];
+      expect(filter.userId).toBeUndefined();
+      expect(filter.teamId).toBeUndefined();
+    });
+
+    it('should enrich member transactions with label and team name', async () => {
+      mockTransactionFind([
+        makeTx({
+          accountType: QuotaAccountType.MEMBER,
+          userId,
+        }),
+      ]);
+      mockLabelAndTeamLookup();
+
+      const result = await service.listTransactions(
+        makeUser({ role: Role.TEAM_ADMIN }),
+        {},
+      );
+
+      expect(result[0].label).toBe('Alice');
+      expect(result[0].teamName).toBe('Team A');
+    });
+
+    it('should leave label null for team account transactions', async () => {
+      mockTransactionFind([makeTx()]);
+      mockLabelAndTeamLookup();
+
+      const result = await service.listTransactions(
+        makeUser({ role: Role.TEAM_ADMIN }),
+        {},
+      );
+
+      expect(result[0].label).toBeNull();
+      expect(result[0].teamName).toBe('Team A');
+    });
+  });
+
   describe('deduct', () => {
     it('should deduct from member account when present', async () => {
       const memberAccount = makeAccount({

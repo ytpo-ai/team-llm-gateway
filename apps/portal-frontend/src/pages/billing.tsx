@@ -71,6 +71,7 @@ function TransactionTable({
     <table className="w-full text-sm">
       <thead>
         <tr className="border-b text-left text-muted-foreground">
+          <th className="py-2 pr-4 font-medium">账户</th>
           <th className="py-2 pr-4 font-medium">类型</th>
           <th className="py-2 pr-4 font-medium">来源</th>
           <th className="py-2 pr-4 text-right font-medium">金额</th>
@@ -83,8 +84,13 @@ function TransactionTable({
         {items.map((item) => {
           const amountCurrency = formatCurrencyAmount(item.amount, config)
           const balanceCurrency = formatCurrencyAmount(item.balanceAfter, config)
+          const accountLabel =
+            item.accountType === 'member'
+              ? `成员 · ${item.label ?? item.userId ?? '—'}`
+              : `团队 · ${item.teamName ?? '—'}`
           return (
             <tr key={item.id} className="border-b last:border-0">
+              <td className="py-2 pr-4">{accountLabel}</td>
               <td className="py-2 pr-4">{TYPE_LABEL[item.type]}</td>
               <td className="py-2 pr-4">{item.source}</td>
               <td
@@ -160,60 +166,78 @@ export function BillingPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {isSystem ? (
-          teams.map((team) => {
-            const balance = teamBalanceMap.get(team.id)?.balance ?? 0
-            return (
-              <Card key={team.id}>
+      <div className="space-y-4">
+        <div>
+          <h2 className="mb-2 text-xs font-medium tracking-wide text-muted-foreground">
+            团队余额
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {isSystem ? (
+              teams.map((team) => {
+                const balance = teamBalanceMap.get(team.id)?.balance ?? 0
+                return (
+                  <Card key={team.id}>
+                    <CardHeader>
+                      <CardDescription>{team.name} · 团队额度余额</CardDescription>
+                      <CardTitle className="text-2xl">
+                        {accountsQuery.isLoading ? '…' : fmtNum.format(balance)}
+                      </CardTitle>
+                      {formatCurrencyAmount(balance, currencyConfig) && (
+                        <p className="text-sm text-muted-foreground">
+                          ≈ {formatCurrencyAmount(balance, currencyConfig)}
+                        </p>
+                      )}
+                    </CardHeader>
+                  </Card>
+                )
+              })
+            ) : (
+              <Card>
                 <CardHeader>
-                  <CardDescription>{team.name} · 团队额度余额</CardDescription>
+                  <CardDescription>团队额度余额</CardDescription>
                   <CardTitle className="text-2xl">
-                    {accountsQuery.isLoading ? '…' : fmtNum.format(balance)}
+                    {accountsQuery.isLoading
+                      ? '…'
+                      : fmtNum.format(teamAccount?.balance ?? 0)}
                   </CardTitle>
-                  {formatCurrencyAmount(balance, currencyConfig) && (
-                    <p className="text-sm text-muted-foreground">
-                      ≈ {formatCurrencyAmount(balance, currencyConfig)}
-                    </p>
-                  )}
+                  {teamAccount &&
+                    formatCurrencyAmount(teamAccount.balance, currencyConfig) && (
+                      <p className="text-sm text-muted-foreground">
+                        ≈ {formatCurrencyAmount(teamAccount.balance, currencyConfig)}
+                      </p>
+                    )}
                 </CardHeader>
               </Card>
-            )
-          })
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardDescription>团队额度余额</CardDescription>
-              <CardTitle className="text-2xl">
-                {accountsQuery.isLoading
-                  ? '…'
-                  : fmtNum.format(teamAccount?.balance ?? 0)}
-              </CardTitle>
-              {teamAccount &&
-                formatCurrencyAmount(teamAccount.balance, currencyConfig) && (
-                  <p className="text-sm text-muted-foreground">
-                    ≈ {formatCurrencyAmount(teamAccount.balance, currencyConfig)}
-                  </p>
-                )}
-            </CardHeader>
-          </Card>
+            )}
+          </div>
+        </div>
+        {memberAccounts.length > 0 && (
+          <div>
+            <h2 className="mb-2 text-xs font-medium tracking-wide text-muted-foreground">
+              成员余额
+            </h2>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {memberAccounts.map((account) => (
+                <Card key={account.id}>
+                  <CardHeader>
+                    <CardDescription>
+                      成员额度 · {account.label ?? account.userId}
+                      {isSystem && account.teamName ? ` · ${account.teamName}` : ''}
+                    </CardDescription>
+                    <CardTitle className="text-2xl">
+                      {fmtNum.format(account.balance)}
+                    </CardTitle>
+                    {formatCurrencyAmount(account.balance, currencyConfig) && (
+                      <p className="text-sm text-muted-foreground">
+                        ≈ {formatCurrencyAmount(account.balance, currencyConfig)}
+                      </p>
+                    )}
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+          </div>
         )}
-        {memberAccounts.map((account) => (
-          <Card key={account.id}>
-            <CardHeader>
-              <CardDescription>
-                成员额度 · {account.label ?? account.userId}
-                {isSystem && account.teamName ? ` · ${account.teamName}` : ''}
-              </CardDescription>
-              <CardTitle className="text-2xl">{fmtNum.format(account.balance)}</CardTitle>
-              {formatCurrencyAmount(account.balance, currencyConfig) && (
-                <p className="text-sm text-muted-foreground">
-                  ≈ {formatCurrencyAmount(account.balance, currencyConfig)}
-                </p>
-              )}
-            </CardHeader>
-          </Card>
-        ))}
       </div>
 
       <Card>

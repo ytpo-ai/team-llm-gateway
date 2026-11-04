@@ -20,6 +20,8 @@ export interface QuotaTransaction {
   accountId: string
   accountType: QuotaAccountType
   userId: string | null
+  label: string | null
+  teamName: string | null
   type: QuotaTransactionType
   source: QuotaTransactionSource
   amount: number

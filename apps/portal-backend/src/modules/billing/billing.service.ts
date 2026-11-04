@@ -41,6 +41,8 @@ export interface QuotaTransactionView {
   accountId: string;
   accountType: QuotaAccountType;
   userId: string | null;
+  label: string | null;
+  teamName: string | null;
   type: QuotaTransactionType;
   source: QuotaTransactionSource;
   amount: number;
@@ -162,7 +164,7 @@ export class BillingService {
     };
     if (user.role === Role.MEMBER) {
       filter.userId = new Types.ObjectId(user.id);
-    } else {
+    } else if (user.role === Role.TEAM_ADMIN) {
       filter.teamId = new Types.ObjectId(user.teamId);
     }
     if (query.type) filter.type = query.type;
@@ -179,11 +181,25 @@ export class BillingService {
       .limit(TRANSACTION_LIMIT)
       .exec();
 
+    const memberIds = rows
+      .filter((r) => r.accountType === QuotaAccountType.MEMBER && r.userId)
+      .map((r) => String(r.userId));
+    const teamIds = [...new Set(rows.map((r) => String(r.teamId)))];
+    const [labelMap, teamNameMap] = await Promise.all([
+      this.buildLabelMap(memberIds),
+      this.buildTeamNameMap(teamIds),
+    ]);
+
     return rows.map((row) => ({
       id: String(row._id),
       accountId: String(row.accountId),
       accountType: row.accountType,
       userId: row.userId ? String(row.userId) : null,
+      label:
+        row.accountType === QuotaAccountType.MEMBER && row.userId
+          ? (labelMap.get(String(row.userId)) ?? null)
+          : null,
+      teamName: teamNameMap.get(String(row.teamId)) ?? null,
       type: row.type,
       source: row.source,
       amount: row.amount,
@@ -249,6 +265,8 @@ export class BillingService {
       accountId: String(doc.accountId),
       accountType: doc.accountType,
       userId: doc.userId ? String(doc.userId) : null,
+      label: null,
+      teamName: null,
       type: doc.type,
       source: doc.source,
       amount: doc.amount,
