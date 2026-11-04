@@ -22,7 +22,7 @@
 
 | Plan | Requirement | Development | Fix |
 |------|------------|-------------|-----|
-| [MODEL_PROVIDER](../plan/MODEL_PROVIDER_PLAN.md) | [REQ-001 后端模型与上游](../requirement/MODEL_PROVIDER_REQ-001_BACKEND_PROVIDER_MODEL.md) | [开发记录](../development/MODEL_PROVIDER_REQ-001_DEVELOPMENT.md) | — |
+| [MODEL_PROVIDER](../plan/MODEL_PROVIDER_PLAN.md) | [REQ-001 后端模型与上游](../requirement/MODEL_PROVIDER_REQ-001_BACKEND_PROVIDER_MODEL.md) | [开发记录](../development/MODEL_PROVIDER_REQ-001_DEVELOPMENT.md) | [禁用渠道级联禁用模型](../issue/fix/2026-11-04-provider-disable-cascade.md) |
 | 同上 | [REQ-002 前端模型与上游管理](../requirement/MODEL_PROVIDER_REQ-002_FRONTEND_PROVIDER_MODEL.md) | [开发记录](../development/MODEL_PROVIDER_REQ-002_DEVELOPMENT.md) | — |
 | [OFFICIAL_API](../plan/OFFICIAL_API_PLAN.md) | [REQ-001 后端适配层](../requirement/OFFICIAL_API_REQ-001_BACKEND_ADAPTER.md) | [开发记录](../development/OFFICIAL_API_REQ-001_DEVELOPMENT.md) | — |
 | 同上 | [REQ-002 Anthropic 翻译](../requirement/OFFICIAL_API_REQ-002_ANTHROPIC.md) | [开发记录](../development/OFFICIAL_API_REQ-002_DEVELOPMENT.md) | — |
@@ -34,6 +34,7 @@
 | 同上 | [REQ-008 前端官方直连卡片区](../requirement/OFFICIAL_API_REQ-008_FRONTEND_OFFICIAL_CHANNEL.md) | [开发记录](../development/OFFICIAL_API_REQ-008_DEVELOPMENT.md) | — |
 | [OFFICIAL_CHANNEL_DUAL_FORMAT](../plan/OFFICIAL_CHANNEL_DUAL_FORMAT_PLAN.md) | [REQ-009 后端 formats+双格式](../requirement/OFFICIAL_API_REQ-009_BACKEND_DUAL_FORMAT.md) | [开发记录](../development/OFFICIAL_API_REQ-009_DEVELOPMENT.md) | — |
 | 同上 | [REQ-010 前端统一添加入口](../requirement/OFFICIAL_API_REQ-010_FRONTEND_UNIFIED_ADD.md) | [开发记录](../development/OFFICIAL_API_REQ-010_DEVELOPMENT.md) | — |
+| [ANTHROPIC_OUTWARD](../plan/ANTHROPIC_OUTWARD_PLAN.md) | [REQ-001 对外 Anthropic Messages 端点](../requirement/ANTHROPIC_OUTWARD_REQ-001_MESSAGES_ENDPOINT.md) | [开发记录](../development/ANTHROPIC_OUTWARD_REQ-001_DEVELOPMENT.md) | — |
 
 ## 3. 相关文档
 - 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（§3、ADR-09/10、D-05）、`docs/technical/db_schema/MODEL_PROVIDER_SCHEMA.MD`
