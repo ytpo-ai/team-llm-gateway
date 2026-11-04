@@ -226,7 +226,7 @@ export class BillingService {
           },
         },
       ],
-      { new: true },
+      { new: true, updatePipeline: true },
     );
 
     const doc = await this.quotaTransactionModel.create({
@@ -368,7 +368,7 @@ export class BillingService {
           },
         },
       ],
-      { new: true },
+      { new: true, updatePipeline: true },
     );
     if (!updated) {
       throw new Error('额度账户更新失败');

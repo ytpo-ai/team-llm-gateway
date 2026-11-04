@@ -98,6 +98,11 @@ describe('BillingService', () => {
       });
 
       expect(result.balance).toBe(1500);
+      expect(quotaAccountModel.findOneAndUpdate).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ updatePipeline: true }),
+      );
       expect(quotaTransactionModel.create).toHaveBeenCalledWith(
         expect.objectContaining({
           amount: 500,
