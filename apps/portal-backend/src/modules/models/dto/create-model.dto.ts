@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsInt,
   IsMongoId,
   IsNumber,
   IsOptional,
@@ -8,12 +10,34 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
 
-export class CreateModelDto {
-  @ApiProperty({ example: '64f1c2a3b4d5e6f7a8b9c0d1', description: '归属上游渠道 ID' })
+export class ProviderBindingDto {
+  @ApiProperty({ example: '64f1c2a3b4d5e6f7a8b9c0d1', description: '渠道 ID' })
   @IsMongoId()
   providerId: string;
+
+  @ApiProperty({ example: 0, description: '优先级（越小越高，0=最高）', default: 0 })
+  @IsInt()
+  @Min(0)
+  priority: number;
+}
+
+export class CreateModelDto {
+  @ApiProperty({ example: '64f1c2a3b4d5e6f7a8b9c0d1', description: '归属上游渠道 ID（主渠道）' })
+  @IsMongoId()
+  providerId: string;
+
+  @ApiPropertyOptional({
+    type: [ProviderBindingDto],
+    description: '额外渠道绑定（含优先级），主渠道由 providerId 表示，无需重复',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProviderBindingDto)
+  providerBindings?: ProviderBindingDto[];
 
   @ApiProperty({ example: 'gpt-4o-mini' })
   @IsString()

@@ -33,6 +33,7 @@ describe('ProvidersService', () => {
     disableByProvider: vi.fn(),
     enableByProvider: vi.fn(),
     deleteByProvider: vi.fn(),
+    removeProviderBinding: vi.fn(),
   };
 
   const makeProvider = (overrides: Record<string, unknown> = {}) => ({
@@ -297,7 +298,7 @@ describe('ProvidersService', () => {
   });
 
   describe('remove', () => {
-    it('should hard-delete provider and cascade-delete its models', async () => {
+    it('should hard-delete provider and remove its model bindings (multi-channel)', async () => {
       const provider = makeProvider();
       providerModel.findOne.mockReturnValue({
         exec: vi.fn().mockResolvedValue(provider),
@@ -305,12 +306,12 @@ describe('ProvidersService', () => {
       providerModel.deleteOne.mockReturnValue({
         exec: vi.fn().mockResolvedValue({ deletedCount: 1 }),
       });
-      modelsService.deleteByProvider.mockResolvedValue(2);
+      modelsService.removeProviderBinding.mockResolvedValue(2);
 
       const result = await service.remove(tenantId, teamId, String(providerId));
 
       expect(result.status).toBe(ProviderStatus.ACTIVE);
-      expect(modelsService.deleteByProvider).toHaveBeenCalledWith(
+      expect(modelsService.removeProviderBinding).toHaveBeenCalledWith(
         tenantId,
         teamId,
         String(providerId),
@@ -320,42 +321,34 @@ describe('ProvidersService', () => {
   });
 
   describe('disable', () => {
-    it('should soft-disable provider and cascade-disable its models', async () => {
+    it('should soft-disable provider without cascading to models (multi-channel)', async () => {
       const provider = makeProvider();
       providerModel.findOne.mockReturnValue({
         exec: vi.fn().mockResolvedValue(provider),
       });
-      modelsService.disableByProvider.mockResolvedValue(2);
 
       const result = await service.disable(tenantId, teamId, String(providerId));
 
       expect(provider.status).toBe(ProviderStatus.DISABLED);
       expect(result.status).toBe(ProviderStatus.DISABLED);
-      expect(modelsService.disableByProvider).toHaveBeenCalledWith(
-        tenantId,
-        teamId,
-        String(providerId),
-      );
+      // Multi-channel: models are not cascaded
+      expect(modelsService.disableByProvider).not.toHaveBeenCalled();
     });
   });
 
   describe('enable', () => {
-    it('should enable provider and cascade-enable its models', async () => {
+    it('should enable provider without cascading to models (multi-channel)', async () => {
       const provider = makeProvider({ status: ProviderStatus.DISABLED });
       providerModel.findOne.mockReturnValue({
         exec: vi.fn().mockResolvedValue(provider),
       });
-      modelsService.enableByProvider.mockResolvedValue(2);
 
       const result = await service.enable(tenantId, teamId, String(providerId));
 
       expect(provider.status).toBe(ProviderStatus.ACTIVE);
       expect(result.status).toBe(ProviderStatus.ACTIVE);
-      expect(modelsService.enableByProvider).toHaveBeenCalledWith(
-        tenantId,
-        teamId,
-        String(providerId),
-      );
+      // Multi-channel: models are not cascaded
+      expect(modelsService.enableByProvider).not.toHaveBeenCalled();
     });
   });
 

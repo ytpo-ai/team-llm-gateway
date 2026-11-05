@@ -44,13 +44,19 @@ import {
   listOfficialPresets,
   updateModel,
 } from '@/features/models/api'
-import type { Model, ModelInput, ModelPatch } from '@/features/models/types'
+import type { Model, ModelInput, ModelPatch, ProviderBindingInput } from '@/features/models/types'
 import { listProviders } from '@/features/providers/api'
 import type { Provider } from '@/features/providers/types'
 import { ApiError } from '@/lib/http'
 
+interface BindingFormEntry {
+  providerId: string
+  priority: string
+}
+
 interface FormState {
   providerId: string
+  bindings: BindingFormEntry[]
   modelId: string
   displayName: string
   multiplier: string
@@ -58,8 +64,11 @@ interface FormState {
   aliases: string
 }
 
+const emptyBinding: BindingFormEntry = { providerId: '', priority: '0' }
+
 const emptyForm: FormState = {
   providerId: '',
+  bindings: [],
   modelId: '',
   displayName: '',
   multiplier: '1',
@@ -75,8 +84,16 @@ function parseList(raw: string): string[] {
 }
 
 function toForm(model: Model): FormState {
+  const extraBindings = model.providerBindings
+    .filter((b) => b.providerId !== model.providerId)
+    .map((b) => ({
+      providerId: b.providerId,
+      priority: String(b.priority),
+    }))
+
   return {
     providerId: model.providerId,
+    bindings: extraBindings,
     modelId: model.modelId,
     displayName: model.displayName,
     multiplier: String(model.multiplier),
@@ -179,13 +196,43 @@ export function ModelsPage() {
     setFormOpen(true)
   }
 
+  const addBinding = () => {
+    setForm({ ...form, bindings: [...form.bindings, { ...emptyBinding }] })
+  }
+
+  const removeBinding = (index: number) => {
+    setForm({
+      ...form,
+      bindings: form.bindings.filter((_, i) => i !== index),
+    })
+  }
+
+  const updateBinding = (index: number, field: keyof BindingFormEntry, value: string) => {
+    const updated = [...form.bindings]
+    updated[index] = { ...updated[index], [field]: value }
+    setForm({ ...form, bindings: updated })
+  }
+
+  const buildProviderBindings = (): ProviderBindingInput[] | undefined => {
+    const valid = form.bindings
+      .filter((b) => b.providerId && b.providerId !== form.providerId)
+      .map((b) => ({
+        providerId: b.providerId,
+        priority: Number(b.priority) || 0,
+      }))
+    return valid.length > 0 ? valid : undefined
+  }
+
   const submitMutation = useMutation({
     mutationFn: () => {
       const capabilities = parseList(form.capabilities)
       const aliases = parseList(form.aliases)
+      const providerBindings = buildProviderBindings()
+
       if (editing) {
         const patch: ModelPatch = {
           providerId: form.providerId,
+          providerBindings,
           modelId: form.modelId.trim(),
           displayName: form.displayName.trim(),
           multiplier: form.multiplier ? Number(form.multiplier) : 1,
@@ -196,6 +243,7 @@ export function ModelsPage() {
       }
       const input: ModelInput = {
         providerId: form.providerId,
+        providerBindings,
         modelId: form.modelId.trim(),
         displayName: form.displayName.trim() || undefined,
         multiplier: form.multiplier ? Number(form.multiplier) : undefined,
@@ -252,13 +300,22 @@ export function ModelsPage() {
   const providers: Provider[] = providersQuery.data ?? []
   const activeProviders = providers.filter((p) => p.status === 'active')
 
+  const availableProviders = (bindingIndex: number) => {
+    const used = form.bindings
+      .filter((_, i) => i !== bindingIndex)
+      .map((b) => b.providerId)
+      .concat(form.providerId)
+      .filter(Boolean)
+    return activeProviders.filter((p) => !used.includes(p.id))
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-xl font-semibold">模型目录</h1>
           <p className="text-sm text-muted-foreground">
-            维护可用模型、计费倍率与能力标签，供计量、计费与选型建议使用
+            维护可用模型、计费倍率与能力标签，支持多渠道绑定与优先级管理
           </p>
         </div>
         {isAdmin && (
@@ -289,6 +346,7 @@ export function ModelsPage() {
                   <tr className="border-b text-left text-muted-foreground">
                     <th className="py-2 pr-4 font-medium">模型标识</th>
                     <th className="py-2 pr-4 font-medium">展示名</th>
+                    <th className="py-2 pr-4 font-medium">渠道</th>
                     <th className="py-2 pr-4 font-medium">倍率</th>
                     <th className="py-2 pr-4 font-medium">能力标签</th>
                     <th className="py-2 pr-4 font-medium">状态</th>
@@ -296,87 +354,118 @@ export function ModelsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {models.map((model) => (
-                    <tr key={model.id} className="border-b last:border-0">
-                      <td className="py-2 pr-4">
-                        <code className="text-xs">{model.modelId}</code>
-                      </td>
-                      <td className="py-2 pr-4">
-                        {model.displayName || (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </td>
-                      <td className="py-2 pr-4">×{model.multiplier}</td>
-                      <td className="py-2 pr-4 text-muted-foreground">
-                        {model.capabilities.length > 0
-                          ? model.capabilities.join(', ')
-                          : '—'}
-                      </td>
-                      <td className="py-2 pr-4">
-                        {model.status === 'active' ? (
-                          <span className="text-green-600">正常</span>
-                        ) : (
-                          <span className="text-muted-foreground">已禁用</span>
-                        )}
-                      </td>
-                      {isAdmin && (
-                        <td className="py-2">
-                          <div className="flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => startEdit(model)}
-                            >
-                              编辑
-                            </Button>
-                            {model.status === 'active' ? (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() =>
-                                    setConfirm({ model, kind: 'disable' })
-                                  }
-                                >
-                                  禁用
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive"
-                                  onClick={() =>
-                                    setConfirm({ model, kind: 'delete' })
-                                  }
-                                >
-                                  删除
-                                </Button>
-                              </>
-                            ) : (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => enableMutation.mutate(model.id)}
-                                >
-                                  启用
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive"
-                                  onClick={() =>
-                                    setConfirm({ model, kind: 'delete' })
-                                  }
-                                >
-                                  删除
-                                </Button>
-                              </>
-                            )}
-                          </div>
+                  {models.map((model) => {
+                    const bindings = model.providerBindings ?? []
+                    const sorted = [...bindings].sort((a, b) => a.priority - b.priority)
+
+                    return (
+                      <tr key={model.id} className="border-b last:border-0">
+                        <td className="py-2 pr-4">
+                          <code className="text-xs">{model.modelId}</code>
                         </td>
-                      )}
-                    </tr>
-                  ))}
+                        <td className="py-2 pr-4">
+                          {model.displayName || (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className="py-2 pr-4">
+                          {sorted.length === 0 ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <div className="flex flex-wrap gap-1">
+                              {sorted.map((b) => {
+                                const isPrimary = b.providerId === model.providerId
+                                return (
+                                  <span
+                                    key={b.providerId}
+                                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                                      isPrimary
+                                        ? 'bg-primary/10 text-primary'
+                                        : 'bg-muted text-muted-foreground'
+                                    }`}
+                                  >
+                                    {b.providerName}
+                                    <span className="ml-1 opacity-60">
+                                      [P{b.priority}]
+                                    </span>
+                                  </span>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2 pr-4">×{model.multiplier}</td>
+                        <td className="py-2 pr-4 text-muted-foreground">
+                          {model.capabilities.length > 0
+                            ? model.capabilities.join(', ')
+                            : '—'}
+                        </td>
+                        <td className="py-2 pr-4">
+                          {model.status === 'active' ? (
+                            <span className="text-green-600">正常</span>
+                          ) : (
+                            <span className="text-muted-foreground">已禁用</span>
+                          )}
+                        </td>
+                        {isAdmin && (
+                          <td className="py-2">
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => startEdit(model)}
+                              >
+                                编辑
+                              </Button>
+                              {model.status === 'active' ? (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      setConfirm({ model, kind: 'disable' })
+                                    }
+                                  >
+                                    禁用
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-destructive"
+                                    onClick={() =>
+                                      setConfirm({ model, kind: 'delete' })
+                                    }
+                                  >
+                                    删除
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => enableMutation.mutate(model.id)}
+                                  >
+                                    启用
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-destructive"
+                                    onClick={() =>
+                                      setConfirm({ model, kind: 'delete' })
+                                    }
+                                  >
+                                    删除
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -389,7 +478,7 @@ export function ModelsPage() {
           <SheetHeader>
             <SheetTitle>{editing ? '编辑模型' : '添加模型'}</SheetTitle>
             <SheetDescription>
-              模型标识在团队内唯一；倍率用于计费（倍率 × token）
+              模型标识在团队内唯一；可绑定多个渠道并设置优先级（数字越小优先级越高）
             </SheetDescription>
           </SheetHeader>
           <form
@@ -398,14 +487,14 @@ export function ModelsPage() {
           >
             <div>
               <label className="mb-1 block text-sm text-muted-foreground">
-                归属渠道
+                主渠道
               </label>
               <Select
                 value={form.providerId}
                 onValueChange={(v) => setForm({ ...form, providerId: v })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="请选择渠道" />
+                  <SelectValue placeholder="请选择主渠道" />
                 </SelectTrigger>
                 <SelectContent>
                   {activeProviders.map((provider) => (
@@ -416,6 +505,69 @@ export function ModelsPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Extra channel bindings */}
+            <div>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="text-sm text-muted-foreground">
+                  额外渠道绑定
+                </label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={addBinding}
+                >
+                  + 添加渠道
+                </Button>
+              </div>
+              {form.bindings.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  可不填；仅当模型可通过多个渠道访问时添加
+                </p>
+              )}
+              {form.bindings.map((binding, i) => (
+                <div key={i} className="mb-2 flex items-center gap-2 rounded-md border border-border p-2">
+                  <div className="flex-1">
+                    <Select
+                      value={binding.providerId}
+                      onValueChange={(v) => updateBinding(i, 'providerId', v)}
+                    >
+                      <SelectTrigger className="text-xs">
+                        <SelectValue placeholder="选择渠道" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableProviders(i).map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-20">
+                    <Input
+                      type="number"
+                      min={0}
+                      placeholder="优先级"
+                      value={binding.priority}
+                      onChange={(e) => updateBinding(i, 'priority', e.target.value)}
+                      className="text-xs"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive shrink-0"
+                    onClick={() => removeBinding(i)}
+                  >
+                    移除
+                  </Button>
+                </div>
+              ))}
+            </div>
+
             <div>
               <label className="mb-1 block text-sm text-muted-foreground">
                 模型标识

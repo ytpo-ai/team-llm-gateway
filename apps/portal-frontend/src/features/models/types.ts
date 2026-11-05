@@ -2,9 +2,21 @@ import type { ProviderType } from '@/features/providers/types'
 
 export type ModelStatus = 'active' | 'disabled'
 
+export interface ProviderBindingView {
+  providerId: string
+  providerName: string
+  priority: number
+}
+
+export interface ProviderBindingInput {
+  providerId: string
+  priority: number
+}
+
 export interface Model {
   id: string
   providerId: string
+  providerBindings: ProviderBindingView[]
   modelId: string
   displayName: string
   multiplier: number
@@ -38,6 +50,7 @@ export interface OfficialProviderPreset {
 
 export interface ModelInput {
   providerId: string
+  providerBindings?: ProviderBindingInput[]
   modelId: string
   displayName?: string
   multiplier?: number
@@ -47,6 +60,7 @@ export interface ModelInput {
 
 export interface ModelPatch {
   providerId?: string
+  providerBindings?: ProviderBindingInput[]
   modelId?: string
   displayName?: string
   multiplier?: number

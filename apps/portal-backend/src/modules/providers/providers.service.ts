@@ -224,11 +224,8 @@ export class ProvidersService {
     const provider = await this.findInTeam(tenantId, teamId, id);
     provider.status = ProviderStatus.DISABLED;
     await provider.save();
-    await this.modelsService.disableByProvider(
-      tenantId,
-      teamId,
-      String(provider._id),
-    );
+    // Multi-channel: disabling a provider does not cascade to models
+    // Models may still be accessible through other channels
     return this.toView(provider);
   }
 
@@ -240,11 +237,7 @@ export class ProvidersService {
     const provider = await this.findInTeam(tenantId, teamId, id);
     provider.status = ProviderStatus.ACTIVE;
     await provider.save();
-    await this.modelsService.enableByProvider(
-      tenantId,
-      teamId,
-      String(provider._id),
-    );
+    // Multi-channel: enabling a provider does not cascade to models
     return this.toView(provider);
   }
 
@@ -254,7 +247,9 @@ export class ProvidersService {
     id: string,
   ): Promise<ProviderView> {
     const provider = await this.findInTeam(tenantId, teamId, id);
-    await this.modelsService.deleteByProvider(
+    // Multi-channel: remove the provider from all model bindings
+    // Models with no remaining bindings will be disabled
+    await this.modelsService.removeProviderBinding(
       tenantId,
       teamId,
       String(provider._id),

@@ -8,6 +8,22 @@ export enum ModelStatus {
   DISABLED = 'disabled',
 }
 
+@Schema({ _id: false })
+export class ProviderBinding {
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Provider',
+    required: true,
+  })
+  providerId: Types.ObjectId;
+
+  @Prop({ type: Number, required: true, default: 0 })
+  priority: number;
+}
+
+export const ProviderBindingSchema =
+  SchemaFactory.createForClass(ProviderBinding);
+
 @Schema({ timestamps: true })
 export class Model {
   @Prop({
@@ -33,6 +49,9 @@ export class Model {
     index: true,
   })
   providerId: Types.ObjectId;
+
+  @Prop({ type: [ProviderBindingSchema], default: [] })
+  providerBindings: ProviderBinding[];
 
   @Prop({ required: true, trim: true })
   modelId: string;

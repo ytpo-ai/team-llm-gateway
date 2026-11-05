@@ -21,9 +21,16 @@ import {
   ModelStatus,
 } from './schemas/model.schema.js';
 
+export interface ProviderBindingView {
+  providerId: string;
+  providerName: string;
+  priority: number;
+}
+
 export interface ModelView {
   id: string;
   providerId: string;
+  providerBindings: ProviderBindingView[];
   modelId: string;
   displayName: string;
   multiplier: number;
@@ -39,6 +46,46 @@ export interface BulkCreateResult {
 }
 
 const PRESETS_TTL_MS = 60 * 60 * 1000;
+
+/**
+ * Merge raw bindings from the document with resolved provider info.
+ * Falls back to `providerId` if `providerBindings` is empty (backward compat).
+ */
+async function resolveBindings(
+  model: ModelDocument,
+  providerModel: Model<Provider>,
+): Promise<ProviderBindingView[]> {
+  const rawBindings = model.providerBindings ?? [];
+
+  if (rawBindings.length > 0) {
+    const providerIds = rawBindings.map((b) => b.providerId);
+    const providers = await providerModel
+      .find({ _id: { $in: providerIds } })
+      .select('name status')
+      .exec();
+    const nameMap = new Map(providers.map((p) => [String(p._id), p.name]));
+
+    return rawBindings.map((b) => ({
+      providerId: String(b.providerId),
+      providerName: nameMap.get(String(b.providerId)) ?? '未知渠道',
+      priority: b.priority,
+    }));
+  }
+
+  // Backward compat: no bindings — derive from providerId
+  if (model.providerId) {
+    const provider = await providerModel.findById(model.providerId).select('name').exec();
+    return [
+      {
+        providerId: String(model.providerId),
+        providerName: provider?.name ?? '未知渠道',
+        priority: 0,
+      },
+    ];
+  }
+
+  return [];
+}
 
 @Injectable()
 export class ModelsService {
@@ -80,12 +127,17 @@ export class ModelsService {
       .find({ tenantId, teamId })
       .sort({ createdAt: -1 })
       .exec();
-    return models.map((model) => this.toView(model));
+
+    const views: ModelView[] = [];
+    for (const model of models) {
+      views.push(await this.toView(model, true));
+    }
+    return views;
   }
 
   async get(tenantId: string, teamId: string, id: string): Promise<ModelView> {
     const model = await this.findInTeam(tenantId, teamId, id);
-    return this.toView(model);
+    return this.toView(model, true);
   }
 
   async create(
@@ -94,12 +146,27 @@ export class ModelsService {
     dto: CreateModelDto,
   ): Promise<ModelView> {
     await this.assertProviderInTeam(tenantId, teamId, dto.providerId);
+
+    // Validate all additional bindings' providers
+    if (dto.providerBindings) {
+      for (const binding of dto.providerBindings) {
+        if (binding.providerId === dto.providerId) continue;
+        await this.assertProviderInTeam(tenantId, teamId, binding.providerId);
+      }
+    }
+
     await this.assertModelIdAvailable(tenantId, teamId, dto.modelId);
+
+    const rawBindings = (dto.providerBindings ?? []).map((b) => ({
+      providerId: new Types.ObjectId(b.providerId),
+      priority: b.priority,
+    }));
 
     const model = await this.modelModel.create({
       tenantId,
       teamId,
       providerId: dto.providerId,
+      providerBindings: rawBindings,
       modelId: dto.modelId,
       displayName: dto.displayName ?? '',
       multiplier: dto.multiplier ?? 1,
@@ -108,7 +175,7 @@ export class ModelsService {
       status: ModelStatus.ACTIVE,
     });
 
-    return this.toView(model);
+    return this.toView(model, true);
   }
 
   async bulkCreate(
@@ -141,7 +208,7 @@ export class ModelsService {
         aliases: item.aliases ?? [],
         status: ModelStatus.ACTIVE,
       });
-      created.push(this.toView(model));
+      created.push(await this.toView(model, true));
     }
 
     return { created, skipped };
@@ -159,6 +226,16 @@ export class ModelsService {
       await this.assertProviderInTeam(tenantId, teamId, dto.providerId);
       model.providerId = new Types.ObjectId(dto.providerId);
     }
+    if (dto.providerBindings !== undefined) {
+      // Validate all bindings' providers
+      for (const binding of dto.providerBindings) {
+        await this.assertProviderInTeam(tenantId, teamId, binding.providerId);
+      }
+      model.providerBindings = dto.providerBindings.map((b) => ({
+        providerId: new Types.ObjectId(b.providerId),
+        priority: b.priority,
+      }));
+    }
     if (dto.modelId !== undefined && dto.modelId !== model.modelId) {
       await this.assertModelIdAvailable(tenantId, teamId, dto.modelId);
       model.modelId = dto.modelId;
@@ -170,65 +247,106 @@ export class ModelsService {
     if (dto.status !== undefined) model.status = dto.status;
 
     await model.save();
-    return this.toView(model);
+    return this.toView(model, true);
   }
 
   async disable(tenantId: string, teamId: string, id: string): Promise<ModelView> {
     const model = await this.findInTeam(tenantId, teamId, id);
     model.status = ModelStatus.DISABLED;
     await model.save();
-    return this.toView(model);
+    return this.toView(model, true);
   }
 
   async enable(tenantId: string, teamId: string, id: string): Promise<ModelView> {
     const model = await this.findInTeam(tenantId, teamId, id);
     model.status = ModelStatus.ACTIVE;
     await model.save();
-    return this.toView(model);
+    return this.toView(model, true);
   }
 
   async remove(tenantId: string, teamId: string, id: string): Promise<ModelView> {
     const model = await this.findInTeam(tenantId, teamId, id);
+    const view = await this.toView(model, false);
     await this.modelModel.deleteOne({ _id: model._id }).exec();
-    return this.toView(model);
+    return view;
+  }
+
+  /**
+   * Remove a provider from all model bindings.
+   * If a model has no remaining bindings and its primary providerId matches,
+   * disable the model. Returns count of models disabled.
+   */
+  async removeProviderBinding(
+    tenantId: string,
+    teamId: string,
+    providerId: string,
+  ): Promise<number> {
+    const providerOid = new Types.ObjectId(providerId);
+
+    // Find all models that have this provider in their bindings or as primary
+    const models = await this.modelModel
+      .find({
+        tenantId,
+        teamId,
+        $or: [
+          { providerId: providerOid },
+          { 'providerBindings.providerId': providerOid },
+        ],
+      })
+      .exec();
+
+    let disabledCount = 0;
+
+    for (const model of models) {
+      // Remove the provider from bindings
+      if (model.providerBindings && model.providerBindings.length > 0) {
+        model.providerBindings = model.providerBindings.filter(
+          (b) => String(b.providerId) !== providerId,
+        );
+      }
+
+      // If this was the primary provider, switch to the highest-priority remaining binding
+      if (String(model.providerId) === providerId) {
+        if (model.providerBindings && model.providerBindings.length > 0) {
+          const sorted = [...model.providerBindings].sort(
+            (a, b) => a.priority - b.priority,
+          );
+          model.providerId = sorted[0].providerId;
+          model.providerBindings = model.providerBindings.filter(
+            (b) => String(b.providerId) !== String(sorted[0].providerId),
+          );
+        } else {
+          // No remaining bindings — disable the model
+          model.status = ModelStatus.DISABLED;
+          disabledCount++;
+        }
+      }
+
+      await model.save();
+    }
+
+    return disabledCount;
   }
 
   async disableByProvider(
-    tenantId: string,
-    teamId: string,
-    providerId: string,
+    _tenantId: string,
+    _teamId: string,
+    _providerId: string,
   ): Promise<number> {
-    const result = await this.modelModel
-      .updateMany(
-        {
-          tenantId,
-          teamId,
-          providerId: new Types.ObjectId(providerId),
-          status: ModelStatus.ACTIVE,
-        },
-        { $set: { status: ModelStatus.DISABLED } },
-      )
-      .exec();
-    return result.modifiedCount;
+    // With multi-channel, disabling a provider does NOT cascade to models.
+    // Models may still be accessible through other channels.
+    // Returning 0 for backward compatibility.
+    return 0;
   }
 
   async enableByProvider(
-    tenantId: string,
-    teamId: string,
-    providerId: string,
+    _tenantId: string,
+    _teamId: string,
+    _providerId: string,
   ): Promise<number> {
-    const result = await this.modelModel
-      .updateMany(
-        {
-          tenantId,
-          teamId,
-          providerId: new Types.ObjectId(providerId),
-          status: ModelStatus.DISABLED,
-        },
-        { $set: { status: ModelStatus.ACTIVE } },
-      )
-      .exec();
-    return result.modifiedCount;
+    // With multi-channel, enabling a provider does not cascade to models.
+    // Returning 0 for backward compatibility.
+    return 0;
   }
 
   async deleteByProvider(
@@ -236,14 +354,8 @@ export class ModelsService {
     teamId: string,
     providerId: string,
   ): Promise<number> {
-    const result = await this.modelModel
-      .deleteMany({
-        tenantId,
-        teamId,
-        providerId: new Types.ObjectId(providerId),
-      })
-      .exec();
-    return result.deletedCount;
+    // Delegate to removeProviderBinding for multi-channel aware cascade
+    return this.removeProviderBinding(tenantId, teamId, providerId);
   }
 
   private async assertProviderInTeam(
@@ -286,10 +398,22 @@ export class ModelsService {
     return model;
   }
 
-  private toView(model: ModelDocument): ModelView {
+  private async toView(
+    model: ModelDocument,
+    resolveBindingNames: boolean,
+  ): Promise<ModelView> {
+    let providerBindings: ProviderBindingView[];
+
+    if (resolveBindingNames) {
+      providerBindings = await resolveBindings(model, this.providerModel);
+    } else {
+      providerBindings = [];
+    }
+
     return {
       id: String(model._id),
       providerId: String(model.providerId),
+      providerBindings,
       modelId: model.modelId,
       displayName: model.displayName,
       multiplier: model.multiplier,

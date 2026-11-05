@@ -24,17 +24,26 @@ describe('ModelsService', () => {
 
   const providerModel = {
     findOne: vi.fn(),
+    findById: vi.fn(),
+    find: vi.fn(),
   };
 
   const configService = {
     get: vi.fn(),
   };
 
+  const makeProviderDoc = () => ({
+    _id: providerId,
+    name: 'Test Provider',
+    status: 'active',
+  });
+
   const makeModel = (overrides: Record<string, unknown> = {}) => ({
     _id: modelId,
     tenantId,
     teamId,
     providerId,
+    providerBindings: [],
     modelId: 'gpt-4o-mini',
     displayName: 'GPT-4o mini',
     multiplier: 1.5,
@@ -50,6 +59,16 @@ describe('ModelsService', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+
+    // Default mocks for provider resolution (used by toView)
+    providerModel.findById.mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      exec: vi.fn().mockResolvedValue(makeProviderDoc()),
+    });
+    providerModel.find.mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      exec: vi.fn().mockResolvedValue([makeProviderDoc()]),
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -85,6 +104,31 @@ describe('ModelsService', () => {
       expect(result.modelId).toBe('gpt-4o-mini');
       expect(result.multiplier).toBe(1.5);
       expect(modelModel.create.mock.calls[0][0].tenantId).toBe(tenantId);
+    });
+
+    it('should create with providerBindings', async () => {
+      const secondProviderId = new Types.ObjectId();
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue({ _id: providerId }),
+      });
+      modelModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(null),
+      });
+      modelModel.create.mockImplementation(async (input: any) => ({
+        ...makeModel(),
+        ...input,
+      }));
+
+      const result = await service.create(tenantId, teamId, {
+        providerId: String(providerId),
+        modelId: 'deepseek-v4-pro',
+        providerBindings: [
+          { providerId: String(secondProviderId), priority: 1 },
+        ],
+      });
+
+      expect(result.modelId).toBe('deepseek-v4-pro');
+      expect(result.providerBindings).toBeDefined();
     });
 
     it('should throw NotFound when provider missing', async () => {
@@ -127,6 +171,40 @@ describe('ModelsService', () => {
       await service.list(tenantId, teamId);
 
       expect(modelModel.find.mock.calls[0][0]).toEqual({ tenantId, teamId });
+    });
+
+    it('should include providerBindings in view', async () => {
+      modelModel.find.mockReturnValue({
+        sort: vi.fn().mockReturnThis(),
+        exec: vi.fn().mockResolvedValue([makeModel()]),
+      });
+
+      const result = await service.list(tenantId, teamId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toHaveProperty('providerBindings');
+    });
+  });
+
+  describe('update', () => {
+    it('should update providerBindings', async () => {
+      const secondProviderId = new Types.ObjectId();
+      const model = makeModel();
+      modelModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(model),
+      });
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue({ _id: secondProviderId }),
+      });
+
+      const result = await service.update(tenantId, teamId, String(modelId), {
+        providerBindings: [
+          { providerId: String(secondProviderId), priority: 1 },
+        ],
+      });
+
+      expect(model.providerBindings).toHaveLength(1);
+      expect(result.providerBindings).toBeDefined();
     });
   });
 
@@ -174,52 +252,35 @@ describe('ModelsService', () => {
   });
 
   describe('disableByProvider', () => {
-    it('should disable active models of the provider and return count', async () => {
-      modelModel.updateMany.mockReturnValue({
-        exec: vi.fn().mockResolvedValue({ modifiedCount: 2 }),
-      });
-
+    it('should return 0 without cascading (multi-channel)', async () => {
       const count = await service.disableByProvider(
         tenantId,
         teamId,
         String(providerId),
       );
 
-      expect(count).toBe(2);
-      const filter = modelModel.updateMany.mock.calls[0][0];
-      expect(String(filter.providerId)).toBe(String(providerId));
-      expect(filter.status).toBe(ModelStatus.ACTIVE);
-      const update = modelModel.updateMany.mock.calls[0][1];
-      expect(update).toEqual({ $set: { status: ModelStatus.DISABLED } });
+      expect(count).toBe(0);
     });
   });
 
   describe('enableByProvider', () => {
-    it('should enable disabled models of the provider and return count', async () => {
-      modelModel.updateMany.mockReturnValue({
-        exec: vi.fn().mockResolvedValue({ modifiedCount: 3 }),
-      });
-
+    it('should return 0 without cascading (multi-channel)', async () => {
       const count = await service.enableByProvider(
         tenantId,
         teamId,
         String(providerId),
       );
 
-      expect(count).toBe(3);
-      const filter = modelModel.updateMany.mock.calls[0][0];
-      expect(String(filter.providerId)).toBe(String(providerId));
-      expect(filter.status).toBe(ModelStatus.DISABLED);
-      expect(modelModel.updateMany.mock.calls[0][1]).toEqual({
-        $set: { status: ModelStatus.ACTIVE },
-      });
+      expect(count).toBe(0);
     });
   });
 
   describe('deleteByProvider', () => {
-    it('should delete all models of the provider and return count', async () => {
-      modelModel.deleteMany.mockReturnValue({
-        exec: vi.fn().mockResolvedValue({ deletedCount: 4 }),
+    it('should delegate to removeProviderBinding', async () => {
+      // Models with this provider as primary or in bindings
+      const model = makeModel();
+      modelModel.find.mockReturnValue({
+        exec: vi.fn().mockResolvedValue([model]),
       });
 
       const count = await service.deleteByProvider(
@@ -228,11 +289,47 @@ describe('ModelsService', () => {
         String(providerId),
       );
 
-      expect(count).toBe(4);
-      const filter = modelModel.deleteMany.mock.calls[0][0];
-      expect(String(filter.providerId)).toBe(String(providerId));
-      expect(filter.tenantId).toBe(tenantId);
-      expect(filter.teamId).toBe(teamId);
+      // One model had no remaining bindings, so it was disabled
+      expect(count).toBe(1);
+    });
+  });
+
+  describe('removeProviderBinding', () => {
+    it('should disable model with no remaining bindings', async () => {
+      const model = makeModel();
+      modelModel.find.mockReturnValue({
+        exec: vi.fn().mockResolvedValue([model]),
+      });
+
+      const count = await service.removeProviderBinding(
+        tenantId,
+        teamId,
+        String(providerId),
+      );
+
+      expect(count).toBe(1);
+      expect(model.status).toBe(ModelStatus.DISABLED);
+    });
+
+    it('should switch to next binding when primary provider is removed', async () => {
+      const altProviderId = new Types.ObjectId();
+      const model = makeModel({
+        providerBindings: [{ providerId: altProviderId, priority: 0 }],
+      });
+      modelModel.find.mockReturnValue({
+        exec: vi.fn().mockResolvedValue([model]),
+      });
+
+      const count = await service.removeProviderBinding(
+        tenantId,
+        teamId,
+        String(providerId),
+      );
+
+      expect(count).toBe(0);
+      expect(String(model.providerId)).toBe(String(altProviderId));
+      expect(model.providerBindings).toHaveLength(0);
+      expect(model.status).toBe(ModelStatus.ACTIVE);
     });
   });
 
