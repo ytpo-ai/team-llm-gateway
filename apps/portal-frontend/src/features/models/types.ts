@@ -26,9 +26,12 @@ export interface OfficialFormatPreset {
   baseUrl: string
 }
 
+export type PresetCategory = 'official' | 'service-provider'
+
 export interface OfficialProviderPreset {
   key: string
   label: string
+  category: PresetCategory
   formats: OfficialFormatPreset[]
   models: OfficialModelPreset[]
 }

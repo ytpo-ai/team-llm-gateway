@@ -12,6 +12,7 @@ import { CreateModelDto } from './dto/create-model.dto.js';
 import { UpdateModelDto } from './dto/update-model.dto.js';
 import {
   OFFICIAL_PRESETS,
+  SERVICE_PROVIDER_PRESETS,
   type OfficialProviderPreset,
 } from './official-presets.js';
 import {
@@ -56,7 +57,7 @@ export class ModelsService {
 
   async getOfficialPresets(): Promise<OfficialProviderPreset[]> {
     const remoteUrl = this.configService.get<string>('modelPresets.url');
-    if (!remoteUrl) return OFFICIAL_PRESETS;
+    if (!remoteUrl) return [...OFFICIAL_PRESETS, ...SERVICE_PROVIDER_PRESETS];
 
     const now = Date.now();
     if (this.presetsCache && now - this.presetsCache.fetchedAt < PRESETS_TTL_MS) {
@@ -70,7 +71,7 @@ export class ModelsService {
       this.presetsCache = { presets, fetchedAt: now };
       return presets;
     } catch {
-      return OFFICIAL_PRESETS;
+      return [...OFFICIAL_PRESETS, ...SERVICE_PROVIDER_PRESETS];
     }
   }
 

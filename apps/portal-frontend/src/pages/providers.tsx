@@ -41,6 +41,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuthStore } from '@/features/auth/store'
 import { listOfficialPresets } from '@/features/models/api'
 import type { OfficialProviderPreset } from '@/features/models/types'
@@ -93,6 +94,7 @@ export function ProvidersPage() {
   const isAdmin = user?.role === 'team_admin' || user?.role === 'system'
 
   const [addOpen, setAddOpen] = useState(false)
+  const [addTab, setAddTab] = useState<string>('official')
   const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [form, setForm] = useState<FormState>(emptyForm)
@@ -282,6 +284,12 @@ export function ProvidersPage() {
 
   const providers: Provider[] = providersQuery.data ?? []
   const officialPresets: OfficialProviderPreset[] = presetsQuery.data ?? []
+  const officialOnlyPresets = officialPresets.filter(
+    (p) => p.category !== 'service-provider',
+  )
+  const serviceProviderPresets = officialPresets.filter(
+    (p) => p.category === 'service-provider',
+  )
 
   const formBody = (
     <>
@@ -569,7 +577,7 @@ export function ProvidersPage() {
           <DialogHeader>
             <DialogTitle>添加渠道</DialogTitle>
             <DialogDescription>
-              手动配置自定义渠道，或从官方渠道快捷开启
+              手动配置自定义渠道，或从官方渠道/服务商快捷开启
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -590,37 +598,82 @@ export function ProvidersPage() {
               <span className="text-lg text-muted-foreground">＋</span>
             </button>
 
-            <div>
-              <div className="mb-2 text-sm font-medium">官方渠道</div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {officialPresets.map((preset) => (
-                  <div
-                    key={preset.key}
-                    className="flex items-center justify-between rounded-md border border-border p-3 text-sm"
-                  >
-                    <div className="min-w-0">
-                      <div className="font-medium">{preset.label}</div>
-                      <div className="truncate text-xs text-muted-foreground">
-                        {preset.formats
-                          .map((f) => PROVIDER_TYPE_LABELS[f.type])
-                          .join(' / ')}{' '}
-                        · {preset.models.length} 个模型
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setAddOpen(false)
-                        openEnable(preset)
-                      }}
+            <Tabs value={addTab} onValueChange={setAddTab}>
+              <TabsList className="w-full">
+                <TabsTrigger value="official" className="flex-1">
+                  官方渠道
+                </TabsTrigger>
+                <TabsTrigger value="service-provider" className="flex-1">
+                  服务商
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="official">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {officialOnlyPresets.map((preset) => (
+                    <div
+                      key={preset.key}
+                      className="flex items-center justify-between rounded-md border border-border p-3 text-sm"
                     >
-                      开启
-                    </Button>
+                      <div className="min-w-0">
+                        <div className="font-medium">{preset.label}</div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {preset.formats
+                            .map((f) => PROVIDER_TYPE_LABELS[f.type])
+                            .join(' / ')}{' '}
+                          · {preset.models.length} 个模型
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setAddOpen(false)
+                          openEnable(preset)
+                        }}
+                      >
+                        开启
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </TabsContent>
+              <TabsContent value="service-provider">
+                {serviceProviderPresets.length === 0 ? (
+                  <div className="py-8 text-center text-sm text-muted-foreground">
+                    暂无内置服务商，敬请期待
                   </div>
-                ))}
-              </div>
-            </div>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {serviceProviderPresets.map((preset) => (
+                      <div
+                        key={preset.key}
+                        className="flex items-center justify-between rounded-md border border-border p-3 text-sm"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-medium">{preset.label}</div>
+                          <div className="truncate text-xs text-muted-foreground">
+                            {preset.formats
+                              .map((f) => PROVIDER_TYPE_LABELS[f.type])
+                              .join(' / ')}{' '}
+                            · {preset.models.length} 个模型
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setAddOpen(false)
+                            openEnable(preset)
+                          }}
+                        >
+                          开启
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </div>
         </DialogContent>
       </Dialog>

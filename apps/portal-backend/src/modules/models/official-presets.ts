@@ -12,9 +12,12 @@ export interface OfficialFormatPreset {
   baseUrl: string;
 }
 
+export type PresetCategory = 'official' | 'service-provider';
+
 export interface OfficialProviderPreset {
   key: string;
   label: string;
+  category: PresetCategory;
   formats: OfficialFormatPreset[];
   models: OfficialModelPreset[];
 }
@@ -23,6 +26,7 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   {
     key: 'openai',
     label: 'OpenAI',
+    category: 'official',
     formats: [
       { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://api.openai.com/v1' },
     ],
@@ -56,6 +60,7 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   {
     key: 'anthropic',
     label: 'Anthropic Claude',
+    category: 'official',
     formats: [
       { type: ProviderType.ANTHROPIC, baseUrl: 'https://api.anthropic.com' },
       { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://api.anthropic.com/v1' },
@@ -84,6 +89,7 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   {
     key: 'gemini',
     label: 'Google Gemini',
+    category: 'official',
     formats: [
       { type: ProviderType.GEMINI, baseUrl: 'https://generativelanguage.googleapis.com' },
       { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai' },
@@ -112,6 +118,7 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   {
     key: 'deepseek',
     label: 'DeepSeek',
+    category: 'official',
     formats: [
       { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://api.deepseek.com' },
       { type: ProviderType.ANTHROPIC, baseUrl: 'https://api.deepseek.com/anthropic' },
@@ -134,6 +141,7 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   {
     key: 'moonshot',
     label: 'Moonshot Kimi',
+    category: 'official',
     formats: [
       { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://api.moonshot.cn/v1' },
     ],
@@ -161,6 +169,7 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   {
     key: 'kimi-code',
     label: 'Kimi Code',
+    category: 'official',
     formats: [
       { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://api.kimi.com/coding/v1' },
     ],
@@ -188,6 +197,7 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   {
     key: 'qwen',
     label: '通义千问 Qwen',
+    category: 'official',
     formats: [
       { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://maas.qianwenaiapi.com/compatible-mode/v1' },
     ],
@@ -215,6 +225,7 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   {
     key: 'zhipu',
     label: '智谱 GLM',
+    category: 'official',
     formats: [
       { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
     ],
@@ -242,6 +253,7 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   {
     key: 'minimax',
     label: 'MiniMax',
+    category: 'official',
     formats: [
       { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://api.minimax.chat/v1' },
     ],
@@ -257,6 +269,7 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   {
     key: 'doubao',
     label: '豆包 Doubao',
+    category: 'official',
     formats: [
       { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://ark.cn-beijing.volces.com/api/v3' },
     ],
@@ -278,6 +291,7 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   {
     key: 'grok',
     label: 'xAI Grok',
+    category: 'official',
     formats: [
       { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://api.x.ai/v1' },
     ],
@@ -293,6 +307,7 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
   {
     key: 'mistral',
     label: 'Mistral',
+    category: 'official',
     formats: [
       { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://api.mistral.ai/v1' },
     ],
@@ -308,6 +323,55 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
         displayName: 'Mistral Large',
         capabilities: ['chat', 'code', 'reasoning', 'writing', 'long-context'],
         multiplier: 0.6,
+      },
+    ],
+  },
+];
+
+export const SERVICE_PROVIDER_PRESETS: OfficialProviderPreset[] = [
+  {
+    key: 'alibaba-token-plan',
+    label: '阿里云百炼 Token Plan',
+    category: 'service-provider',
+    formats: [
+      { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+    ],
+    models: [
+      {
+        modelId: 'qwen-turbo',
+        displayName: 'Qwen Turbo',
+        capabilities: ['chat', 'summarization'],
+        multiplier: 1,
+      },
+      {
+        modelId: 'qwen-plus',
+        displayName: 'Qwen Plus',
+        capabilities: ['chat', 'code', 'reasoning'],
+        multiplier: 1,
+      },
+      {
+        modelId: 'qwen-max',
+        displayName: 'Qwen Max',
+        capabilities: ['chat', 'code', 'reasoning', 'writing'],
+        multiplier: 1,
+      },
+      {
+        modelId: 'qwen2.5-72b-instruct',
+        displayName: 'Qwen2.5 72B',
+        capabilities: ['chat', 'code', 'reasoning', 'writing', 'long-context'],
+        multiplier: 1,
+      },
+      {
+        modelId: 'qwen2.5-32b-instruct',
+        displayName: 'Qwen2.5 32B',
+        capabilities: ['chat', 'code', 'reasoning', 'long-context'],
+        multiplier: 0.6,
+      },
+      {
+        modelId: 'qwen2.5-7b-instruct',
+        displayName: 'Qwen2.5 7B',
+        capabilities: ['chat', 'code', 'summarization'],
+        multiplier: 0.2,
       },
     ],
   },
