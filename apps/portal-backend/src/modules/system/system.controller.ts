@@ -30,13 +30,15 @@ export class SystemController {
   ) {}
 
   @Get('settings')
-  @ApiOperation({ summary: '系统配置列表（team_admin）' })
+  @Roles(Role.SYSTEM)
+  @ApiOperation({ summary: '系统配置列表（system）' })
   listSettings(@CurrentUser('tenantId') tenantId: string) {
     return this.systemSettingsService.list(tenantId);
   }
 
   @Put('settings')
-  @ApiOperation({ summary: '更新系统配置（批量 upsert，team_admin）' })
+  @Roles(Role.SYSTEM)
+  @ApiOperation({ summary: '更新系统配置（批量 upsert，system）' })
   upsertSettings(
     @CurrentUser() user: AuthUser,
     @Body() dto: UpdateSettingsDto,

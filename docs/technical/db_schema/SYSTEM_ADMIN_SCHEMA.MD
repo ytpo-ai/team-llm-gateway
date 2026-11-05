@@ -11,7 +11,7 @@
 - **多租户内建（ADR-03）**：配置/审计携带 `tenantId`（+`teamId`），查询按租户/团队过滤。
 - **配置 KV 化**：`SystemSetting` 为 `tenantId + key` 唯一的键值存储，`value` 存 JSON，upsert 语义，`updatedBy` 记录最后修改人。
 - **审计只增不改**：`AuditLog` 只追加、不提供管理写接口，由各模块控制器进程内调用 `AuditService.log()` 写入。
-- **服务商/系统角色隐藏**：开源单团队版中，系统配置与审计日志仅 `team_admin` 可见/可写。
+- **服务商/系统角色隐藏**：开源单团队版中，系统配置仅 `system` 可读写，审计日志 `team_admin` 可读。
 
 ## 2. SystemSetting（系统配置）
 
@@ -95,8 +95,8 @@ interface AuditEntryInput {
 
 ## 5. 配置 API 契约
 
-- `GET /system/settings`：返回 `[{ key, value, updatedBy, updatedAt }]`（`team_admin`）。
-- `PUT /system/settings`：body `{ settings: Record<string, unknown> }`，批量 upsert，返回更新后的列表（`team_admin`）。
+- `GET /system/settings`：返回 `[{ key, value, updatedBy, updatedAt }]`（`system`）。
+- `PUT /system/settings`：body `{ settings: Record<string, unknown> }`，批量 upsert，返回更新后的列表（`system`）。
 
 ## 6. 审计查询 API 契约
 

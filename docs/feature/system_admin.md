@@ -13,8 +13,8 @@
 - `AuditLog`（审计流水）：`tenantId/teamId/userId` + `action/resourceType/resourceId/summary` + `before/after` 快照 + `ip/userAgent`，只增不改。见 `docs/technical/db_schema/SYSTEM_ADMIN_SCHEMA.MD`。
 
 ### 核心逻辑
-- `SystemSettingsService`：`GET/PUT /system/settings`（批量 upsert，`team_admin`）。
-- `CurrencyService`：`GET/PUT /system/currency`（点数↔货币汇率配置，`member` 可读、`team_admin` 可写），未配置回退纯点数展示。
+- `SystemSettingsService`：`GET/PUT /system/settings`（批量 upsert，`system`）。
+- `CurrencyService`：`GET/PUT /system/currency`（点数↔货币汇率配置，`member` 可读、`system` 可写），未配置回退纯点数展示。
 - `AuditService`：`log()` 进程内埋点 + `GET /system/audit-logs`（分页 + 筛选，`team_admin`）。
 - 审计埋点：billing（recharge/adjust）、api-keys（create/revoke/rotate）、models（create/disable）、providers（create/disable）、teams（角色变更/移除/邀请）、system（currency_update）。
 - 通知：本期不实现，`SystemSetting` 预留 `notification.*` 配置键。

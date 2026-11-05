@@ -40,8 +40,8 @@ export class CurrencyController {
   }
 
   @Put('currency')
-  @Roles(Role.TEAM_ADMIN, Role.SYSTEM)
-  @ApiOperation({ summary: '更新货币汇率配置（team_admin/system）' })
+  @Roles(Role.SYSTEM)
+  @ApiOperation({ summary: '更新货币汇率配置（system）' })
   async updateCurrency(
     @CurrentUser() user: AuthUser,
     @Body() dto: UpdateCurrencyDto,

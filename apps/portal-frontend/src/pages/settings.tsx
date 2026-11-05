@@ -116,7 +116,7 @@ export function SettingsPage() {
       <div>
         <h1 className="text-xl font-semibold">系统设置</h1>
         <p className="text-sm text-muted-foreground">
-          租户级系统配置（仅 team_admin 可读写）
+          租户级系统配置（仅 system 可读写）
         </p>
       </div>
 

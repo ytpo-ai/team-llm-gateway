@@ -139,7 +139,7 @@ export function AppLayout() {
       title: '观察',
       items: [
         { label: '用量看板', to: '/', end: true, icon: Gauge },
-        { label: '余额与流水', to: '/billing', icon: Wallet },
+        { label: '余额/流水', to: '/billing', icon: Wallet },
         ...(isTeamManager
           ? [{ label: '使用日志', to: '/usage-logs', icon: ScrollText }]
           : []),
@@ -151,10 +151,10 @@ export function AppLayout() {
     {
       title: '系统管理',
       items: [
-        ...(isTeamManager
+        ...(isSystem
           ? [{ label: '系统设置', to: '/settings', icon: Settings }]
           : []),
-        ...(isTeamManager
+        ...(isSystem
           ? [{ label: '额度管理', to: '/quota-topup', icon: CreditCard }]
           : []),
         ...(isSystem

@@ -52,8 +52,8 @@ export class BillingController {
 
   @Post('recharge')
   @UseGuards(RolesGuard)
-  @Roles(Role.TEAM_ADMIN, Role.SYSTEM)
-  @ApiOperation({ summary: '充值额度（team_admin/system）' })
+  @Roles(Role.SYSTEM)
+  @ApiOperation({ summary: '充值额度（system）' })
   async recharge(
     @CurrentUser() user: AuthUser,
     @Body() dto: RechargeQuotaDto,
@@ -77,8 +77,8 @@ export class BillingController {
 
   @Post('adjust')
   @UseGuards(RolesGuard)
-  @Roles(Role.TEAM_ADMIN, Role.SYSTEM)
-  @ApiOperation({ summary: '调整额度（team_admin/system，正加负减）' })
+  @Roles(Role.SYSTEM)
+  @ApiOperation({ summary: '调整额度（system，正加负减）' })
   async adjust(
     @CurrentUser() user: AuthUser,
     @Body() dto: AdjustQuotaDto,
