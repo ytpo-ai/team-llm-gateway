@@ -44,4 +44,4 @@
 | 类型 | 文档 |
 |---|---|
 | plan | `docs/plan/PROVIDER_TEST_DIALOG_PLAN.md` |
-| development | `docs/development/PROVIDER_TEST_DIALOG_REQ-001_DEVELOPMENT.md`（待补充） |
+| development | `docs/development/PROVIDER_TEST_DIALOG_REQ-001_DEVELOPMENT.md` |
