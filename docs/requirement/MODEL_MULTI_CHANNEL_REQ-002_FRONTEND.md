@@ -8,7 +8,7 @@
 | 所属 plan | `docs/plan/MODEL_MULTI_CHANNEL_PLAN.md` |
 | 需求管理 ID | — |
 | 分支 | `feat/model-multi-channel-frontend` |
-| 状态 | `in-progress` |
+| 状态 | `done` |
 
 ## 2. 需求描述
 
@@ -22,16 +22,16 @@
 - API 层适配：`ModelInput/ModelPatch` 增加 `providerBindings`
 
 ### 验收条件
-- [ ] `pnpm --filter portal-frontend build` 通过
-- [ ] 模型列表页正确展示每个模型的绑定渠道标签和优先级
-- [ ] 添加/编辑模型时可选择多个渠道并设置优先级
-- [ ] 无 `providerBindings` 的存量模型正常回退显示
+- [x] `pnpm --filter portal-frontend build` 通过
+- [x] 模型列表页正确展示每个模型的绑定渠道标签和优先级
+- [x] 添加/编辑模型时可选择多个渠道并设置优先级
+- [x] 无 `providerBindings` 的存量模型正常回退显示
 
 ## 3. 技术方案摘要
 - 复用既有 React + Tailwind + Radix UI 模式
-- 渠道标签使用 `Badge` 组件样式，带优先级数字和渠道名称
-- 编辑表单中使用多选 Select + 每项带优先级 Input
-- `toForm` / `fromForm` 适配多渠道数据
+- 渠道标签使用 inline tag 样式，带优先级数字和渠道名称，主渠道 primary 色高亮
+- 编辑表单中使用动态增删行（每行：渠道 Select + 优先级 Input + 移除按钮）
+- `toForm` / `buildProviderBindings` 适配多渠道数据
 
 ## 4. 交付物与追溯
 
@@ -41,6 +41,6 @@
 | fix | — |
 
 ## 5. 状态跟踪
-- [ ] 开发中
-- [ ] 待验收
-- [ ] 已交付
+- [x] 开发中
+- [x] 待验收
+- [x] 已交付

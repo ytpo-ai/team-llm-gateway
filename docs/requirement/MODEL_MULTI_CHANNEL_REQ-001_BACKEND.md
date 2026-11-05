@@ -8,7 +8,7 @@
 | 所属 plan | `docs/plan/MODEL_MULTI_CHANNEL_PLAN.md` |
 | 需求管理 ID | — |
 | 分支 | `feat/model-multi-channel-backend` |
-| 状态 | `in-progress` |
+| 状态 | `done` |
 
 ## 2. 需求描述
 
@@ -24,10 +24,10 @@
 - 审计日志适配
 
 ### 验收条件
-- [ ] `pnpm --filter portal-backend lint` / `typecheck` / `test` 通过
-- [ ] `start:dev` 启动，Swagger 可调用 create/update/list 接口并正确返回 `providerBindings`
-- [ ] 删除 Provider 后，相关 Model 的 binding 被移除，若无剩余 binding 则模型被禁用
-- [ ] 存量无 `providerBindings` 的 Model，list 返回时自动从 `providerId` 回退
+- [x] `pnpm --filter portal-backend lint` / `typecheck` / `test` 通过
+- [x] `start:dev` 启动，Swagger 可调用 create/update/list 接口并正确返回 `providerBindings`
+- [x] 删除 Provider 后，相关 Model 的 binding 被移除，若无剩余 binding 则模型被禁用
+- [x] 存量无 `providerBindings` 的 Model，list 返回时自动从 `providerId` 回退
 
 ## 3. 技术方案摘要
 - 复用既有 Nest.js + Mongoose + class-validator 模式
@@ -43,6 +43,6 @@
 | fix | — |
 
 ## 5. 状态跟踪
-- [ ] 开发中
-- [ ] 待验收
-- [ ] 已交付
+- [x] 开发中
+- [x] 待验收
+- [x] 已交付

@@ -42,8 +42,8 @@
 | 同上 | [REQ-002 后端模型生命周期](../requirement/PROVIDER_MODEL_LIFECYCLE_REQ-002_BACKEND_MODEL.md) | [开发记录](../development/PROVIDER_MODEL_LIFECYCLE_REQ-002_DEVELOPMENT.md) | — |
 | 同上 | [REQ-003 前端禁用/启用/删除](../requirement/PROVIDER_MODEL_LIFECYCLE_REQ-003_FRONTEND.md) | [开发记录](../development/PROVIDER_MODEL_LIFECYCLE_REQ-003_DEVELOPMENT.md) | — |
 | [TEAM_CONTEXT_SWITCH](../plan/TEAM_CONTEXT_SWITCH_PLAN.md) | [REQ-004 团队选择器与上下文切换](../requirement/TEAM_MEMBER_REQ-004_TEAM_SELECTOR.md) | [开发记录](../development/TEAM_MEMBER_REQ-004_DEVELOPMENT.md) | — |
-| [MODEL_MULTI_CHANNEL](../plan/MODEL_MULTI_CHANNEL_PLAN.md) | [REQ-001 后端多渠道绑定与级联适配](../requirement/MODEL_MULTI_CHANNEL_REQ-001_BACKEND.md) | — | — |
-| 同上 | [REQ-002 前端渠道展示与优先级管理](../requirement/MODEL_MULTI_CHANNEL_REQ-002_FRONTEND.md) | — | — |
+| [MODEL_MULTI_CHANNEL](../plan/MODEL_MULTI_CHANNEL_PLAN.md) | [REQ-001 后端多渠道绑定与级联适配](../requirement/MODEL_MULTI_CHANNEL_REQ-001_BACKEND.md) | [开发记录](../development/MODEL_MULTI_CHANNEL_REQ-001_DEVELOPMENT.md) | — |
+| 同上 | [REQ-002 前端渠道展示与优先级管理](../requirement/MODEL_MULTI_CHANNEL_REQ-002_FRONTEND.md) | [开发记录](../development/MODEL_MULTI_CHANNEL_REQ-002_DEVELOPMENT.md) | — |
 
 ## 3. 相关文档
 - 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（§3、ADR-09/10、D-05）、`docs/technical/db_schema/MODEL_PROVIDER_SCHEMA.MD`
