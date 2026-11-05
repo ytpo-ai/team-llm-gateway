@@ -334,7 +334,8 @@ export const SERVICE_PROVIDER_PRESETS: OfficialProviderPreset[] = [
     label: '阿里云百炼 Token Plan',
     category: 'service-provider',
     formats: [
-      { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+      { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1' },
+      { type: ProviderType.ANTHROPIC, baseUrl: 'https://token-plan.cn-beijing.maas.aliyuncs.com/apps/anthropic' },
     ],
     models: [
       {
