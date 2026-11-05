@@ -231,6 +231,7 @@ export class ProvidersService {
       teamId,
       String(provider._id),
       provider.type,
+      provider.presetKey,
     );
 
     try {
@@ -282,12 +283,29 @@ export class ProvidersService {
     teamId: string,
     providerId: string,
     type: ProviderType,
+    presetKey?: string,
   ): Promise<string> {
     const models = await this.modelsService.list(tenantId, teamId);
-    const model = models.find(
+
+    // 1. Try active model
+    const activeModel = models.find(
       (m) => m.providerId === providerId && m.status === 'active',
     );
-    return model?.modelId ?? PROBE_MODEL[type] ?? 'gpt-4o-mini';
+    if (activeModel) return activeModel.modelId;
+
+    // 2. Try any model (even disabled)
+    const anyModel = models.find((m) => m.providerId === providerId);
+    if (anyModel) return anyModel.modelId;
+
+    // 3. Try preset models via presetKey
+    if (presetKey) {
+      const presets = await this.modelsService.getOfficialPresets();
+      const preset = presets.find((p) => p.key === presetKey);
+      if (preset?.models.length) return preset.models[0].modelId;
+    }
+
+    // 4. Last resort: hardcoded defaults
+    return PROBE_MODEL[type] ?? 'gpt-4o-mini';
   }
 
   private async assertNameAvailable(
