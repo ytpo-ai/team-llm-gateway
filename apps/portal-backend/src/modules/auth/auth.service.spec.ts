@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -28,6 +29,7 @@ describe('AuthService', () => {
     findById: vi.fn(),
     create: vi.fn(),
     updateById: vi.fn(),
+    existsSystemUser: vi.fn(),
   };
 
   const tenantService = {
@@ -67,6 +69,7 @@ describe('AuthService', () => {
     vi.clearAllMocks();
 
     usersService.findSystemUserByEmail.mockResolvedValue(null);
+    usersService.existsSystemUser.mockResolvedValue(false);
 
     tenantService.ensureDefaultTenant.mockResolvedValue({
       _id: tenantId,
@@ -159,6 +162,31 @@ describe('AuthService', () => {
           password: 'password123',
         }),
       ).rejects.toThrow(ConflictException);
+    });
+
+    it('should throw ForbiddenException when system already initialized', async () => {
+      usersService.existsSystemUser.mockResolvedValue(true);
+
+      await expect(
+        service.register({
+          name: '张三',
+          email: 'admin@example.com',
+          password: 'password123',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(usersService.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('isInitialized', () => {
+    it('should return true when a system user exists', async () => {
+      usersService.existsSystemUser.mockResolvedValue(true);
+      await expect(service.isInitialized()).resolves.toBe(true);
+    });
+
+    it('should return false when no system user exists', async () => {
+      usersService.existsSystemUser.mockResolvedValue(false);
+      await expect(service.isInitialized()).resolves.toBe(false);
     });
   });
 

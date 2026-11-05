@@ -20,6 +20,12 @@ export class AuthController {
     return this.authService.register(dto);
   }
 
+  @Get('init-status')
+  @ApiOperation({ summary: '查询系统初始化状态（公开）' })
+  async initStatus() {
+    return { initialized: await this.authService.isInitialized() };
+  }
+
   @Post('login')
   @ApiOperation({ summary: '登录获取访问令牌' })
   login(@Body() dto: LoginDto) {

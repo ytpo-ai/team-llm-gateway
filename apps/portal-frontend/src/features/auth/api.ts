@@ -1,5 +1,5 @@
 import { request } from '@/lib/http'
-import type { AuthResponse, LoginInput, RegisterInput, TokenPair, User } from './types'
+import type { AuthResponse, InitStatus, LoginInput, RegisterInput, TokenPair, User } from './types'
 
 export function login(input: LoginInput): Promise<AuthResponse> {
   return request<AuthResponse>('/auth/login', {
@@ -15,6 +15,10 @@ export function register(input: RegisterInput): Promise<AuthResponse> {
     body: input,
     auth: false,
   })
+}
+
+export function getInitStatus(): Promise<InitStatus> {
+  return request<InitStatus>('/auth/init-status', { auth: false })
 }
 
 export function acceptInvite(input: {

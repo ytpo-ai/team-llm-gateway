@@ -31,3 +31,7 @@ export interface RegisterInput {
   password: string
   tenantName?: string
 }
+
+export interface InitStatus {
+  initialized: boolean
+}

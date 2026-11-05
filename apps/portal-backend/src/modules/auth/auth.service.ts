@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -38,6 +39,10 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
+    if (await this.isInitialized()) {
+      throw new ForbiddenException('系统已初始化，无法再次注册');
+    }
+
     const tenant = await this.tenantService.ensureDefaultTenant(dto.tenantName);
     const team = await this.teamsService.ensureDefaultTeam(tenant._id, tenant.name);
 
@@ -61,6 +66,10 @@ export class AuthService {
 
     const tokens = await this.issueTokens(user, team._id);
     return { user: this.toPublicUser(user), ...tokens };
+  }
+
+  isInitialized(): Promise<boolean> {
+    return this.usersService.existsSystemUser();
   }
 
   async login(dto: LoginDto) {

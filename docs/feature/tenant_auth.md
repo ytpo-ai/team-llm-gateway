@@ -13,7 +13,7 @@
 
 ### 核心逻辑
 - 本地账号认证：邮箱+密码（bcrypt）+ JWT(access+refresh)，payload 含 `sub/email/tenantId/role`。
-- 租户初始化：首次注册自举默认租户 + 首个团队管理员。
+- 租户初始化：首次注册自举默认租户 + 首个系统管理员；系统初始化门控（已初始化后 `register` 拒绝，前端隐藏初始化 UI）。
 - RBAC：`team_admin/member/finance/viewer`（+ 预留 `provider/system`）。
 
 ## 2. 需求追溯
@@ -25,6 +25,7 @@
 | 同上 | [REQ-002 前端认证闭环](../requirement/TENANT_AUTH_REQ-002_FRONTEND_AUTH.md) | [开发记录](../development/TENANT_AUTH_REQ-002_DEVELOPMENT.md) | — |
 | [TEAM_MANAGEMENT_OPTIMIZATION](../plan/TEAM_MANAGEMENT_OPTIMIZATION_PLAN.md) | [REQ-001 角色体系重构](../requirement/TEAM_MANAGEMENT_REQ-001_ROLE_SYSTEM.md) | [开发记录](../development/TEAM_MANAGEMENT_REQ-001_DEVELOPMENT.md) | — |
 | [SYSTEM_ADMIN_ACCOUNT_MENU](../plan/SYSTEM_ADMIN_ACCOUNT_MENU_PLAN.md) | [REQ-003 账号与菜单优化（修改密码）](../requirement/SYSTEM_ADMIN_REQ-003_ACCOUNT_MENU.md) | [开发记录](../development/SYSTEM_ADMIN_REQ-003_DEVELOPMENT.md) | — |
+| [TENANT_AUTH_INITIALIZATION_GATE](../plan/TENANT_AUTH_INITIALIZATION_GATE_PLAN.md) | [REQ-003 初始化门控](../requirement/TENANT_AUTH_REQ-003_INITIALIZATION_GATE.md) | [开发记录](../development/TENANT_AUTH_REQ-003_DEVELOPMENT.md) | — |
 
 ## 3. 相关文档
 - 技术文档：`docs/technical/SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-03/04、§6）、`docs/technical/db_schema/TENANT_USER_SCHEMA.MD`

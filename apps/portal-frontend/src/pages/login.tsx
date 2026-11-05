@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { getInitStatus } from '@/features/auth/api'
 import { useAuthStore } from '@/features/auth/store'
 import { ApiError } from '@/lib/http'
 import { cn } from '@/lib/utils'
@@ -15,6 +16,7 @@ export function LoginPage() {
   const login = useAuthStore((s) => s.login)
   const register = useAuthStore((s) => s.register)
 
+  const [initialized, setInitialized] = useState<boolean | null>(null)
   const [mode, setMode] = useState<Mode>('login')
   const [name, setName] = useState('')
   const [tenantName, setTenantName] = useState('')
@@ -22,6 +24,23 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    getInitStatus()
+      .then((status) => {
+        if (!active) return
+        setInitialized(status.initialized)
+        if (!status.initialized) setMode('register')
+      })
+      .catch(() => {
+        // 状态查询失败时默认视为已初始化，避免误暴露初始化入口
+        if (active) setInitialized(true)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   if (accessToken) {
     return <Navigate to="/" replace />
@@ -62,26 +81,28 @@ export function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="mb-6 grid grid-cols-2 gap-1 rounded-lg border border-input p-1">
-            {(['login', 'register'] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => {
-                  setMode(m)
-                  setError(null)
-                }}
-                className={cn(
-                  'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                  mode === m
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {m === 'login' ? '登录' : '初始化'}
-              </button>
-            ))}
-          </div>
+          {initialized === false && (
+            <div className="mb-6 grid grid-cols-2 gap-1 rounded-lg border border-input p-1">
+              {(['login', 'register'] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => {
+                    setMode(m)
+                    setError(null)
+                  }}
+                  className={cn(
+                    'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                    mode === m
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {m === 'login' ? '登录' : '初始化'}
+                </button>
+              ))}
+            </div>
+          )}
 
           <form className="space-y-4" onSubmit={handleSubmit}>
             {mode === 'register' && (

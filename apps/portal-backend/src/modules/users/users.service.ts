@@ -43,6 +43,10 @@ export class UsersService {
       .exec();
   }
 
+  existsSystemUser(): Promise<boolean> {
+    return this.userModel.exists({ role: Role.SYSTEM }).then((doc) => doc !== null);
+  }
+
   findById(id: string): Promise<UserDocument | null> {
     return this.userModel.findById(id).exec();
   }
