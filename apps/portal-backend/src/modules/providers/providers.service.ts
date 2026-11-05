@@ -41,6 +41,8 @@ export interface ProviderProbeResult {
   ok: boolean;
   latencyMs: number;
   message: string;
+  reply?: string;
+  modelId?: string;
 }
 
 export interface CreateFromPresetResult {
@@ -53,6 +55,54 @@ const PROBE_MODEL: Record<ProviderType, string> = {
   [ProviderType.ANTHROPIC]: 'claude-3-5-haiku-20241022',
   [ProviderType.GEMINI]: 'gemini-1.5-flash',
 };
+
+/**
+ * Extract the model's text reply from a raw response body.
+ * Returns `undefined` on any parse failure so the caller falls back gracefully.
+ */
+function extractReply(
+  body: unknown,
+  providerType: ProviderType,
+): string | undefined {
+  try {
+    if (providerType === ProviderType.OPENAI_COMPATIBLE) {
+      const b = body as Record<string, unknown>;
+      const choices = b?.choices as Array<Record<string, unknown>> | undefined;
+      const content = choices?.[0]?.message as Record<string, unknown> | undefined;
+      return typeof content?.content === 'string' ? content.content : undefined;
+    }
+
+    if (providerType === ProviderType.ANTHROPIC) {
+      const b = body as Record<string, unknown>;
+      const content = b?.content as Array<Record<string, unknown>> | undefined;
+      if (Array.isArray(content) && content.length > 0) {
+        const texts = content
+          .filter((c) => c?.type === 'text' && typeof c.text === 'string')
+          .map((c) => c.text as string);
+        if (texts.length > 0) return texts.join('\n');
+      }
+      return undefined;
+    }
+
+    if (providerType === ProviderType.GEMINI) {
+      const b = body as Record<string, unknown>;
+      const candidates = b?.candidates as Array<Record<string, unknown>> | undefined;
+      const parts = candidates?.[0]?.content as Record<string, unknown> | undefined;
+      const partList = parts?.parts as Array<Record<string, unknown>> | undefined;
+      if (Array.isArray(partList) && partList.length > 0) {
+        const texts = partList
+          .filter((p) => typeof p.text === 'string')
+          .map((p) => p.text as string);
+        if (texts.length > 0) return texts.join('\n');
+      }
+      return undefined;
+    }
+
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 @Injectable()
 export class ProvidersService {
@@ -213,10 +263,41 @@ export class ProvidersService {
     return this.toView(provider);
   }
 
+  async syncPresetModels(
+    tenantId: string,
+    teamId: string,
+    id: string,
+  ): Promise<BulkCreateResult> {
+    const provider = await this.findInTeam(tenantId, teamId, id);
+
+    if (!provider.presetKey) {
+      return { created: [], skipped: [] };
+    }
+
+    const presets = await this.modelsService.getOfficialPresets();
+    const preset = presets.find((p) => p.key === provider.presetKey);
+    if (!preset || !preset.models.length) {
+      return { created: [], skipped: [] };
+    }
+
+    return this.modelsService.bulkCreate(tenantId, teamId, {
+      providerId: String(provider._id),
+      models: preset.models.map((model) => ({
+        modelId: model.modelId,
+        displayName: model.displayName,
+        multiplier: model.multiplier,
+        capabilities: model.capabilities,
+        aliases: [],
+      })),
+    });
+  }
+
   async test(
     tenantId: string,
     teamId: string,
     id: string,
+    modelId?: string,
+    message?: string,
   ): Promise<ProviderProbeResult> {
     const provider = await this.findInTeam(tenantId, teamId, id);
 
@@ -226,22 +307,25 @@ export class ProvidersService {
     );
     const adapter = resolveAdapter(provider.type);
     const startedAt = Date.now();
-    const modelId = await this.resolveProbeModelId(
-      tenantId,
-      teamId,
-      String(provider._id),
-      provider.type,
-      provider.presetKey,
-    );
+    const resolvedModelId =
+      modelId ||
+      (await this.resolveProbeModelId(
+        tenantId,
+        teamId,
+        String(provider._id),
+        provider.type,
+        provider.presetKey,
+      ));
+    const testMessage = message || 'ping';
 
     try {
       const request = await adapter.buildRequest({
         baseUrl: provider.baseUrl,
         apiKey: upstreamKey,
-        modelId,
+        modelId: resolvedModelId,
         body: {
-          messages: [{ role: 'user', content: 'ping' }],
-          max_tokens: 1,
+          messages: [{ role: 'user', content: testMessage }],
+          max_tokens: message ? 1024 : 1,
         },
         stream: false,
         authType: provider.authType,
@@ -258,12 +342,24 @@ export class ProvidersService {
         return { ok: false, latencyMs, message: '鉴权失败，请检查上游 key' };
       }
       const ok = response.status >= 200 && response.status < 300;
+
+      let reply: string | undefined;
+      if (ok) {
+        try {
+          const body = await response.json();
+          reply = extractReply(body, provider.type);
+        } catch {
+          // non-JSON or parse error — ignore, reply stays undefined
+        }
+      }
+
       return {
         ok,
         latencyMs,
         message: ok
           ? `连通正常（HTTP ${response.status}）`
           : `上游返回 HTTP ${response.status}`,
+        reply,
       };
     } catch (err) {
       return {
@@ -272,6 +368,89 @@ export class ProvidersService {
         message: err instanceof Error ? err.message : '连接失败',
       };
     }
+  }
+
+  async batchTest(
+    tenantId: string,
+    teamId: string,
+    id: string,
+    modelIds: string[],
+    message?: string,
+  ): Promise<{ results: ProviderProbeResult[] }> {
+    const provider = await this.findInTeam(tenantId, teamId, id);
+
+    const upstreamKey = decrypt(
+      this.encryptionSecret(),
+      provider.apiKeyCiphertext,
+    );
+    const adapter = resolveAdapter(provider.type);
+    const testMessage = message || 'ping';
+
+    const results: ProviderProbeResult[] = [];
+
+    for (const modelId of modelIds) {
+      const startedAt = Date.now();
+      try {
+        const request = await adapter.buildRequest({
+          baseUrl: provider.baseUrl,
+          apiKey: upstreamKey,
+          modelId,
+          body: {
+            messages: [{ role: 'user', content: testMessage }],
+            max_tokens: message ? 1024 : 1,
+          },
+          stream: false,
+          authType: provider.authType,
+        });
+
+        const response = await fetch(request.url, {
+          method: 'POST',
+          headers: request.headers,
+          body: request.body,
+        });
+
+        const latencyMs = Date.now() - startedAt;
+        if (response.status === 401 || response.status === 403) {
+          results.push({
+            modelId,
+            ok: false,
+            latencyMs,
+            message: '鉴权失败，请检查上游 key',
+          });
+          continue;
+        }
+        const ok = response.status >= 200 && response.status < 300;
+
+        let reply: string | undefined;
+        if (ok) {
+          try {
+            const body = await response.json();
+            reply = extractReply(body, provider.type);
+          } catch {
+            // ignore parse error
+          }
+        }
+
+        results.push({
+          modelId,
+          ok,
+          latencyMs,
+          message: ok
+            ? `连通正常（HTTP ${response.status}）`
+            : `上游返回 HTTP ${response.status}`,
+          reply,
+        });
+      } catch (err) {
+        results.push({
+          modelId,
+          ok: false,
+          latencyMs: Date.now() - startedAt,
+          message: err instanceof Error ? err.message : '连接失败',
+        });
+      }
+    }
+
+    return { results };
   }
 
   private encryptionSecret(): string {

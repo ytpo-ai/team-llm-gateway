@@ -22,8 +22,10 @@ import {
   AuditAction,
   AuditResourceType,
 } from '../system/schemas/audit-log.schema.js';
+import { BatchTestProviderDto } from './dto/batch-test-provider.dto.js';
 import { CreateProviderDto } from './dto/create-provider.dto.js';
 import { CreateProviderFromPresetDto } from './dto/create-provider-from-preset.dto.js';
+import { TestProviderDto } from './dto/test-provider.dto.js';
 import { UpdateProviderDto } from './dto/update-provider.dto.js';
 import { ProvidersService } from './providers.service.js';
 
@@ -117,13 +119,47 @@ export class ProvidersController {
   }
 
   @Post(':id/test')
-  @ApiOperation({ summary: '上游连通性探活（最小探测请求，不落库不计量）' })
+  @ApiOperation({ summary: '上游连通性探活（支持指定模型和自定义消息，不落库不计量）' })
   test(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('teamId') teamId: string,
     @Param('id') id: string,
+    @Body() dto?: TestProviderDto,
   ) {
-    return this.providersService.test(tenantId, teamId, id);
+    return this.providersService.test(
+      tenantId,
+      teamId,
+      id,
+      dto?.modelId,
+      dto?.message,
+    );
+  }
+
+  @Post(':id/sync-models')
+  @ApiOperation({ summary: '将渠道对应预置的缺失模型补全到团队模型目录' })
+  syncModels(
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('teamId') teamId: string,
+    @Param('id') id: string,
+  ) {
+    return this.providersService.syncPresetModels(tenantId, teamId, id);
+  }
+
+  @Post(':id/batch-test')
+  @ApiOperation({ summary: '批量探测指定模型连通性（不落库不计量）' })
+  batchTest(
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('teamId') teamId: string,
+    @Param('id') id: string,
+    @Body() dto: BatchTestProviderDto,
+  ) {
+    return this.providersService.batchTest(
+      tenantId,
+      teamId,
+      id,
+      dto.modelIds,
+      dto.message,
+    );
   }
 
   @Patch(':id')

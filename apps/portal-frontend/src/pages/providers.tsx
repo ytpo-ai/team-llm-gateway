@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
+import { Fragment, useState, type FormEvent } from 'react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,16 +43,16 @@ import {
 } from '@/components/ui/sheet'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuthStore } from '@/features/auth/store'
-import { listOfficialPresets } from '@/features/models/api'
-import type { OfficialProviderPreset } from '@/features/models/types'
+import { bulkCreateModels, listModels, listOfficialPresets } from '@/features/models/api'
+import type { Model, OfficialProviderPreset } from '@/features/models/types'
 import {
+  batchTestProvider,
   createProvider,
   createProviderFromPreset,
   deleteProvider,
   disableProvider,
   enableProvider,
   listProviders,
-  testProvider,
   updateProvider,
 } from '@/features/providers/api'
 import {
@@ -104,10 +104,22 @@ export function ProvidersPage() {
     provider: Provider
     kind: 'disable' | 'delete'
   } | null>(null)
-  const [probeResults, setProbeResults] = useState<
+  const [testDrawerOpen, setTestDrawerOpen] = useState(false)
+  const [testDrawerProvider, setTestDrawerProvider] =
+    useState<Provider | null>(null)
+  const [selectedModelIds, setSelectedModelIds] = useState<Set<string>>(
+    new Set(),
+  )
+  const [modelTestResults, setModelTestResults] = useState<
     Record<string, ProviderProbeResult>
   >({})
-  const [probingId, setProbingId] = useState<string | null>(null)
+  const [testingModelIds, setTestingModelIds] = useState<Set<string>>(
+    new Set(),
+  )
+  const [testMessage, setTestMessage] = useState('请问你是哪个模型？')
+  const [expandedReplies, setExpandedReplies] = useState<Set<string>>(
+    new Set(),
+  )
 
   const [enablePreset, setEnablePreset] =
     useState<OfficialProviderPreset | null>(null)
@@ -127,6 +139,11 @@ export function ProvidersPage() {
   const presetsQuery = useQuery({
     queryKey: ['official-presets'],
     queryFn: listOfficialPresets,
+  })
+
+  const modelsQuery = useQuery({
+    queryKey: ['models'],
+    queryFn: listModels,
   })
 
   const invalidate = () =>
@@ -181,13 +198,95 @@ export function ProvidersPage() {
     },
   })
 
-  const testMutation = useMutation({
-    mutationFn: (id: string) => testProvider(id),
-    onMutate: (id) => setProbingId(id),
-    onSuccess: (result, id) =>
-      setProbeResults((prev) => ({ ...prev, [id]: result })),
-    onSettled: () => setProbingId(null),
+  const batchTestMutation = useMutation({
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: string
+      body: { modelIds: string[]; message?: string }
+    }) => batchTestProvider(id, body),
+    onMutate: ({ body }) => {
+      setTestingModelIds(new Set([...testingModelIds, ...body.modelIds]))
+    },
+    onSuccess: (result) => {
+      const newResults = { ...modelTestResults }
+      for (const r of result.results) {
+        if (!r.modelId) continue
+        newResults[r.modelId] = {
+          ok: r.ok,
+          latencyMs: r.latencyMs,
+          message: r.message,
+          reply: r.reply,
+        }
+      }
+      setModelTestResults(newResults)
+    },
+    onSettled: (_data, _err, vars) => {
+      setTestingModelIds((prev) => {
+        const next = new Set(prev)
+        for (const id of vars.body.modelIds) next.delete(id)
+        return next
+      })
+    },
   })
+
+  const importMutation = useMutation({
+    mutationFn: ({
+      providerId,
+      models,
+    }: {
+      providerId: string
+      models: {
+        modelId: string
+        displayName: string
+        multiplier: number
+        capabilities: string[]
+        aliases: string[]
+      }[]
+    }) => bulkCreateModels({ providerId, models }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['models'] })
+    },
+  })
+
+  const openTestDrawer = (provider: Provider) => {
+    setTestDrawerProvider(provider)
+    setTestMessage('请问你是哪个模型？')
+    setSelectedModelIds(new Set())
+    setModelTestResults({})
+    setTestingModelIds(new Set())
+    setExpandedReplies(new Set())
+    setTestDrawerOpen(true)
+  }
+
+  const toggleModel = (modelId: string) => {
+    setSelectedModelIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(modelId)) next.delete(modelId)
+      else next.add(modelId)
+      return next
+    })
+  }
+
+  const toggleAllModels = (modelIds: string[]) => {
+    setSelectedModelIds((prev) => {
+      if (prev.size === modelIds.length) return new Set()
+      return new Set(modelIds)
+    })
+  }
+
+  const handleBatchTest = () => {
+    if (!testDrawerProvider || selectedModelIds.size === 0) return
+    setModelTestResults({})
+    batchTestMutation.mutate({
+      id: testDrawerProvider.id,
+      body: {
+        modelIds: [...selectedModelIds],
+        message: testMessage || undefined,
+      },
+    })
+  }
 
   const resetForm = () => {
     setForm(emptyForm)
@@ -283,6 +382,7 @@ export function ProvidersPage() {
   }
 
   const providers: Provider[] = providersQuery.data ?? []
+  const allModels: Model[] = modelsQuery.data ?? []
   const officialPresets: OfficialProviderPreset[] = presetsQuery.data ?? []
   const officialOnlyPresets = officialPresets.filter(
     (p) => p.category !== 'service-provider',
@@ -290,6 +390,50 @@ export function ProvidersPage() {
   const serviceProviderPresets = officialPresets.filter(
     (p) => p.category === 'service-provider',
   )
+
+  const getPresetModels = (): OfficialProviderPreset['models'] => {
+    if (!testDrawerProvider?.presetKey) return []
+    const preset = officialPresets.find(
+      (p) => p.key === testDrawerProvider.presetKey,
+    )
+    return preset?.models ?? []
+  }
+
+  const importedModelIdSet = new Set(
+    allModels
+      .filter((m) => m.providerId === testDrawerProvider?.id)
+      .map((m) => m.modelId),
+  )
+
+  const canImportSome =
+    Object.entries(modelTestResults).some(
+      ([id, r]) => r.ok && !importedModelIdSet.has(id),
+    ) && !importMutation.isPending
+
+  const handleImportPassing = () => {
+    if (!testDrawerProvider) return
+    const presetModels = getPresetModels()
+    const passingModelIds = Object.entries(modelTestResults)
+      .filter(([, r]) => r.ok)
+      .map(([id]) => id)
+      .filter((id) => !importedModelIdSet.has(id))
+
+    if (passingModelIds.length === 0) return
+
+    const models = presetModels
+      .filter((m) => passingModelIds.includes(m.modelId))
+      .map((m) => ({
+        modelId: m.modelId,
+        displayName: m.displayName,
+        multiplier: m.multiplier,
+        capabilities: m.capabilities,
+        aliases: [] as string[],
+      }))
+
+    if (models.length > 0) {
+      importMutation.mutate({ providerId: testDrawerProvider.id, models })
+    }
+  }
 
   const formBody = (
     <>
@@ -469,19 +613,6 @@ export function ProvidersPage() {
                     <tr key={provider.id} className="border-b last:border-0">
                       <td className="py-2 pr-4">
                         <div>{provider.name}</div>
-                        {probeResults[provider.id] && (
-                          <div
-                            className={`mt-1 text-xs ${
-                              probeResults[provider.id].ok
-                                ? 'text-green-600'
-                                : 'text-red-500'
-                            }`}
-                          >
-                            {probeResults[provider.id].ok ? '连通' : '失败'}（
-                            {probeResults[provider.id].latencyMs}ms）{' '}
-                            {probeResults[provider.id].message}
-                          </div>
-                        )}
                       </td>
                       <td className="py-2 pr-4 text-muted-foreground">
                         {PROVIDER_TYPE_LABELS[provider.type]}
@@ -504,10 +635,9 @@ export function ProvidersPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            disabled={probingId === provider.id}
-                            onClick={() => testMutation.mutate(provider.id)}
+                            onClick={() => openTestDrawer(provider)}
                           >
-                            {probingId === provider.id ? '测试中…' : '测试'}
+                            测试
                           </Button>
                           <Button
                             variant="ghost"
@@ -819,6 +949,159 @@ export function ProvidersPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Sheet
+        open={testDrawerOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTestDrawerOpen(false)
+            setModelTestResults({})
+          }
+        }}
+      >
+        <SheetContent className="flex flex-col sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>测试渠道「{testDrawerProvider?.name}」</SheetTitle>
+            <SheetDescription>
+              勾选模型后批量测试连通性，通过的模型可一键导入
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-4 flex flex-1 flex-col gap-4 overflow-hidden">
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                测试消息
+              </label>
+              <Input
+                value={testMessage}
+                onChange={(e) => setTestMessage(e.target.value)}
+                placeholder="输入测试消息"
+              />
+            </div>
+
+            {getPresetModels().length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                该渠道无预置模型，请先通过"添加渠道"导入模型
+              </div>
+            ) : (
+              <>
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-gray-300"
+                    checked={
+                      selectedModelIds.size === getPresetModels().length &&
+                      getPresetModels().length > 0
+                    }
+                    onChange={() =>
+                      toggleAllModels(
+                        getPresetModels().map((m) => m.modelId),
+                      )
+                    }
+                  />
+                  全选（{getPresetModels().length} 个模型）
+                </label>
+
+                <div className="flex-1 overflow-y-auto rounded-md border">
+                  {getPresetModels().map((model) => {
+                    const isSelected = selectedModelIds.has(model.modelId)
+                    const isTesting = testingModelIds.has(model.modelId)
+                    const result = modelTestResults[model.modelId]
+                    const isImported = importedModelIdSet.has(model.modelId)
+
+                    return (
+                      <Fragment key={model.modelId}>
+                        <div
+                          className="flex items-center gap-3 border-b px-3 py-2 last:border-0"
+                        >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-gray-300"
+                          checked={isSelected}
+                          onChange={() => toggleModel(model.modelId)}
+                        />
+                        <span className="flex-1 truncate text-sm">
+                          {model.displayName || model.modelId}
+                        </span>
+                        {isImported && (
+                          <span className="shrink-0 rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600">
+                            已导入
+                          </span>
+                        )}
+                        {isTesting && (
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            测试中…
+                          </span>
+                        )}
+                        {result && !isTesting && (
+                          <button
+                            type="button"
+                            className={`shrink-0 text-xs underline-offset-2 hover:underline ${result.ok ? 'text-green-600' : 'text-red-500'}`}
+                            onClick={() => {
+                              if (!result.reply) return
+                              setExpandedReplies((prev) => {
+                                const next = new Set(prev)
+                                if (next.has(model.modelId)) {
+                                  next.delete(model.modelId)
+                                } else {
+                                  next.add(model.modelId)
+                                }
+                                return next
+                              })
+                            }}
+                            title={result.reply ? '点击查看模型回复' : undefined}
+                          >
+                            {result.ok
+                              ? `✓ ${result.latencyMs}ms`
+                              : `✗ ${result.message}`}
+                          </button>
+                        )}
+                      </div>
+                      {expandedReplies.has(model.modelId) &&
+                        modelTestResults[model.modelId]?.reply && (
+                          <div className="border-b px-3 py-2 last:border-0">
+                            <p className="whitespace-pre-wrap break-words text-xs text-muted-foreground">
+                              {modelTestResults[model.modelId].reply}
+                            </p>
+                          </div>
+                        )}
+                    </Fragment>)
+                  })}
+                </div>
+              </>
+            )}
+
+            <SheetFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setTestDrawerOpen(false)
+                  setModelTestResults({})
+                }}
+              >
+                关闭
+              </Button>
+              <Button
+                variant="outline"
+                disabled={!canImportSome}
+                onClick={handleImportPassing}
+              >
+                {importMutation.isPending
+                  ? '导入中…'
+                  : '导入通过模型'}
+              </Button>
+              <Button
+                disabled={
+                  selectedModelIds.size === 0 || batchTestMutation.isPending
+                }
+                onClick={handleBatchTest}
+              >
+                {batchTestMutation.isPending ? '测试中…' : '开始测试'}
+              </Button>
+            </SheetFooter>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <AlertDialog
         open={confirm !== null}

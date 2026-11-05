@@ -38,6 +38,8 @@ export interface ProviderProbeResult {
   ok: boolean
   latencyMs: number
   message: string
+  reply?: string
+  modelId?: string
 }
 
 export interface CreateProviderFromPresetInput {

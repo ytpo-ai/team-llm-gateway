@@ -7,6 +7,7 @@ import type {
   ProviderPatch,
   ProviderProbeResult,
 } from './types'
+import type { BulkCreateModelsResult } from '@/features/models/api'
 
 export function listProviders(): Promise<Provider[]> {
   return request<Provider[]>('/providers')
@@ -44,8 +45,45 @@ export function deleteProvider(id: string): Promise<Provider> {
   return request<Provider>(`/providers/${id}`, { method: 'DELETE' })
 }
 
-export function testProvider(id: string): Promise<ProviderProbeResult> {
+export interface TestProviderInput {
+  modelId?: string
+  message?: string
+}
+
+export function testProvider(
+  id: string,
+  body?: TestProviderInput,
+): Promise<ProviderProbeResult> {
   return request<ProviderProbeResult>(`/providers/${id}/test`, {
     method: 'POST',
+    body,
+  })
+}
+
+export function syncProviderModels(
+  id: string,
+): Promise<BulkCreateModelsResult> {
+  return request<BulkCreateModelsResult>(
+    `/providers/${id}/sync-models`,
+    { method: 'POST' },
+  )
+}
+
+export interface BatchTestInput {
+  modelIds: string[]
+  message?: string
+}
+
+export interface BatchTestResult {
+  results: ProviderProbeResult[]
+}
+
+export function batchTestProvider(
+  id: string,
+  body: BatchTestInput,
+): Promise<BatchTestResult> {
+  return request<BatchTestResult>(`/providers/${id}/batch-test`, {
+    method: 'POST',
+    body,
   })
 }
