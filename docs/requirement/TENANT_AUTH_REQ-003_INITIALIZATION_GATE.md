@@ -7,7 +7,7 @@
 | 所属 feature | `docs/feature/tenant_auth.md` |
 | 所属 plan | `docs/plan/TENANT_AUTH_INITIALIZATION_GATE_PLAN.md` |
 | 需求管理 ID | — |
-| 分支 | `feat/tenant-auth-init-gate` |
+| 分支 | main（提交 `367285a`） |
 | 状态 | `in-review` |
 
 ## 2. 需求描述
