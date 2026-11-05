@@ -159,6 +159,33 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
     ],
   },
   {
+    key: 'kimi-code',
+    label: 'Kimi Code',
+    formats: [
+      { type: ProviderType.OPENAI_COMPATIBLE, baseUrl: 'https://api.kimi.com/coding/v1' },
+    ],
+    models: [
+      {
+        modelId: 'k3',
+        displayName: 'K3',
+        capabilities: ['chat', 'code', 'reasoning', 'vision', 'long-context'],
+        multiplier: 1,
+      },
+      {
+        modelId: 'kimi-for-coding',
+        displayName: 'Kimi for Coding',
+        capabilities: ['chat', 'code', 'reasoning', 'vision', 'long-context'],
+        multiplier: 0.5,
+      },
+      {
+        modelId: 'kimi-for-coding-highspeed',
+        displayName: 'Kimi for Coding HighSpeed',
+        capabilities: ['chat', 'code', 'reasoning', 'vision', 'long-context'],
+        multiplier: 0.8,
+      },
+    ],
+  },
+  {
     key: 'qwen',
     label: '通义千问 Qwen',
     formats: [
