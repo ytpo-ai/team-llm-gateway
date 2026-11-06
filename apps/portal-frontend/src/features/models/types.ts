@@ -19,6 +19,11 @@ export interface Model {
   providerBindings: ProviderBindingView[]
   modelId: string
   displayName: string
+  description: string
+  contextLength: number | null
+  maxOutputLength: number | null
+  inputModalities: string[]
+  outputModalities: string[]
   multiplier: number
   capabilities: string[]
   aliases: string[]
@@ -29,8 +34,13 @@ export interface Model {
 export interface OfficialModelPreset {
   modelId: string
   displayName: string
+  description: string
   capabilities: string[]
   multiplier: number
+  contextLength: number | null
+  maxOutputLength: number | null
+  inputModalities: string[]
+  outputModalities: string[]
 }
 
 export interface OfficialFormatPreset {
@@ -53,6 +63,11 @@ export interface ModelInput {
   providerBindings?: ProviderBindingInput[]
   modelId: string
   displayName?: string
+  description?: string
+  contextLength?: number
+  maxOutputLength?: number
+  inputModalities?: string[]
+  outputModalities?: string[]
   multiplier?: number
   capabilities?: string[]
   aliases?: string[]
@@ -63,6 +78,11 @@ export interface ModelPatch {
   providerBindings?: ProviderBindingInput[]
   modelId?: string
   displayName?: string
+  description?: string
+  contextLength?: number
+  maxOutputLength?: number
+  inputModalities?: string[]
+  outputModalities?: string[]
   multiplier?: number
   capabilities?: string[]
   aliases?: string[]

@@ -9,6 +9,11 @@ import type {
 export interface BulkModelItem {
   modelId: string
   displayName?: string
+  description?: string
+  contextLength?: number | null
+  maxOutputLength?: number | null
+  inputModalities?: string[]
+  outputModalities?: string[]
   multiplier?: number
   capabilities?: string[]
   aliases?: string[]

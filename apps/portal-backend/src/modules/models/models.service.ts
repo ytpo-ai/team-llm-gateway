@@ -33,6 +33,11 @@ export interface ModelView {
   providerBindings: ProviderBindingView[];
   modelId: string;
   displayName: string;
+  description: string;
+  contextLength: number | null;
+  maxOutputLength: number | null;
+  inputModalities: string[];
+  outputModalities: string[];
   multiplier: number;
   capabilities: string[];
   aliases: string[];
@@ -184,6 +189,11 @@ export class ModelsService {
       providerBindings: rawBindings,
       modelId: dto.modelId,
       displayName: dto.displayName ?? '',
+      description: dto.description ?? '',
+      contextLength: dto.contextLength ?? null,
+      maxOutputLength: dto.maxOutputLength ?? null,
+      inputModalities: dto.inputModalities ?? ['text'],
+      outputModalities: dto.outputModalities ?? ['text'],
       multiplier: dto.multiplier ?? 1,
       capabilities: dto.capabilities ?? [],
       aliases: dto.aliases ?? [],
@@ -218,6 +228,11 @@ export class ModelsService {
         providerId: dto.providerId,
         modelId: item.modelId,
         displayName: item.displayName ?? '',
+        description: item.description ?? '',
+        contextLength: item.contextLength ?? null,
+        maxOutputLength: item.maxOutputLength ?? null,
+        inputModalities: item.inputModalities ?? ['text'],
+        outputModalities: item.outputModalities ?? ['text'],
         multiplier: item.multiplier ?? 1,
         capabilities: item.capabilities ?? [],
         aliases: item.aliases ?? [],
@@ -257,6 +272,14 @@ export class ModelsService {
       model.modelId = dto.modelId;
     }
     if (dto.displayName !== undefined) model.displayName = dto.displayName;
+    if (dto.description !== undefined) model.description = dto.description;
+    if (dto.contextLength !== undefined) model.contextLength = dto.contextLength;
+    if (dto.maxOutputLength !== undefined)
+      model.maxOutputLength = dto.maxOutputLength;
+    if (dto.inputModalities !== undefined)
+      model.inputModalities = dto.inputModalities;
+    if (dto.outputModalities !== undefined)
+      model.outputModalities = dto.outputModalities;
     if (dto.multiplier !== undefined) model.multiplier = dto.multiplier;
     if (dto.capabilities !== undefined) model.capabilities = dto.capabilities;
     if (dto.aliases !== undefined) model.aliases = dto.aliases;
@@ -432,6 +455,11 @@ export class ModelsService {
       providerBindings,
       modelId: model.modelId,
       displayName: model.displayName,
+      description: model.description,
+      contextLength: model.contextLength ?? null,
+      maxOutputLength: model.maxOutputLength ?? null,
+      inputModalities: model.inputModalities ?? ['text'],
+      outputModalities: model.outputModalities ?? ['text'],
       multiplier: model.multiplier,
       capabilities: model.capabilities,
       aliases: model.aliases,

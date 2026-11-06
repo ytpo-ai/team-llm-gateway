@@ -59,6 +59,21 @@ export class Model {
   @Prop({ type: String, trim: true, default: '' })
   displayName: string;
 
+  @Prop({ type: String, trim: true, default: '' })
+  description: string;
+
+  @Prop({ type: Number, default: null })
+  contextLength: number | null;
+
+  @Prop({ type: Number, default: null })
+  maxOutputLength: number | null;
+
+  @Prop({ type: [String], default: ['text'] })
+  inputModalities: string[];
+
+  @Prop({ type: [String], default: ['text'] })
+  outputModalities: string[];
+
   @Prop({ type: Number, required: true, default: 1 })
   multiplier: number;
 

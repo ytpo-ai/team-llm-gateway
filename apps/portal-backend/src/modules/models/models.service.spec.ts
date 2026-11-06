@@ -46,6 +46,11 @@ describe('ModelsService', () => {
     providerBindings: [],
     modelId: 'gpt-4o-mini',
     displayName: 'GPT-4o mini',
+    description: '',
+    contextLength: 128000,
+    maxOutputLength: 16384,
+    inputModalities: ['text'],
+    outputModalities: ['text'],
     multiplier: 1.5,
     capabilities: ['chat'],
     aliases: [],
@@ -131,6 +136,60 @@ describe('ModelsService', () => {
       expect(result.providerBindings).toBeDefined();
     });
 
+    it('should pass through metadata fields', async () => {
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue({ _id: providerId }),
+      });
+      modelModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(null),
+      });
+      modelModel.create.mockImplementation(async (input: any) => ({
+        ...makeModel(),
+        ...input,
+      }));
+
+      const result = await service.create(tenantId, teamId, {
+        providerId: String(providerId),
+        modelId: 'gpt-4o',
+        description: 'OpenAI 多模态旗舰模型',
+        contextLength: 128000,
+        maxOutputLength: 16384,
+        inputModalities: ['text', 'image'],
+        outputModalities: ['text'],
+      });
+
+      expect(result.description).toBe('OpenAI 多模态旗舰模型');
+      expect(result.contextLength).toBe(128000);
+      expect(result.maxOutputLength).toBe(16384);
+      expect(result.inputModalities).toEqual(['text', 'image']);
+      expect(result.outputModalities).toEqual(['text']);
+    });
+
+    it('should apply metadata defaults when omitted', async () => {
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue({ _id: providerId }),
+      });
+      modelModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(null),
+      });
+      modelModel.create.mockImplementation(async (input: any) => ({
+        ...makeModel(),
+        ...input,
+      }));
+
+      await service.create(tenantId, teamId, {
+        providerId: String(providerId),
+        modelId: 'gpt-4o-mini',
+      });
+
+      const created = modelModel.create.mock.calls[0][0];
+      expect(created.description).toBe('');
+      expect(created.contextLength).toBeNull();
+      expect(created.maxOutputLength).toBeNull();
+      expect(created.inputModalities).toEqual(['text']);
+      expect(created.outputModalities).toEqual(['text']);
+    });
+
     it('should throw NotFound when provider missing', async () => {
       providerModel.findOne.mockReturnValue({
         exec: vi.fn().mockResolvedValue(null),
@@ -205,6 +264,26 @@ describe('ModelsService', () => {
 
       expect(model.providerBindings).toHaveLength(1);
       expect(result.providerBindings).toBeDefined();
+    });
+
+    it('should update metadata fields', async () => {
+      const model = makeModel();
+      modelModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(model),
+      });
+
+      const result = await service.update(tenantId, teamId, String(modelId), {
+        description: '更新后的简介',
+        contextLength: 1000000,
+        maxOutputLength: 32768,
+        inputModalities: ['text', 'image', 'video'],
+      });
+
+      expect(result.description).toBe('更新后的简介');
+      expect(result.contextLength).toBe(1000000);
+      expect(result.maxOutputLength).toBe(32768);
+      expect(result.inputModalities).toEqual(['text', 'image', 'video']);
+      expect(model.save).toHaveBeenCalled();
     });
   });
 

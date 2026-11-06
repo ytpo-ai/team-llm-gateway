@@ -11,12 +11,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -44,6 +38,8 @@ import {
   listOfficialPresets,
   updateModel,
 } from '@/features/models/api'
+import { ModelCard } from '@/features/models/components/model-card'
+import { formatTokenCount } from '@/features/models/utils'
 import type { Model, ModelInput, ModelPatch, ProviderBindingInput } from '@/features/models/types'
 import { listProviders } from '@/features/providers/api'
 import type { Provider } from '@/features/providers/types'
@@ -59,10 +55,22 @@ interface FormState {
   bindings: BindingFormEntry[]
   modelId: string
   displayName: string
+  description: string
+  contextLength: string
+  maxOutputLength: string
+  inputModalities: string[]
+  outputModalities: string[]
   multiplier: string
   capabilities: string
   aliases: string
 }
+
+const MODALITY_OPTIONS = [
+  { value: 'text', label: '文本' },
+  { value: 'image', label: '图片' },
+  { value: 'audio', label: '音频' },
+  { value: 'video', label: '视频' },
+] as const
 
 const emptyBinding: BindingFormEntry = { providerId: '', priority: '0' }
 
@@ -71,6 +79,11 @@ const emptyForm: FormState = {
   bindings: [],
   modelId: '',
   displayName: '',
+  description: '',
+  contextLength: '',
+  maxOutputLength: '',
+  inputModalities: ['text'],
+  outputModalities: ['text'],
   multiplier: '1',
   capabilities: '',
   aliases: '',
@@ -96,6 +109,14 @@ function toForm(model: Model): FormState {
     bindings: extraBindings,
     modelId: model.modelId,
     displayName: model.displayName,
+    description: model.description ?? '',
+    contextLength: model.contextLength != null ? String(model.contextLength) : '',
+    maxOutputLength:
+      model.maxOutputLength != null ? String(model.maxOutputLength) : '',
+    inputModalities:
+      model.inputModalities?.length > 0 ? model.inputModalities : ['text'],
+    outputModalities:
+      model.outputModalities?.length > 0 ? model.outputModalities : ['text'],
     multiplier: String(model.multiplier),
     capabilities: model.capabilities.join(', '),
     aliases: model.aliases.join(', '),
@@ -165,6 +186,11 @@ export function ModelsPage() {
         .map((m) => ({
           modelId: m.modelId,
           displayName: m.displayName,
+          description: m.description,
+          contextLength: m.contextLength,
+          maxOutputLength: m.maxOutputLength,
+          inputModalities: m.inputModalities,
+          outputModalities: m.outputModalities,
           multiplier: m.multiplier,
           capabilities: m.capabilities,
           aliases: [],
@@ -223,11 +249,30 @@ export function ModelsPage() {
     return valid.length > 0 ? valid : undefined
   }
 
+  const toggleModality = (
+    field: 'inputModalities' | 'outputModalities',
+    value: string,
+  ) => {
+    const current = form[field]
+    setForm({
+      ...form,
+      [field]: current.includes(value)
+        ? current.filter((v) => v !== value)
+        : [...current, value],
+    })
+  }
+
   const submitMutation = useMutation({
     mutationFn: () => {
       const capabilities = parseList(form.capabilities)
       const aliases = parseList(form.aliases)
       const providerBindings = buildProviderBindings()
+      const contextLength = form.contextLength
+        ? Number(form.contextLength)
+        : undefined
+      const maxOutputLength = form.maxOutputLength
+        ? Number(form.maxOutputLength)
+        : undefined
 
       if (editing) {
         const patch: ModelPatch = {
@@ -235,6 +280,11 @@ export function ModelsPage() {
           providerBindings,
           modelId: form.modelId.trim(),
           displayName: form.displayName.trim(),
+          description: form.description.trim(),
+          contextLength,
+          maxOutputLength,
+          inputModalities: form.inputModalities,
+          outputModalities: form.outputModalities,
           multiplier: form.multiplier ? Number(form.multiplier) : 1,
           capabilities,
           aliases,
@@ -246,6 +296,11 @@ export function ModelsPage() {
         providerBindings,
         modelId: form.modelId.trim(),
         displayName: form.displayName.trim() || undefined,
+        description: form.description.trim() || undefined,
+        contextLength,
+        maxOutputLength,
+        inputModalities: form.inputModalities,
+        outputModalities: form.outputModalities,
         multiplier: form.multiplier ? Number(form.multiplier) : undefined,
         capabilities,
         aliases,
@@ -328,150 +383,40 @@ export function ModelsPage() {
         )}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>模型列表</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {modelsQuery.isLoading ? (
-            <div className="text-sm text-muted-foreground">加载中…</div>
-          ) : models.length === 0 ? (
-            <div className="text-sm text-muted-foreground">
-              暂无模型，点击右上角添加。
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="py-2 pr-4 font-medium">模型标识</th>
-                    <th className="py-2 pr-4 font-medium">展示名</th>
-                    <th className="py-2 pr-4 font-medium">渠道</th>
-                    <th className="py-2 pr-4 font-medium">倍率</th>
-                    <th className="py-2 pr-4 font-medium">能力标签</th>
-                    <th className="py-2 pr-4 font-medium">状态</th>
-                    {isAdmin && <th className="py-2 font-medium">操作</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {models.map((model) => {
-                    const bindings = model.providerBindings ?? []
-                    const sorted = [...bindings].sort((a, b) => a.priority - b.priority)
-
-                    return (
-                      <tr key={model.id} className="border-b last:border-0">
-                        <td className="py-2 pr-4">
-                          <code className="text-xs">{model.modelId}</code>
-                        </td>
-                        <td className="py-2 pr-4">
-                          {model.displayName || (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                        <td className="py-2 pr-4">
-                          {sorted.length === 0 ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <div className="flex flex-wrap gap-1">
-                              {sorted.map((b) => {
-                                const isPrimary = b.providerId === model.providerId
-                                return (
-                                  <span
-                                    key={b.providerId}
-                                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                                      isPrimary
-                                        ? 'bg-primary/10 text-primary'
-                                        : 'bg-muted text-muted-foreground'
-                                    }`}
-                                  >
-                                    {b.providerName}
-                                    <span className="ml-1 opacity-60">
-                                      [P{b.priority}]
-                                    </span>
-                                  </span>
-                                )
-                              })}
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-2 pr-4">×{model.multiplier}</td>
-                        <td className="py-2 pr-4 text-muted-foreground">
-                          {model.capabilities.length > 0
-                            ? model.capabilities.join(', ')
-                            : '—'}
-                        </td>
-                        <td className="py-2 pr-4">
-                          {model.status === 'active' ? (
-                            <span className="text-green-600">正常</span>
-                          ) : (
-                            <span className="text-muted-foreground">已禁用</span>
-                          )}
-                        </td>
-                        {isAdmin && (
-                          <td className="py-2">
-                            <div className="flex gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => startEdit(model)}
-                              >
-                                编辑
-                              </Button>
-                              {model.status === 'active' ? (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() =>
-                                      setConfirm({ model, kind: 'disable' })
-                                    }
-                                  >
-                                    禁用
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-destructive"
-                                    onClick={() =>
-                                      setConfirm({ model, kind: 'delete' })
-                                    }
-                                  >
-                                    删除
-                                  </Button>
-                                </>
-                              ) : (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => enableMutation.mutate(model.id)}
-                                  >
-                                    启用
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-destructive"
-                                    onClick={() =>
-                                      setConfirm({ model, kind: 'delete' })
-                                    }
-                                  >
-                                    删除
-                                  </Button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {modelsQuery.isLoading ? (
+        <div className="text-sm text-muted-foreground">加载中…</div>
+      ) : modelsQuery.isError ? (
+        <div className="flex items-center gap-2 text-sm text-red-500">
+          {modelsQuery.error instanceof ApiError
+            ? modelsQuery.error.message
+            : '加载失败，请稍后重试'}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => modelsQuery.refetch()}
+          >
+            重试
+          </Button>
+        </div>
+      ) : models.length === 0 ? (
+        <div className="text-sm text-muted-foreground">
+          暂无模型，点击右上角添加。
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {models.map((model) => (
+            <ModelCard
+              key={model.id}
+              model={model}
+              isAdmin={isAdmin}
+              onEdit={startEdit}
+              onDisable={(m) => setConfirm({ model: m, kind: 'disable' })}
+              onEnable={(m) => enableMutation.mutate(m.id)}
+              onDelete={(m) => setConfirm({ model: m, kind: 'delete' })}
+            />
+          ))}
+        </div>
+      )}
 
       <Sheet open={formOpen} onOpenChange={setFormOpen}>
         <SheetContent className="sm:max-w-md">
@@ -590,6 +535,92 @@ export function ModelsPage() {
                   setForm({ ...form, displayName: e.target.value })
                 }
               />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                简介（可选）
+              </label>
+              <Input
+                placeholder="模型能力与适用场景的简要介绍"
+                value={form.description}
+                onChange={(e) =>
+                  setForm({ ...form, description: e.target.value })
+                }
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground">
+                  上下文长度（tokens）
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="128000"
+                  value={form.contextLength}
+                  onChange={(e) =>
+                    setForm({ ...form, contextLength: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted-foreground">
+                  最大输出（tokens）
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="16384"
+                  value={form.maxOutputLength}
+                  onChange={(e) =>
+                    setForm({ ...form, maxOutputLength: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                输入模态
+              </label>
+              <div className="flex flex-wrap gap-3">
+                {MODALITY_OPTIONS.map((option) => (
+                  <label
+                    key={option.value}
+                    className="flex items-center gap-1.5 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={form.inputModalities.includes(option.value)}
+                      onChange={() =>
+                        toggleModality('inputModalities', option.value)
+                      }
+                    />
+                    {option.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                输出模态
+              </label>
+              <div className="flex flex-wrap gap-3">
+                {MODALITY_OPTIONS.map((option) => (
+                  <label
+                    key={option.value}
+                    className="flex items-center gap-1.5 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={form.outputModalities.includes(option.value)}
+                      onChange={() =>
+                        toggleModality('outputModalities', option.value)
+                      }
+                    />
+                    {option.label}
+                  </label>
+                ))}
+              </div>
             </div>
             <div>
               <label className="mb-1 block text-sm text-muted-foreground">
@@ -715,8 +746,14 @@ export function ModelsPage() {
                   <span>
                     <code className="text-xs">{model.modelId}</code>
                     <span className="ml-2 text-muted-foreground">
-                      {model.displayName} · ×{model.multiplier}
+                      {model.displayName} · ×{model.multiplier} ·{' '}
+                      {formatTokenCount(model.contextLength)} 上下文
                     </span>
+                    {model.description && (
+                      <span className="block text-xs text-muted-foreground">
+                        {model.description}
+                      </span>
+                    )}
                     <span className="block text-xs text-muted-foreground">
                       {model.capabilities.join(', ')}
                     </span>

@@ -14,7 +14,7 @@
 ### 核心逻辑
 - 上游统一「OpenAI 兼容」抽象（§3 核心解耦原则）；`type` 保留 `anthropic` 位（协议翻译后续）。
 - 上游 key AES-256-GCM 加密落库，明文仅创建/更新时输入、绝不返回。
-- 模型目录：`modelId` + `multiplier`（倍率）+ `capabilities`（能力标签）+ `aliases`。
+- 模型目录：`modelId` + `multiplier`（倍率）+ `capabilities`（能力标签）+ `aliases`；元信息：`description`（简介）、`contextLength`/`maxOutputLength`（上下文/最大输出 tokens）、`inputModalities`/`outputModalities`（输入/输出模态），模型目录页以卡片网格展示。
 - OpenAI 兼容转发层（成员 key → Portal → 上游 key 转发，D-05）：已交付，见 `docs/plan/USAGE_METERING_PLAN.md`（M-01 闭环），代码在 `apps/portal-backend/src/modules/proxy/`。
 - 官方直连一键开启：渠道管理页内置主流 LLM 官方预置（默认未开启），填 Key 即建官方直连渠道并自动导入官方模型（`POST /providers/from-preset`），`Provider.presetKey` 标记来源官方预置。
 
@@ -44,6 +44,8 @@
 | [TEAM_CONTEXT_SWITCH](../plan/TEAM_CONTEXT_SWITCH_PLAN.md) | [REQ-004 团队选择器与上下文切换](../requirement/TEAM_MEMBER_REQ-004_TEAM_SELECTOR.md) | [开发记录](../development/TEAM_MEMBER_REQ-004_DEVELOPMENT.md) | — |
 | [MODEL_MULTI_CHANNEL](../plan/MODEL_MULTI_CHANNEL_PLAN.md) | [REQ-001 后端多渠道绑定与级联适配](../requirement/MODEL_MULTI_CHANNEL_REQ-001_BACKEND.md) | [开发记录](../development/MODEL_MULTI_CHANNEL_REQ-001_DEVELOPMENT.md) | — |
 | 同上 | [REQ-002 前端渠道展示与优先级管理](../requirement/MODEL_MULTI_CHANNEL_REQ-002_FRONTEND.md) | [开发记录](../development/MODEL_MULTI_CHANNEL_REQ-002_DEVELOPMENT.md) | — |
+| [MODEL_CARD_VIEW](../plan/MODEL_CARD_VIEW_PLAN.md) | [REQ-001 后端模型元信息扩展](../requirement/MODEL_CARD_VIEW_REQ-001_BACKEND.md) | — | — |
+| 同上 | [REQ-002 前端模型卡片化展示](../requirement/MODEL_CARD_VIEW_REQ-002_FRONTEND.md) | — | — |
 
 ## 3. 相关文档
 - 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（§3、ADR-09/10、D-05）、`docs/technical/db_schema/MODEL_PROVIDER_SCHEMA.MD`

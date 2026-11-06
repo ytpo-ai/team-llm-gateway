@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
+  IsInt,
   IsMongoId,
   IsNumber,
   IsOptional,
@@ -43,6 +44,36 @@ export class UpdateModelDto {
   @IsString()
   @MaxLength(200)
   displayName?: string;
+
+  @ApiPropertyOptional({ example: 'OpenAI 多模态旗舰模型，支持文本与图像输入' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  description?: string;
+
+  @ApiPropertyOptional({ example: 128000, description: '上下文长度（tokens）' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  contextLength?: number;
+
+  @ApiPropertyOptional({ example: 16384, description: '最大输出长度（tokens）' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxOutputLength?: number;
+
+  @ApiPropertyOptional({ type: [String], example: ['text', 'image'], description: '输入模态' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  inputModalities?: string[];
+
+  @ApiPropertyOptional({ type: [String], example: ['text'], description: '输出模态' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  outputModalities?: string[];
 
   @ApiPropertyOptional({ example: 1.5 })
   @IsOptional()

@@ -43,7 +43,12 @@
 | `teamId` | ObjectId | 必填、ref `Team`、索引 | 所属团队 |
 | `providerId` | ObjectId | 必填、ref `Provider`、索引 | 归属上游渠道 |
 | `modelId` | string | 必填、trim | 模型标识（如 `gpt-4o-mini`） |
-| `displayName` | string | 可选、trim | 展示名（如 `GPT-4o mini`） |
+| `displayName` | string | 可选、trim、默认 `''` | 展示名（如 `GPT-4o mini`） |
+| `description` | string | 可选、trim、默认 `''` | 模型简介（卡片展示） |
+| `contextLength` | number \| null | 可选、默认 `null` | 上下文长度（tokens） |
+| `maxOutputLength` | number \| null | 可选、默认 `null` | 最大输出长度（tokens） |
+| `inputModalities` | string[] | 可选、默认 `['text']` | 输入模态（约定取值 `text`/`image`/`audio`/`video`） |
+| `outputModalities` | string[] | 可选、默认 `['text']` | 输出模态（约定取值同上） |
 | `multiplier` | number | 必填、默认 `1` | 计费倍率（模型倍率 × token） |
 | `capabilities` | string[] | 可选、默认 `[]` | 能力标签（如 `code`/`chat`/`vision`/`reasoning`） |
 | `aliases` | string[] | 可选、默认 `[]` | 模型别名（映射到 `modelId`） |
@@ -86,6 +91,11 @@ interface ModelView {
   providerId: string;
   modelId: string;
   displayName: string;
+  description: string;
+  contextLength: number | null;
+  maxOutputLength: number | null;
+  inputModalities: string[];
+  outputModalities: string[];
   multiplier: number;
   capabilities: string[];
   aliases: string[];
