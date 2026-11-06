@@ -52,6 +52,7 @@ import {
   deleteProvider,
   disableProvider,
   enableProvider,
+  fetchProviderUsage,
   getProviderUsages,
   listProviders,
   updateProvider,
@@ -397,6 +398,13 @@ export function ProvidersPage() {
     },
   })
 
+  const fetchUsageMutation = useMutation({
+    mutationFn: (id: string) => fetchProviderUsage(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['provider-usages'] })
+    },
+  })
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -724,49 +732,68 @@ export function ProvidersPage() {
                         )}
                       </td>
                       <td className="py-2 pr-4">
-                        {(() => {
-                          const usage = providerUsageMap.get(provider.id)
-                          if (usage?.isExhausted) {
-                            return (
-                              <span className="text-xs text-red-500" title={usage.errorMessage ?? '已耗尽'}>
-                                已耗尽
-                              </span>
-                            )
-                          }
-                          if (usage?.lastStatus === 'error') {
-                            return (
-                              <span className="text-xs text-yellow-500" title={usage.errorMessage ?? '查询失败'}>
-                                查询异常
-                              </span>
-                            )
-                          }
-                          if (usage) {
-                            const parts: string[] = []
-                            if (usage.quotaUsed != null && usage.quotaTotal != null) {
-                              parts.push(`${fmtQuota(usage.quotaUsed)}/${fmtQuota(usage.quotaTotal)}`)
-                            }
-                            if (usage.rateLimitRemaining != null) {
-                              parts.push(`速率:${usage.rateLimitRemaining}`)
-                            }
-                            if (parts.length > 0) {
+                        <div className="flex items-center gap-1">
+                          {(() => {
+                            const usage = providerUsageMap.get(provider.id)
+                            if (usage?.isExhausted) {
                               return (
-                                <span className="text-xs text-green-600" title={`更新: ${new Date(usage.fetchedAt).toLocaleString()}`}>
-                                  {parts.join(' ')}
+                                <span className="text-xs text-red-500" title={usage.errorMessage ?? '已耗尽'}>
+                                  已耗尽
                                 </span>
                               )
                             }
-                            return (
-                              <span className="text-xs text-green-600">
-                                正常
-                              </span>
+                            if (usage?.lastStatus === 'error') {
+                              return (
+                                <span className="text-xs text-yellow-500" title={usage.errorMessage ?? '查询失败'}>
+                                  查询异常
+                                </span>
+                              )
+                            }
+                            if (usage) {
+                              const parts: string[] = []
+                              if (usage.quotaUsed != null && usage.quotaTotal != null) {
+                                parts.push(`${fmtQuota(usage.quotaUsed)}/${fmtQuota(usage.quotaTotal)}`)
+                              }
+                              if (usage.rateLimitRemaining != null) {
+                                parts.push(`速率:${usage.rateLimitRemaining}`)
+                              }
+                              if (parts.length > 0) {
+                                return (
+                                  <span className="text-xs text-green-600" title={`更新: ${new Date(usage.fetchedAt).toLocaleString()}`}>
+                                    {parts.join(' ')}
+                                  </span>
+                                )
+                              }
+                              return (
+                                <span className="text-xs text-green-600">
+                                  正常
+                                </span>
+                              )
+                            }
+                            return provider.usageEndpoint ? (
+                              <span className="text-xs text-muted-foreground">未探测</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">未配置</span>
                             )
-                          }
-                          return provider.usageEndpoint ? (
-                            <span className="text-xs text-muted-foreground">未探测</span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">未配置</span>
-                          )
-                        })()}
+                          })()}
+                          {provider.usageEndpoint && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 px-1 text-xs"
+                              disabled={fetchUsageMutation.isPending}
+                              onClick={() =>
+                                fetchUsageMutation.mutate(provider.id)
+                              }
+                              title="主动探测上游用量"
+                            >
+                              {fetchUsageMutation.isPending &&
+                              fetchUsageMutation.variables === provider.id
+                                ? '…'
+                                : '🔍'}
+                            </Button>
+                          )}
+                        </div>
                       </td>
                       <td className="py-2">
                         <div className="flex gap-1">
