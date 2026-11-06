@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpException,
+  HttpStatus,
   NotFoundException,
   Param,
   Patch,
@@ -151,7 +153,13 @@ export class ProvidersController {
       id,
     );
     if (!result) {
-      throw new NotFoundException('该渠道不支持用量查询或查询失败');
+      throw new NotFoundException('渠道不存在或已禁用');
+    }
+    if (result.lastStatus === 'error') {
+      throw new HttpException(
+        result.errorMessage ?? '上游用量查询失败',
+        HttpStatus.BAD_GATEWAY,
+      );
     }
     return result;
   }

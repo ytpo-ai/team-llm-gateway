@@ -45,7 +45,8 @@ export class ProviderUsageService {
 
   /**
    * Query upstream provider usage and cache the snapshot.
-   * Returns the cached snapshot, or null if the provider does not support usage queries.
+   * Falls back to a generic HTTP GET on usageEndpoint if the adapter does not implement fetchUsage.
+   * Returns null only if the provider cannot be queried at all.
    */
   async fetchAndCache(
     tenantId: string,
@@ -62,29 +63,132 @@ export class ProviderUsageService {
       .exec();
     if (!provider) return null;
 
-    const adapter = resolveAdapter(provider.type);
-    if (!adapter.fetchUsage) return null;
-
     const secret = this.configService.getOrThrow<string>('encryption.secret');
     const apiKey = decrypt(secret, provider.apiKeyCiphertext);
 
     let snapshot: ProviderUsageSnapshot | null = null;
-    try {
-      snapshot = await adapter.fetchUsage(
-        provider.baseUrl,
-        apiKey,
-        provider.usageEndpoint ?? undefined,
-      );
-    } catch (err) {
-      this.logger.warn(
-        `Failed to fetch usage for provider ${provider.name}: ${err instanceof Error ? err.message : 'unknown error'}`,
-      );
-      return this.markError(tenantId, teamId, providerId, err);
+
+    // 1. Try adapter-specific fetchUsage
+    const adapter = resolveAdapter(provider.type);
+    if (adapter.fetchUsage) {
+      try {
+        snapshot = await adapter.fetchUsage(
+          provider.baseUrl,
+          apiKey,
+          provider.usageEndpoint ?? undefined,
+        );
+      } catch (err) {
+        this.logger.warn(
+          `Adapter fetchUsage failed for ${provider.name}: ${err instanceof Error ? err.message : 'unknown'}`,
+        );
+      }
     }
 
-    if (!snapshot) return null;
+    // 2. Fallback: generic HTTP GET to usageEndpoint
+    if (!snapshot && provider.usageEndpoint) {
+      try {
+        snapshot = await this.genericFetchUsage(
+          provider.usageEndpoint,
+          apiKey,
+          provider.name,
+        );
+      } catch (err) {
+        this.logger.warn(
+          `Generic fetchUsage failed for ${provider.name}: ${err instanceof Error ? err.message : 'unknown'}`,
+        );
+      }
+    }
+
+    if (!snapshot) {
+      return this.markError(tenantId, teamId, providerId, new Error('无法查询上游用量'));
+    }
 
     return this.upsert(tenantId, teamId, providerId, snapshot);
+  }
+
+  /**
+   * Generic HTTP GET to a usage endpoint.
+   * Tries to parse common upstream usage response formats.
+   */
+  private async genericFetchUsage(
+    endpoint: string,
+    apiKey: string,
+    providerName: string,
+  ): Promise<ProviderUsageSnapshot | null> {
+    const res = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!res.ok) {
+      this.logger.warn(
+        `Usage endpoint for ${providerName} returned ${res.status}`,
+      );
+      return null;
+    }
+
+    const body = (await res.json()) as Record<string, unknown>;
+
+    // Try to extract usage data from common response formats
+    const data = (body.data ?? body.usage ?? body) as Record<string, unknown>;
+
+    const quotaTotal = this.pickNumber(data, [
+      'total', 'quota_total', 'limit',
+      'total_available', 'granted',
+    ]);
+    const quotaUsed = this.pickNumber(data, [
+      'used', 'usage', 'quota_used', 'consumed',
+      'total_used', 'available',
+    ]);
+    const quotaRemaining = this.pickNumber(data, [
+      'remaining', 'remain', 'quota_remaining',
+      'available', 'left',
+    ]);
+    const rateLimitRemaining = this.pickNumber(data, [
+      'rate_limit_remaining', 'rate_remaining',
+    ]);
+
+    // Detect unit from response hints
+    let quotaUnit: ProviderUsageSnapshot['quotaUnit'] = null;
+    const unit = this.pickString(data, ['unit', 'quota_unit', 'type']);
+    if (unit) {
+      if (unit.includes('second') || unit.includes('time')) quotaUnit = 'second';
+      else if (unit.includes('token')) quotaUnit = 'token';
+      else if (unit.includes('request')) quotaUnit = 'request';
+      else if (unit.includes('usd') || unit.includes('dollar')) quotaUnit = 'usd';
+    }
+
+    return {
+      quotaTotal,
+      quotaUsed,
+      quotaRemaining,
+      quotaUnit,
+      rateLimitRemaining,
+      rateLimitReset: null,
+    };
+  }
+
+  private pickNumber(obj: Record<string, unknown>, names: string[]): number | null {
+    for (const name of names) {
+      const v = obj[name];
+      if (typeof v === 'number' && Number.isFinite(v)) return v;
+      if (typeof v === 'string') {
+        const n = Number(v);
+        if (Number.isFinite(n)) return n;
+      }
+    }
+    return null;
+  }
+
+  private pickString(obj: Record<string, unknown>, names: string[]): string | null {
+    for (const name of names) {
+      const v = obj[name];
+      if (typeof v === 'string' && v.trim()) return v;
+    }
+    return null;
   }
 
   /**
