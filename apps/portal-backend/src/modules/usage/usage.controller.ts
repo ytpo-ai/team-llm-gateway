@@ -59,6 +59,15 @@ export class UsageController {
     return this.usageService.byKey(user, query);
   }
 
+  @Get('by-provider')
+  @ApiOperation({ summary: '按上游渠道拆分' })
+  byProvider(
+    @CurrentUser() user: AuthUser,
+    @Query() query: UsageQueryDto,
+  ) {
+    return this.usageService.byProvider(user, query);
+  }
+
   @Get('logs')
   @ApiOperation({ summary: '使用日志（请求级分页明细）' })
   logs(

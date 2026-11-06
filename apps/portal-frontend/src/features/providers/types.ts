@@ -14,6 +14,7 @@ export interface Provider {
   status: ProviderStatus
   presetKey?: string | null
   defaultPriority: number
+  usageEndpoint: string | null
   createdAt?: string
 }
 
@@ -24,6 +25,7 @@ export interface ProviderInput {
   baseUrl: string
   apiKey: string
   defaultPriority?: number
+  usageEndpoint?: string
 }
 
 export interface ProviderPatch {
@@ -35,6 +37,7 @@ export interface ProviderPatch {
   status?: ProviderStatus
   presetKey?: string
   defaultPriority?: number
+  usageEndpoint?: string
 }
 
 export interface ProviderProbeResult {

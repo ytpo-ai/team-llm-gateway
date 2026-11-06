@@ -4,6 +4,7 @@ import { Model, Types } from 'mongoose';
 import { Role } from '../../common/enums/role.enum.js';
 import { ApiKey } from '../api-keys/schemas/api-key.schema.js';
 import type { AuthUser } from '../auth/decorators/current-user.decorator.js';
+import { Provider } from '../providers/schemas/provider.schema.js';
 import { User } from '../users/schemas/user.schema.js';
 import {
   UsageGranularity,
@@ -100,6 +101,7 @@ export class UsageService {
     private readonly usageLogModel: Model<UsageLog>,
     @InjectModel(User.name) private readonly userModel: Model<User>,
     @InjectModel(ApiKey.name) private readonly apiKeyModel: Model<ApiKey>,
+    @InjectModel(Provider.name) private readonly providerModel: Model<Provider>,
   ) {}
 
   async record(input: UsageRecordInput): Promise<UsageLogDocument> {
@@ -323,6 +325,28 @@ export class UsageService {
     }));
   }
 
+  async byProvider(
+    user: AuthUser,
+    query: UsageQueryDto,
+  ): Promise<UsageBreakdownItem[]> {
+    const rows = await this.breakdown(user, query, '$providerId');
+    const ids = rows.map((row) => String(row._id));
+
+    const providers = await this.providerModel
+      .find({ _id: { $in: ids.map((id) => new Types.ObjectId(id)) } })
+      .select('name')
+      .exec();
+    const labelMap = new Map(providers.map((p) => [String(p._id), p.name]));
+
+    return rows.map((row) => ({
+      id: String(row._id),
+      label: labelMap.get(String(row._id)) ?? String(row._id),
+      requestCount: row.requestCount,
+      totalTokens: row.totalTokens,
+      totalCost: row.totalCost,
+    }));
+  }
+
   async listLogs(
     user: AuthUser,
     query: UsageLogQueryDto,
@@ -390,7 +414,7 @@ export class UsageService {
   private async breakdown(
     user: AuthUser,
     query: UsageQueryDto,
-    groupField: '$modelId' | '$userId' | '$apiKeyId',
+    groupField: '$modelId' | '$userId' | '$apiKeyId' | '$providerId',
   ): Promise<AggregateRow[]> {
     const { from, to } = this.resolveRange(query);
     const match = this.buildMatch(user, from, to);

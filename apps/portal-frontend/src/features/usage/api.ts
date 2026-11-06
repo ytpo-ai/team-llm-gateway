@@ -37,6 +37,10 @@ export function getUsageByKey(query: UsageQuery): Promise<UsageBreakdownItem[]> 
   return request<UsageBreakdownItem[]>(`/usage/by-key${toQuery(query)}`)
 }
 
+export function getUsageByProvider(query: UsageQuery): Promise<UsageBreakdownItem[]> {
+  return request<UsageBreakdownItem[]>(`/usage/by-provider${toQuery(query)}`)
+}
+
 export function getUsageLogs(query: UsageLogQuery): Promise<UsageLogPage> {
   const search = new URLSearchParams()
   if (query.page) search.set('page', String(query.page))

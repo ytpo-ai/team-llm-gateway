@@ -12,6 +12,7 @@ import {
   getUsageByKey,
   getUsageByMember,
   getUsageByModel,
+  getUsageByProvider,
   getUsageSummary,
   getUsageTrends,
 } from '@/features/usage/api'
@@ -146,6 +147,10 @@ export function DashboardPage() {
     queryKey: ['usage', 'by-key', range],
     queryFn: () => getUsageByKey(range),
   })
+  const byProviderQuery = useQuery({
+    queryKey: ['usage', 'by-provider', range],
+    queryFn: () => getUsageByProvider(range),
+  })
 
   const summary = summaryQuery.data
   const trends: UsageTrendPoint[] = trendsQuery.data ?? []
@@ -242,7 +247,7 @@ export function DashboardPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>按模型</CardTitle>
@@ -252,6 +257,18 @@ export function DashboardPage() {
               <div className="py-6 text-sm text-muted-foreground">加载中…</div>
             ) : (
               <BreakdownTable items={byModelQuery.data ?? []} />
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>按渠道</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {byProviderQuery.isLoading ? (
+              <div className="py-6 text-sm text-muted-foreground">加载中…</div>
+            ) : (
+              <BreakdownTable items={byProviderQuery.data ?? []} />
             )}
           </CardContent>
         </Card>

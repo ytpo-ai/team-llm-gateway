@@ -645,6 +645,7 @@ export function ProvidersPage() {
                     <th className="py-2 pr-4 font-medium">Key</th>
                     <th className="py-2 pr-4 font-medium">优先级</th>
                     <th className="py-2 pr-4 font-medium">状态</th>
+                    <th className="py-2 pr-4 font-medium">用量探测</th>
                     <th className="py-2 font-medium">操作</th>
                   </tr>
                 </thead>
@@ -673,6 +674,13 @@ export function ProvidersPage() {
                           <span className="text-green-600">正常</span>
                         ) : (
                           <span className="text-muted-foreground">已禁用</span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-4">
+                        {provider.usageEndpoint ? (
+                          <span className="text-xs text-green-600">已配置</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">未配置</span>
                         )}
                       </td>
                       <td className="py-2">

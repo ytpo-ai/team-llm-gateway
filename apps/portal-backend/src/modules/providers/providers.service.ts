@@ -35,6 +35,7 @@ export interface ProviderView {
   status: ProviderStatus;
   presetKey?: string | null;
   defaultPriority: number;
+  usageEndpoint: string | null;
   createdAt?: Date;
 }
 
@@ -146,6 +147,7 @@ export class ProvidersService {
       status: ProviderStatus.ACTIVE,
       presetKey: dto.presetKey,
       defaultPriority: dto.defaultPriority ?? 0,
+      usageEndpoint: dto.usageEndpoint ?? null,
     });
 
     return this.toView(provider);
@@ -215,6 +217,7 @@ export class ProvidersService {
     if (dto.status !== undefined) provider.status = dto.status;
     if (dto.presetKey !== undefined) provider.presetKey = dto.presetKey || undefined;
     if (dto.defaultPriority !== undefined) provider.defaultPriority = dto.defaultPriority;
+    if (dto.usageEndpoint !== undefined) provider.usageEndpoint = dto.usageEndpoint || null;
 
     await provider.save();
     return this.toView(provider);
@@ -524,6 +527,7 @@ export class ProvidersService {
       status: provider.status,
       presetKey: provider.presetKey ?? null,
       defaultPriority: provider.defaultPriority ?? 0,
+      usageEndpoint: provider.usageEndpoint ?? null,
       createdAt: provider.createdAt,
     };
   }

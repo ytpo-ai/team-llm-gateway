@@ -6,6 +6,18 @@ export interface UpstreamUsage {
   total_tokens?: number;
 }
 
+/**
+ * Snapshot of upstream provider usage/quota, returned by fetchUsage().
+ */
+export interface ProviderUsageSnapshot {
+  quotaTotal: number | null;
+  quotaUsed: number | null;
+  quotaRemaining: number | null;
+  quotaUnit: 'token' | 'request' | 'second' | 'usd' | null;
+  rateLimitRemaining: number | null;
+  rateLimitReset: Date | null;
+}
+
 export interface AdapterRequest {
   url: string;
   headers: Record<string, string>;
@@ -32,6 +44,18 @@ export interface UpstreamAdapter {
   buildRequest(input: BuildRequestInput): Promise<AdapterRequest>;
   parseResponse(text: string, modelId: string): Record<string, unknown>;
   createStreamTransformer(): StreamTransformer;
+  /**
+   * Optional: query upstream provider usage/quota.
+   * @param baseUrl - provider base URL
+   * @param apiKey - decrypted upstream API key
+   * @param usageEndpoint - optional dedicated usage endpoint (overrides default)
+   * @returns usage snapshot, or null if not supported
+   */
+  fetchUsage?(
+    baseUrl: string,
+    apiKey: string,
+    usageEndpoint?: string,
+  ): Promise<ProviderUsageSnapshot | null>;
 }
 
 export function trimTrailingSlash(url: string): string {

@@ -13,6 +13,7 @@ import {
 } from '../providers/schemas/provider.schema.js';
 import { UsageStatus } from '../usage/schemas/usage-log.schema.js';
 import { UsageService } from '../usage/usage.service.js';
+import { ProviderUsageService } from '../usage/provider-usage.service.js';
 import { ConcurrencyService } from './concurrency.service.js';
 import type { ApiKeyContext } from './decorators/api-key-context.decorator.js';
 import { ProxyService } from './proxy.service.js';
@@ -42,6 +43,11 @@ describe('ProxyService', () => {
   const rateLimitService = { assertAllowed: vi.fn() };
   const concurrencyService = { acquire: vi.fn(() => () => undefined) };
   const configService = { getOrThrow: vi.fn(() => 'test-secret') };
+  const providerUsageService = {
+    isExhausted: vi.fn(() => false),
+    markExhausted: vi.fn(),
+    updateFromHeaders: vi.fn(),
+  };
 
   const makeContext = (apiKeyOverrides: Record<string, unknown> = {}): ApiKeyContext => ({
     tenantId,
@@ -69,6 +75,7 @@ describe('ProxyService', () => {
     tenantId,
     teamId,
     providerId,
+    providerBindings: [],
     modelId: 'gpt-4o-mini',
     displayName: 'GPT-4o mini',
     multiplier: 1.5,
@@ -113,6 +120,7 @@ describe('ProxyService', () => {
         { provide: QuotaLimitService, useValue: quotaLimitService },
         { provide: RateLimitService, useValue: rateLimitService },
         { provide: ConcurrencyService, useValue: concurrencyService },
+        { provide: ProviderUsageService, useValue: providerUsageService },
       ],
     }).compile();
 

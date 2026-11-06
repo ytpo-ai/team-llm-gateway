@@ -51,4 +51,11 @@ export class UpdateProviderDto {
   @Min(0)
   @Max(2)
   defaultPriority?: number;
+
+  @ApiPropertyOptional({ example: 'https://api.moonshot.cn/v1/users/me/usage', description: '上游用量查询 API URL（可选）' })
+  @IsOptional()
+  @IsString()
+  @IsUrl({ require_tld: false })
+  @MaxLength(500)
+  usageEndpoint?: string;
 }

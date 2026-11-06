@@ -1,8 +1,8 @@
-# 计量与用量数据模型（UsageLog）
+# 计量与用量数据模型（UsageLog / ProviderUsage）
 
-> 所属模块：`docs/feature/usage_metering.md`；上游 plan：`docs/plan/USAGE_METERING_PLAN.md`
+> 所属模块：`docs/feature/usage_metering.md`；上游 plan：`docs/plan/USAGE_METERING_PLAN.md`、`docs/plan/PROVIDER_USAGE_SENSE_PLAN.md`
 >
-> 本文件固化 `UsageLog`（请求级用量流水）的 Mongoose Schema 定义，作为「计量与用量」模块的单一事实来源。下游模块（billing_quota 扣费引擎、admin_overview 全局看板）引用此处的 token/成本/归属字段。
+> 本文件固化 `UsageLog`（请求级用量流水）与 `ProviderUsage`（上游渠道用量快照）的 Mongoose Schema 定义，作为「计量与用量」模块的单一事实来源。下游模块（billing_quota 扣费引擎、admin_overview 全局看板）引用此处的 token/成本/归属字段。
 
 ---
 
@@ -91,8 +91,8 @@ interface UsageTrendPoint {
 }
 
 interface UsageBreakdownItem {
-  id: string;             // modelId / userId / apiKeyId
-  label?: string;         // 展示名（成员名/模型 displayName，可选补全）
+  id: string;             // modelId / userId / apiKeyId / providerId
+  label?: string;         // 展示名（成员名/模型 displayName/渠道名，可选补全）
   requestCount: number;
   totalTokens: number;
   totalCost: number;
@@ -100,6 +100,7 @@ interface UsageBreakdownItem {
 ```
 
 - 聚合均通过 MongoDB aggregation pipeline（`$match` + `$group` + `$sort`）实现，初期不引时序库（ADR-06）。
+- 新增 `$providerId` 聚合分组，支持按上游渠道拆分。
 
 ## 6. 状态流转
 
@@ -108,3 +109,33 @@ interface UsageBreakdownItem {
 ```
 
 - 无删除/更新语义，审计流水只追加。
+
+## 7. ProviderUsage（上游渠道用量快照）
+
+> 关联 plan：`docs/plan/PROVIDER_USAGE_SENSE_PLAN.md`（阶段 1）
+
+| 字段 | 类型 | 约束 | 说明 |
+|---|---|---|---|
+| `_id` | ObjectId | 主键 | 自动生成 |
+| `tenantId` | ObjectId | 必填、ref `Tenant`、索引 | 所属租户 |
+| `teamId` | ObjectId | 必填、ref `Team`、索引 | 所属团队 |
+| `providerId` | ObjectId | 必填、ref `Provider`、唯一索引的一部分 | 归属上游渠道 |
+| `quotaTotal` | number | 可选、默认 `null` | 上游总量（秒/token/请求/USD） |
+| `quotaUsed` | number | 可选、默认 `null` | 上游已用量 |
+| `quotaUnit` | enum | `token` / `request` / `second` / `usd`，默认 `null` | 用量单位 |
+| `rateLimitRemaining` | number | 可选、默认 `null` | 速率剩余（来自上游响应头） |
+| `rateLimitReset` | Date | 可选、默认 `null` | 速率重置时间 |
+| `isExhausted` | boolean | 默认 `false` | 综合判定：是否已耗尽 |
+| `errorMessage` | string | 可选、默认 `null` | 耗尽/错误原因 |
+| `lastStatus` | enum | `ok` / `exhausted` / `error`，默认 `ok` | 最近查询状态 |
+| `fetchedAt` | Date | 必填 | 快照时间 |
+
+**索引**：
+- 唯一索引 `{ tenantId: 1, teamId: 1, providerId: 1 }`：每团队每渠道一份快照。
+- 普通索引 `{ fetchedAt: 1 }`：按快照时间清理过期数据。
+
+**机制**：
+- `ProviderUsageService.fetchAndCache()`：通过 `UpstreamAdapter.fetchUsage()` 查询上游用量 API 并缓存。
+- 缓存 TTL 可配（默认 30s），过期后下次请求触发重新查询。
+- 429 响应自动标记 `isExhausted = true`，后续请求跳过该渠道。
+- `updateFromHeaders()`：从上游响应头提取速率信息更新快照。

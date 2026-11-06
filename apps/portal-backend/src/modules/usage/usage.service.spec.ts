@@ -27,6 +27,9 @@ describe('UsageService', () => {
   const apiKeyModel = {
     find: vi.fn(),
   };
+  const providerModel = {
+    find: vi.fn(),
+  };
 
   const adminUser: AuthUser = {
     id: memberId,
@@ -68,6 +71,7 @@ describe('UsageService', () => {
         { provide: 'UsageLogModel', useValue: usageLogModel },
         { provide: 'UserModel', useValue: userModel },
         { provide: 'ApiKeyModel', useValue: apiKeyModel },
+        { provide: 'ProviderModel', useValue: providerModel },
       ],
     }).compile();
 
