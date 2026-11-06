@@ -6,6 +6,7 @@ import type {
   ProviderInput,
   ProviderPatch,
   ProviderProbeResult,
+  ProviderUsageView,
 } from './types'
 import type { BulkCreateModelsResult } from '@/features/models/api'
 
@@ -86,4 +87,8 @@ export function batchTestProvider(
     method: 'POST',
     body,
   })
+}
+
+export function getProviderUsages(): Promise<ProviderUsageView[]> {
+  return request<ProviderUsageView[]>('/usage/providers')
 }

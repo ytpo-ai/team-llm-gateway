@@ -78,3 +78,17 @@ export const PROVIDER_TYPE_BASE_URL_HINTS: Record<ProviderType, string> = {
   anthropic: 'https://api.anthropic.com',
   gemini: 'https://generativelanguage.googleapis.com',
 }
+
+export interface ProviderUsageView {
+  providerId: string
+  providerName: string
+  quotaTotal: number | null
+  quotaUsed: number | null
+  quotaUnit: string | null
+  rateLimitRemaining: number | null
+  rateLimitReset: string | null
+  isExhausted: boolean
+  errorMessage: string | null
+  lastStatus: string
+  fetchedAt: string
+}

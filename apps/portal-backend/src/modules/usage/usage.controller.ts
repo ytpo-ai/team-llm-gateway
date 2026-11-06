@@ -5,6 +5,7 @@ import type { AuthUser } from '../auth/decorators/current-user.decorator.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { UsageQueryDto } from './dto/usage-query.dto.js';
 import { UsageLogQueryDto } from './dto/usage-log-query.dto.js';
+import { ProviderUsageService } from './provider-usage.service.js';
 import { UsageService } from './usage.service.js';
 
 @ApiTags('usage')
@@ -12,7 +13,10 @@ import { UsageService } from './usage.service.js';
 @UseGuards(JwtAuthGuard)
 @Controller('usage')
 export class UsageController {
-  constructor(private readonly usageService: UsageService) {}
+  constructor(
+    private readonly usageService: UsageService,
+    private readonly providerUsageService: ProviderUsageService,
+  ) {}
 
   @Get('summary')
   @ApiOperation({ summary: '用量总览（member 仅本人，其余角色团队全量）' })
@@ -66,6 +70,18 @@ export class UsageController {
     @Query() query: UsageQueryDto,
   ) {
     return this.usageService.byProvider(user, query);
+  }
+
+  @Get('providers')
+  @ApiOperation({ summary: '上游渠道用量快照列表（实时额度/速率状态）' })
+  providersUsage(
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('teamId') teamId: string,
+  ) {
+    return this.providerUsageService.getTeamProviderUsages(
+      tenantId,
+      teamId,
+    );
   }
 
   @Get('logs')

@@ -52,6 +52,7 @@ import {
   deleteProvider,
   disableProvider,
   enableProvider,
+  getProviderUsages,
   listProviders,
   updateProvider,
 } from '@/features/providers/api'
@@ -65,6 +66,7 @@ import {
   type ProviderPatch,
   type ProviderProbeResult,
   type ProviderType,
+  type ProviderUsageView,
 } from '@/features/providers/types'
 import { ApiError } from '@/lib/http'
 
@@ -74,6 +76,17 @@ const PRIORITY_LABELS: Record<number, string> = {
   0: 'P0（最高）',
   1: 'P1',
   2: 'P2',
+}
+
+function fmtQuota(value: number, unit?: string | null): string {
+  if (unit === 'second') {
+    const hours = (value / 3600).toFixed(1)
+    return hours.endsWith('.0') ? hours.slice(0, -2) + 'h' : hours + 'h'
+  }
+  if (unit === 'usd') return `$${value.toFixed(2)}`
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(0)}M`
+  if (value >= 1_000) return `${(value / 1_000).toFixed(0)}K`
+  return String(value)
 }
 
 interface FormState {
@@ -155,8 +168,22 @@ export function ProvidersPage() {
     queryFn: listModels,
   })
 
+  const providerUsagesQuery = useQuery({
+    queryKey: ['provider-usages'],
+    queryFn: getProviderUsages,
+    enabled: isAdmin,
+    refetchInterval: 60_000, // refresh every 60s
+  })
+
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['providers'] })
+
+  const providerUsageMap = new Map<string, ProviderUsageView>()
+  if (providerUsagesQuery.data) {
+    for (const u of providerUsagesQuery.data) {
+      providerUsageMap.set(u.providerId, u)
+    }
+  }
 
   const openEnable = (preset: OfficialProviderPreset) => {
     const first = preset.formats[0]
@@ -677,11 +704,49 @@ export function ProvidersPage() {
                         )}
                       </td>
                       <td className="py-2 pr-4">
-                        {provider.usageEndpoint ? (
-                          <span className="text-xs text-green-600">已配置</span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">未配置</span>
-                        )}
+                        {(() => {
+                          const usage = providerUsageMap.get(provider.id)
+                          if (usage?.isExhausted) {
+                            return (
+                              <span className="text-xs text-red-500" title={usage.errorMessage ?? '已耗尽'}>
+                                已耗尽
+                              </span>
+                            )
+                          }
+                          if (usage?.lastStatus === 'error') {
+                            return (
+                              <span className="text-xs text-yellow-500" title={usage.errorMessage ?? '查询失败'}>
+                                查询异常
+                              </span>
+                            )
+                          }
+                          if (usage) {
+                            const parts: string[] = []
+                            if (usage.quotaUsed != null && usage.quotaTotal != null) {
+                              parts.push(`${fmtQuota(usage.quotaUsed)}/${fmtQuota(usage.quotaTotal)}`)
+                            }
+                            if (usage.rateLimitRemaining != null) {
+                              parts.push(`速率:${usage.rateLimitRemaining}`)
+                            }
+                            if (parts.length > 0) {
+                              return (
+                                <span className="text-xs text-green-600" title={`更新: ${new Date(usage.fetchedAt).toLocaleString()}`}>
+                                  {parts.join(' ')}
+                                </span>
+                              )
+                            }
+                            return (
+                              <span className="text-xs text-green-600">
+                                正常
+                              </span>
+                            )
+                          }
+                          return provider.usageEndpoint ? (
+                            <span className="text-xs text-muted-foreground">未探测</span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">未配置</span>
+                          )
+                        })()}
                       </td>
                       <td className="py-2">
                         <div className="flex gap-1">

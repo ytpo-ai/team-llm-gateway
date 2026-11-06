@@ -15,6 +15,20 @@ import {
   ProviderUsageStatus,
 } from './schemas/provider-usage.schema.js';
 
+export interface ProviderUsageView {
+  providerId: string;
+  providerName: string;
+  quotaTotal: number | null;
+  quotaUsed: number | null;
+  quotaUnit: string | null;
+  rateLimitRemaining: number | null;
+  rateLimitReset: string | null;
+  isExhausted: boolean;
+  errorMessage: string | null;
+  lastStatus: string;
+  fetchedAt: string;
+}
+
 const DEFAULT_CACHE_TTL_MS = 30_000; // 30s
 
 @Injectable()
@@ -295,6 +309,69 @@ export class ProviderUsageService {
       })
       .sort({ fetchedAt: -1 })
       .exec();
+  }
+
+  /**
+   * Get usage snapshot for a specific provider, with provider name.
+   * Includes stale (expired) snapshots so the frontend can show last-known state.
+   */
+  async getProviderUsage(
+    tenantId: string,
+    teamId: string,
+    providerId: string,
+  ): Promise<ProviderUsageView | null> {
+    const cached = await this.providerUsageModel
+      .findOne({
+        tenantId: new Types.ObjectId(tenantId),
+        teamId: new Types.ObjectId(teamId),
+        providerId: new Types.ObjectId(providerId),
+      })
+      .exec();
+    if (!cached) return null;
+
+    const provider = await this.providerModel
+      .findById(providerId)
+      .select('name')
+      .exec();
+
+    return this.toView(cached, provider?.name ?? null);
+  }
+
+  /**
+   * Get usage snapshots for all providers in a team (for list display).
+   */
+  async getTeamProviderUsages(
+    tenantId: string,
+    teamId: string,
+  ): Promise<ProviderUsageView[]> {
+    const docs = await this.listSnapshots(tenantId, teamId);
+    const providerIds = docs.map((d) => String(d.providerId));
+    const providers = await this.providerModel
+      .find({ _id: { $in: providerIds.map((id) => new Types.ObjectId(id)) } })
+      .select('name')
+      .exec();
+    const nameMap = new Map(providers.map((p) => [String(p._id), p.name]));
+
+    return docs.map((doc) => this.toView(doc, nameMap.get(String(doc.providerId)) ?? null));
+  }
+
+  private toView(
+    doc: ProviderUsageDocument,
+    providerName: string | null,
+  ): ProviderUsageView {
+    return {
+      providerId: String(doc.providerId),
+      providerName: providerName ?? '未知渠道',
+      quotaTotal: doc.quotaTotal,
+      quotaUsed: doc.quotaUsed,
+      quotaUnit: doc.quotaUnit,
+      rateLimitRemaining: doc.rateLimitRemaining,
+      rateLimitReset: doc.rateLimitReset?.toISOString() ?? null,
+      isExhausted: doc.isExhausted,
+      errorMessage: doc.errorMessage,
+      lastStatus: doc.lastStatus,
+      fetchedAt: doc.fetchedAt.toISOString(),
+    };
   }
 
   private cacheTtlMs(): number {
