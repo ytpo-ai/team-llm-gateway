@@ -1,4 +1,4 @@
-import { ProviderType } from '../providers/schemas/provider.schema.js';
+import { ProviderType } from '../providers/schemas/provider-type.enum.js';
 
 export interface OfficialModelPreset {
   modelId: string;
@@ -328,6 +328,39 @@ export const OFFICIAL_PRESETS: OfficialProviderPreset[] = [
         capabilities: ['chat', 'code', 'reasoning', 'writing'],
         multiplier: 0.6,
         contextLength: 32768,
+        maxOutputLength: 8192,
+        inputModalities: TEXT_ONLY,
+        outputModalities: TEXT_ONLY,
+      },
+      {
+        modelId: 'qwen2.5-7b-instruct',
+        displayName: 'Qwen2.5 7B Instruct',
+        description: '通义千问 2.5 小参数指令模型，轻量低成本',
+        capabilities: ['chat', 'summarization'],
+        multiplier: 0.1,
+        contextLength: 131072,
+        maxOutputLength: 8192,
+        inputModalities: TEXT_ONLY,
+        outputModalities: TEXT_ONLY,
+      },
+      {
+        modelId: 'qwen2.5-32b-instruct',
+        displayName: 'Qwen2.5 32B Instruct',
+        description: '通义千问 2.5 中参数指令模型，能力与成本兼顾',
+        capabilities: ['chat', 'code', 'reasoning'],
+        multiplier: 0.2,
+        contextLength: 131072,
+        maxOutputLength: 8192,
+        inputModalities: TEXT_ONLY,
+        outputModalities: TEXT_ONLY,
+      },
+      {
+        modelId: 'qwen2.5-72b-instruct',
+        displayName: 'Qwen2.5 72B Instruct',
+        description: '通义千问 2.5 大参数指令模型，开源旗舰级能力',
+        capabilities: ['chat', 'code', 'reasoning', 'writing'],
+        multiplier: 0.4,
+        contextLength: 131072,
         maxOutputLength: 8192,
         inputModalities: TEXT_ONLY,
         outputModalities: TEXT_ONLY,

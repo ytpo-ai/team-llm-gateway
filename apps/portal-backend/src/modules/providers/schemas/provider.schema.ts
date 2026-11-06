@@ -1,13 +1,10 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Schema as MongooseSchema, Types } from 'mongoose';
+import { ProviderType } from './provider-type.enum.js';
+
+export { ProviderType } from './provider-type.enum.js';
 
 export type ProviderDocument = HydratedDocument<Provider>;
-
-export enum ProviderType {
-  OPENAI_COMPATIBLE = 'openai-compatible',
-  ANTHROPIC = 'anthropic',
-  GEMINI = 'gemini',
-}
 
 export enum ProviderAuthType {
   API_KEY = 'api-key',
