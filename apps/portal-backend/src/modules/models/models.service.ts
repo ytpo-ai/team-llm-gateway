@@ -74,12 +74,12 @@ async function resolveBindings(
 
   // Backward compat: no bindings — derive from providerId
   if (model.providerId) {
-    const provider = await providerModel.findById(model.providerId).select('name').exec();
+    const provider = await providerModel.findById(model.providerId).select('name defaultPriority').exec();
     return [
       {
         providerId: String(model.providerId),
         providerName: provider?.name ?? '未知渠道',
-        priority: 0,
+        priority: provider?.defaultPriority ?? 0,
       },
     ];
   }
@@ -207,6 +207,7 @@ export class ModelsService {
         capabilities: item.capabilities ?? [],
         aliases: item.aliases ?? [],
         status: ModelStatus.ACTIVE,
+        providerBindings: [],
       });
       created.push(await this.toView(model, true));
     }

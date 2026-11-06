@@ -13,6 +13,7 @@ export interface Provider {
   apiKeyHint: string
   status: ProviderStatus
   presetKey?: string | null
+  defaultPriority: number
   createdAt?: string
 }
 
@@ -22,6 +23,7 @@ export interface ProviderInput {
   authType?: ProviderAuthType
   baseUrl: string
   apiKey: string
+  defaultPriority?: number
 }
 
 export interface ProviderPatch {
@@ -32,6 +34,7 @@ export interface ProviderPatch {
   apiKey?: string
   status?: ProviderStatus
   presetKey?: string
+  defaultPriority?: number
 }
 
 export interface ProviderProbeResult {
@@ -48,6 +51,7 @@ export interface CreateProviderFromPresetInput {
   name?: string
   format?: ProviderType
   baseUrl?: string
+  defaultPriority?: number
 }
 
 export interface CreateProviderFromPresetResult {

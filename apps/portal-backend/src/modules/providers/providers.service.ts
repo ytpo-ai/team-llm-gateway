@@ -34,6 +34,7 @@ export interface ProviderView {
   apiKeyHint: string;
   status: ProviderStatus;
   presetKey?: string | null;
+  defaultPriority: number;
   createdAt?: Date;
 }
 
@@ -144,6 +145,7 @@ export class ProvidersService {
       apiKeyHint: buildApiKeyHint(dto.apiKey),
       status: ProviderStatus.ACTIVE,
       presetKey: dto.presetKey,
+      defaultPriority: dto.defaultPriority ?? 0,
     });
 
     return this.toView(provider);
@@ -173,6 +175,7 @@ export class ProvidersService {
       baseUrl: dto.baseUrl?.trim() || format.baseUrl,
       apiKey: dto.apiKey,
       presetKey: preset.key,
+      defaultPriority: dto.defaultPriority,
     });
 
     const models = await this.modelsService.bulkCreate(tenantId, teamId, {
@@ -211,6 +214,7 @@ export class ProvidersService {
     }
     if (dto.status !== undefined) provider.status = dto.status;
     if (dto.presetKey !== undefined) provider.presetKey = dto.presetKey || undefined;
+    if (dto.defaultPriority !== undefined) provider.defaultPriority = dto.defaultPriority;
 
     await provider.save();
     return this.toView(provider);
@@ -519,6 +523,7 @@ export class ProvidersService {
       apiKeyHint: provider.apiKeyHint,
       status: provider.status,
       presetKey: provider.presetKey ?? null,
+      defaultPriority: provider.defaultPriority ?? 0,
       createdAt: provider.createdAt,
     };
   }

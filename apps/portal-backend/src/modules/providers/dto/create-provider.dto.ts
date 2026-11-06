@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsUrl, MaxLength, MinLength } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, IsUrl, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { ProviderAuthType, ProviderType } from '../schemas/provider.schema.js';
 
 export class CreateProviderDto {
@@ -36,4 +36,11 @@ export class CreateProviderDto {
   @IsString()
   @MaxLength(100)
   presetKey?: string;
+
+  @ApiPropertyOptional({ example: 0, description: '渠道默认优先级（0=最高 P0, 1=P1, 2=P2），导入模型时作为绑定优先级', default: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(2)
+  defaultPriority?: number;
 }

@@ -70,6 +70,12 @@ import { ApiError } from '@/lib/http'
 
 const NONE_PRESET = '__none__'
 
+const PRIORITY_LABELS: Record<number, string> = {
+  0: 'P0（最高）',
+  1: 'P1',
+  2: 'P2',
+}
+
 interface FormState {
   name: string
   type: ProviderType
@@ -77,6 +83,7 @@ interface FormState {
   baseUrl: string
   apiKey: string
   presetKey: string
+  defaultPriority: number
 }
 
 const emptyForm: FormState = {
@@ -86,6 +93,7 @@ const emptyForm: FormState = {
   baseUrl: '',
   apiKey: '',
   presetKey: '',
+  defaultPriority: 0,
 }
 
 export function ProvidersPage() {
@@ -129,6 +137,7 @@ export function ProvidersPage() {
   const [enableKey, setEnableKey] = useState('')
   const [enableError, setEnableError] = useState<string | null>(null)
   const [enableResult, setEnableResult] = useState<string | null>(null)
+  const [enableDefaultPriority, setEnableDefaultPriority] = useState(0)
 
   const providersQuery = useQuery({
     queryKey: ['providers'],
@@ -157,6 +166,7 @@ export function ProvidersPage() {
     setEnableName('')
     setEnableKey('')
     setEnableError(null)
+    setEnableDefaultPriority(0)
   }
 
   const selectEnableFormat = (type: ProviderType) => {
@@ -174,6 +184,7 @@ export function ProvidersPage() {
         name: enableName.trim() || undefined,
         format: enableFormat,
         baseUrl: enableUrl.trim() || undefined,
+        defaultPriority: enableDefaultPriority,
       })
     },
     onSuccess: (result) => {
@@ -308,6 +319,7 @@ export function ProvidersPage() {
           authType: form.authType,
           baseUrl: form.baseUrl.trim(),
           presetKey: form.presetKey.trim(),
+          defaultPriority: form.defaultPriority,
         }
         if (form.apiKey.trim()) patch.apiKey = form.apiKey.trim()
         return updateProvider(editing.id, patch)
@@ -318,6 +330,7 @@ export function ProvidersPage() {
         authType: form.authType,
         baseUrl: form.baseUrl.trim(),
         apiKey: form.apiKey.trim(),
+        defaultPriority: form.defaultPriority,
       }
       return createProvider(input)
     },
@@ -368,6 +381,7 @@ export function ProvidersPage() {
       baseUrl: provider.baseUrl,
       apiKey: '',
       presetKey: provider.presetKey ?? '',
+      defaultPriority: provider.defaultPriority ?? 0,
     })
     setError(null)
     setEditOpen(true)
@@ -533,6 +547,31 @@ export function ProvidersPage() {
       )}
       <div>
         <label className="mb-1 block text-sm text-muted-foreground">
+          渠道优先级
+        </label>
+        <Select
+          value={String(form.defaultPriority)}
+          onValueChange={(v) =>
+            setForm({ ...form, defaultPriority: Number(v) })
+          }
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {[0, 1, 2].map((p) => (
+              <SelectItem key={p} value={String(p)}>
+                {PRIORITY_LABELS[p]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="mt-1 text-xs text-muted-foreground">
+          导入模型时，模型与该渠道的绑定优先级
+        </p>
+      </div>
+      <div>
+        <label className="mb-1 block text-sm text-muted-foreground">
           Base URL
         </label>
         <Input
@@ -604,6 +643,7 @@ export function ProvidersPage() {
                     <th className="py-2 pr-4 font-medium">类型</th>
                     <th className="py-2 pr-4 font-medium">Base URL</th>
                     <th className="py-2 pr-4 font-medium">Key</th>
+                    <th className="py-2 pr-4 font-medium">优先级</th>
                     <th className="py-2 pr-4 font-medium">状态</th>
                     <th className="py-2 font-medium">操作</th>
                   </tr>
@@ -622,6 +662,11 @@ export function ProvidersPage() {
                       </td>
                       <td className="py-2 pr-4">
                         <code className="text-xs">{provider.apiKeyHint}</code>
+                      </td>
+                      <td className="py-2 pr-4">
+                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                          P{provider.defaultPriority ?? 0}
+                        </span>
                       </td>
                       <td className="py-2 pr-4">
                         {provider.status === 'active' ? (
@@ -927,6 +972,29 @@ export function ProvidersPage() {
                 value={enableName}
                 onChange={(e) => setEnableName(e.target.value)}
               />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">
+                渠道优先级
+              </label>
+              <Select
+                value={String(enableDefaultPriority)}
+                onValueChange={(v) => setEnableDefaultPriority(Number(v))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[0, 1, 2].map((p) => (
+                    <SelectItem key={p} value={String(p)}>
+                      {PRIORITY_LABELS[p]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                导入的模型与该渠道绑定时使用的优先级
+              </p>
             </div>
             {enableError && (
               <p className="text-sm text-red-500">{enableError}</p>

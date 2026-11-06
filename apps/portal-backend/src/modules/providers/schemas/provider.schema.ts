@@ -73,6 +73,9 @@ export class Provider {
   @Prop({ type: String, trim: true, index: true })
   presetKey?: string;
 
+  @Prop({ type: Number, min: 0, max: 2, default: 0 })
+  defaultPriority: number;
+
   createdAt?: Date;
   updatedAt?: Date;
 }
