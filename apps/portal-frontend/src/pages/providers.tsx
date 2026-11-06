@@ -97,6 +97,7 @@ interface FormState {
   apiKey: string
   presetKey: string
   defaultPriority: number
+  usageEndpoint: string
 }
 
 const emptyForm: FormState = {
@@ -107,6 +108,7 @@ const emptyForm: FormState = {
   apiKey: '',
   presetKey: '',
   defaultPriority: 0,
+  usageEndpoint: '',
 }
 
 export function ProvidersPage() {
@@ -347,6 +349,7 @@ export function ProvidersPage() {
           baseUrl: form.baseUrl.trim(),
           presetKey: form.presetKey.trim(),
           defaultPriority: form.defaultPriority,
+          usageEndpoint: form.usageEndpoint.trim() || undefined,
         }
         if (form.apiKey.trim()) patch.apiKey = form.apiKey.trim()
         return updateProvider(editing.id, patch)
@@ -358,6 +361,7 @@ export function ProvidersPage() {
         baseUrl: form.baseUrl.trim(),
         apiKey: form.apiKey.trim(),
         defaultPriority: form.defaultPriority,
+        usageEndpoint: form.usageEndpoint.trim() || undefined,
       }
       return createProvider(input)
     },
@@ -409,6 +413,7 @@ export function ProvidersPage() {
       apiKey: '',
       presetKey: provider.presetKey ?? '',
       defaultPriority: provider.defaultPriority ?? 0,
+      usageEndpoint: provider.usageEndpoint ?? '',
     })
     setError(null)
     setEditOpen(true)
@@ -629,6 +634,21 @@ export function ProvidersPage() {
             required={!editing}
           />
         )}
+      </div>
+      <div>
+        <label className="mb-1 block text-sm text-muted-foreground">
+          用量查询端点（可选）
+        </label>
+        <Input
+          placeholder="如：https://api.moonshot.cn/v1/users/me/usage"
+          value={form.usageEndpoint}
+          onChange={(e) =>
+            setForm({ ...form, usageEndpoint: e.target.value })
+          }
+        />
+        <p className="mt-1 text-xs text-muted-foreground">
+          上游渠道自身的用量查询 API URL，用于获取实时额度/速率状态。留空则不启用用量探测
+        </p>
       </div>
       {error && <p className="text-sm text-red-500">{error}</p>}
     </>
