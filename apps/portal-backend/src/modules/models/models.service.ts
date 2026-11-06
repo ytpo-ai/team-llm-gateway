@@ -49,7 +49,7 @@ const PRESETS_TTL_MS = 60 * 60 * 1000;
 
 /**
  * Merge raw bindings from the document with resolved provider info.
- * Falls back to `providerId` if `providerBindings` is empty (backward compat).
+ * Always includes primary providerId + extra providerBindings.
  */
 async function resolveBindings(
   model: ModelDocument,
@@ -57,34 +57,49 @@ async function resolveBindings(
 ): Promise<ProviderBindingView[]> {
   const rawBindings = model.providerBindings ?? [];
 
-  if (rawBindings.length > 0) {
-    const providerIds = rawBindings.map((b) => b.providerId);
-    const providers = await providerModel
-      .find({ _id: { $in: providerIds } })
-      .select('name status')
-      .exec();
-    const nameMap = new Map(providers.map((p) => [String(p._id), p.name]));
+  // Collect all unique provider IDs (primary + extras)
+  const allProviderIds: Types.ObjectId[] = [];
+  if (model.providerId) {
+    allProviderIds.push(model.providerId);
+  }
+  for (const b of rawBindings) {
+    if (!allProviderIds.some((id) => String(id) === String(b.providerId))) {
+      allProviderIds.push(b.providerId);
+    }
+  }
 
-    return rawBindings.map((b) => ({
+  if (allProviderIds.length === 0) return [];
+
+  // Batch resolve provider info
+  const providers = await providerModel
+    .find({ _id: { $in: allProviderIds } })
+    .select('name defaultPriority')
+    .exec();
+  const nameMap = new Map(providers.map((p) => [String(p._id), p.name]));
+  const priorityMap = new Map(providers.map((p) => [String(p._id), p.defaultPriority ?? 0]));
+
+  const result: ProviderBindingView[] = [];
+
+  // Primary provider (always first, uses its defaultPriority or 0)
+  if (model.providerId) {
+    result.push({
+      providerId: String(model.providerId),
+      providerName: nameMap.get(String(model.providerId)) ?? '未知渠道',
+      priority: priorityMap.get(String(model.providerId)) ?? 0,
+    });
+  }
+
+  // Extra bindings from providerBindings (exclude primary to avoid dupes)
+  for (const b of rawBindings) {
+    if (String(b.providerId) === String(model.providerId)) continue;
+    result.push({
       providerId: String(b.providerId),
       providerName: nameMap.get(String(b.providerId)) ?? '未知渠道',
       priority: b.priority,
-    }));
+    });
   }
 
-  // Backward compat: no bindings — derive from providerId
-  if (model.providerId) {
-    const provider = await providerModel.findById(model.providerId).select('name defaultPriority').exec();
-    return [
-      {
-        providerId: String(model.providerId),
-        providerName: provider?.name ?? '未知渠道',
-        priority: provider?.defaultPriority ?? 0,
-      },
-    ];
-  }
-
-  return [];
+  return result;
 }
 
 @Injectable()
