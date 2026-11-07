@@ -44,8 +44,13 @@ describe('ProxyService', () => {
   const concurrencyService = { acquire: vi.fn(() => () => undefined) };
   const configService = { getOrThrow: vi.fn(() => 'test-secret') };
   const providerUsageService = {
-    isExhausted: vi.fn(() => false),
+    getAvailability: vi.fn((): { available: boolean; reason: string | null } => ({
+      available: true,
+      reason: null,
+    })),
     markExhausted: vi.fn(),
+    recordFailure: vi.fn(),
+    recordSuccess: vi.fn(),
     updateFromHeaders: vi.fn(),
   };
 
@@ -140,6 +145,10 @@ describe('ProxyService', () => {
     quotaLimitService.assertUsageLimits.mockResolvedValue(undefined);
     quotaLimitService.isModelAllowed.mockReturnValue(true);
     quotaLimitService.isProviderAllowed.mockReturnValue(true);
+    providerUsageService.getAvailability.mockReturnValue({
+      available: true,
+      reason: null,
+    });
     rateLimitService.assertAllowed.mockReset();
     concurrencyService.acquire.mockReturnValue(() => undefined);
 
@@ -252,6 +261,143 @@ describe('ProxyService', () => {
           makeRes() as never,
         ),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should fall back and return 502 when the only channel has a network error', async () => {
+      modelModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(makeModel()),
+      });
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(makeProvider()),
+      });
+
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockRejectedValue(new Error('connect ECONNREFUSED')),
+      );
+
+      const res = makeRes();
+      await service.chatCompletions(
+        makeContext(),
+        { model: 'gpt-4o-mini' },
+        res as never,
+      );
+
+      expect(providerUsageService.recordFailure).toHaveBeenCalledWith(
+        tenantId,
+        teamId,
+        String(providerId),
+        expect.stringContaining('ECONNREFUSED'),
+      );
+      expect(res.status).toHaveBeenCalledWith(502);
+    });
+
+    it('should mark exhausted with response headers on 429', async () => {
+      modelModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(makeModel()),
+      });
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(makeProvider()),
+      });
+
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          new Response('{"error":"rate limited"}', {
+            status: 429,
+            headers: { 'retry-after': '30' },
+          }),
+        ),
+      );
+
+      const res = makeRes();
+      await service.chatCompletions(
+        makeContext(),
+        { model: 'gpt-4o-mini' },
+        res as never,
+      );
+
+      expect(providerUsageService.markExhausted).toHaveBeenCalledWith(
+        tenantId,
+        teamId,
+        String(providerId),
+        expect.any(String),
+        expect.objectContaining({ 'retry-after': '30' }),
+      );
+    });
+
+    it('should record failure on 5xx and success on 2xx', async () => {
+      modelModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(makeModel()),
+      });
+      providerModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(makeProvider()),
+      });
+
+      // 5xx path
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(new Response('oops', { status: 500 })),
+      );
+      await service.chatCompletions(
+        makeContext(),
+        { model: 'gpt-4o-mini' },
+        makeRes() as never,
+      );
+      expect(providerUsageService.recordFailure).toHaveBeenCalledWith(
+        tenantId,
+        teamId,
+        String(providerId),
+        expect.stringContaining('500'),
+      );
+
+      // success path
+      usageService.record.mockResolvedValue(undefined);
+      apiKeyModel.updateOne.mockResolvedValue(undefined);
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              choices: [{ message: { content: 'hi' } }],
+              usage: { total_tokens: 0 },
+            }),
+            { status: 200 },
+          ),
+        ),
+      );
+      await service.chatCompletions(
+        makeContext(),
+        { model: 'gpt-4o-mini' },
+        makeRes() as never,
+      );
+      expect(providerUsageService.recordSuccess).toHaveBeenCalledWith(
+        tenantId,
+        teamId,
+        String(providerId),
+      );
+    });
+
+    it('should skip candidates that are unavailable (cooldown)', async () => {
+      modelModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(makeModel()),
+      });
+      providerUsageService.getAvailability.mockReturnValue({
+        available: false,
+        reason: '渠道熔断冷却中',
+      });
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+
+      const res = makeRes();
+      await service.chatCompletions(
+        makeContext(),
+        { model: 'gpt-4o-mini' },
+        res as never,
+      );
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(502);
     });
   });
 

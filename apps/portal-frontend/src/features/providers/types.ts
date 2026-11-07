@@ -14,7 +14,6 @@ export interface Provider {
   status: ProviderStatus
   presetKey?: string | null
   defaultPriority: number
-  usageEndpoint: string | null
   createdAt?: string
 }
 
@@ -25,7 +24,6 @@ export interface ProviderInput {
   baseUrl: string
   apiKey: string
   defaultPriority?: number
-  usageEndpoint?: string
 }
 
 export interface ProviderPatch {
@@ -37,7 +35,6 @@ export interface ProviderPatch {
   status?: ProviderStatus
   presetKey?: string
   defaultPriority?: number
-  usageEndpoint?: string
 }
 
 export interface ProviderProbeResult {
@@ -82,12 +79,11 @@ export const PROVIDER_TYPE_BASE_URL_HINTS: Record<ProviderType, string> = {
 export interface ProviderUsageView {
   providerId: string
   providerName: string
-  quotaTotal: number | null
-  quotaUsed: number | null
-  quotaUnit: string | null
   rateLimitRemaining: number | null
   rateLimitReset: string | null
-  isExhausted: boolean
+  exhaustedUntil: string | null
+  cooldownUntil: string | null
+  consecutiveFailures: number
   errorMessage: string | null
   lastStatus: string
   fetchedAt: string

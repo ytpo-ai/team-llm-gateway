@@ -110,9 +110,11 @@ interface UsageBreakdownItem {
 
 - 无删除/更新语义，审计流水只追加。
 
-## 7. ProviderUsage（上游渠道用量快照）
+## 7. ProviderUsage（渠道健康快照）
 
-> 关联 plan：`docs/plan/PROVIDER_USAGE_SENSE_PLAN.md`（阶段 1）
+> 关联 plan：`docs/plan/PROVIDER_USAGE_SENSE_PLAN.md`（fallback 骨架）、`docs/plan/PROVIDER_USAGE_HEALTH_PLAN.md`（被动信号强化，移除主动查询）
+>
+> 2026-11-07 调整：移除主动查询链路（`fetchUsage` / `usageEndpoint` / quota 字段），改为纯被动信号驱动的渠道健康模型。存量文档中残留的 `quotaTotal/quotaUsed/quotaUnit/isExhausted` 旧字段不再读写，不做数据迁移。
 
 | 字段 | 类型 | 约束 | 说明 |
 |---|---|---|---|
@@ -120,22 +122,23 @@ interface UsageBreakdownItem {
 | `tenantId` | ObjectId | 必填、ref `Tenant`、索引 | 所属租户 |
 | `teamId` | ObjectId | 必填、ref `Team`、索引 | 所属团队 |
 | `providerId` | ObjectId | 必填、ref `Provider`、唯一索引的一部分 | 归属上游渠道 |
-| `quotaTotal` | number | 可选、默认 `null` | 上游总量（秒/token/请求/USD） |
-| `quotaUsed` | number | 可选、默认 `null` | 上游已用量 |
-| `quotaUnit` | enum | `token` / `request` / `second` / `usd`，默认 `null` | 用量单位 |
 | `rateLimitRemaining` | number | 可选、默认 `null` | 速率剩余（来自上游响应头） |
 | `rateLimitReset` | Date | 可选、默认 `null` | 速率重置时间 |
-| `isExhausted` | boolean | 默认 `false` | 综合判定：是否已耗尽 |
-| `errorMessage` | string | 可选、默认 `null` | 耗尽/错误原因 |
-| `lastStatus` | enum | `ok` / `exhausted` / `error`，默认 `ok` | 最近查询状态 |
+| `exhaustedUntil` | Date | 可选、默认 `null` | 429 限流恢复时间；`> now` 即不可用 |
+| `consecutiveFailures` | number | 默认 `0` | 连续失败计数（5xx/408/网络错误/重复 429） |
+| `cooldownUntil` | Date | 可选、默认 `null` | 熔断冷却截止时间；`> now` 即不可用 |
+| `errorMessage` | string | 可选、默认 `null` | 不可用原因 |
+| `lastStatus` | enum | `ok` / `exhausted` / `error`，默认 `ok` | 最近状态 |
 | `fetchedAt` | Date | 必填 | 快照时间 |
 
 **索引**：
 - 唯一索引 `{ tenantId: 1, teamId: 1, providerId: 1 }`：每团队每渠道一份快照。
 - 普通索引 `{ fetchedAt: 1 }`：按快照时间清理过期数据。
 
-**机制**：
-- `ProviderUsageService.fetchAndCache()`：通过 `UpstreamAdapter.fetchUsage()` 查询上游用量 API 并缓存。
-- 缓存 TTL 可配（默认 30s），过期后下次请求触发重新查询。
-- 429 响应自动标记 `isExhausted = true`，后续请求跳过该渠道。
-- `updateFromHeaders()`：从上游响应头提取速率信息更新快照。
+**机制（纯被动信号，无上游用量 API 依赖）**：
+- 429 → `markExhausted()`：恢复时间取响应头 `Retry-After` / `x-ratelimit-reset-*`，缺省回落 `providerHealth.rateLimitCooldownMs`（默认 60s），重复 429 按连续失败次数指数退避（封顶 `cooldownMaxMs`）。
+- 5xx / 408 / 网络错误 → `recordFailure()`：连续失败达 `providerHealth.failureThreshold`（默认 3）进入熔断冷却，退避 `cooldownBaseMs × 2^(failures-threshold)`（默认 30s 起，封顶 10min）。
+- 请求成功 → `recordSuccess()`：重置失败计数，清除 exhausted/cooldown 状态。
+- 转发层 `tryCandidate()` 通过 `getAvailability()` 判定可用性，跳过限流中/冷却中渠道。
+- `updateFromHeaders()`：从上游响应头提取 `x-ratelimit-remaining-*` / `x-ratelimit-reset-*` 更新速率信息。
+- 配置：`providerHealth.failureThreshold` / `cooldownBaseMs` / `cooldownMaxMs` / `rateLimitCooldownMs`（对应环境变量 `PROVIDER_FAILURE_THRESHOLD` 等，见 `.env.example`）。

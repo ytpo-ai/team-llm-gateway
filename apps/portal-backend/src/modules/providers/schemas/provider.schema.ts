@@ -73,9 +73,6 @@ export class Provider {
   @Prop({ type: Number, min: 0, max: 2, default: 0 })
   defaultPriority: number;
 
-  @Prop({ type: String, trim: true, default: null })
-  usageEndpoint: string | null;
-
   createdAt?: Date;
   updatedAt?: Date;
 }

@@ -9,13 +9,12 @@ export enum ProviderUsageStatus {
   ERROR = 'error',
 }
 
-export enum QuotaUnit {
-  TOKEN = 'token',
-  REQUEST = 'request',
-  SECOND = 'second',
-  USD = 'usd',
-}
-
+/**
+ * Channel health snapshot, driven by passive signals only:
+ * - 429 responses (rate limited → exhaustedUntil)
+ * - 5xx/408/network errors (consecutive failures → cooldownUntil)
+ * - upstream response headers (rate-limit remaining/reset)
+ */
 @Schema({ timestamps: true })
 export class ProviderUsage {
   @Prop({
@@ -43,26 +42,22 @@ export class ProviderUsage {
   providerId: Types.ObjectId;
 
   @Prop({ type: Number, default: null })
-  quotaTotal: number | null;
-
-  @Prop({ type: Number, default: null })
-  quotaUsed: number | null;
-
-  @Prop({
-    type: String,
-    enum: Object.values(QuotaUnit),
-    default: null,
-  })
-  quotaUnit: QuotaUnit | null;
-
-  @Prop({ type: Number, default: null })
   rateLimitRemaining: number | null;
 
   @Prop({ type: Date, default: null })
   rateLimitReset: Date | null;
 
-  @Prop({ type: Boolean, default: false })
-  isExhausted: boolean;
+  /** 429 rate-limit recovery time; channel is unavailable while > now */
+  @Prop({ type: Date, default: null })
+  exhaustedUntil: Date | null;
+
+  /** Consecutive failure count (5xx/408/network error/repeated 429) */
+  @Prop({ type: Number, default: 0 })
+  consecutiveFailures: number;
+
+  /** Circuit-breaker cooldown deadline; channel is unavailable while > now */
+  @Prop({ type: Date, default: null })
+  cooldownUntil: Date | null;
 
   @Prop({ type: String, default: null })
   errorMessage: string | null;

@@ -52,7 +52,6 @@ import {
   deleteProvider,
   disableProvider,
   enableProvider,
-  fetchProviderUsage,
   getProviderUsages,
   listProviders,
   updateProvider,
@@ -79,15 +78,8 @@ const PRIORITY_LABELS: Record<number, string> = {
   2: 'P2',
 }
 
-function fmtQuota(value: number, unit?: string | null): string {
-  if (unit === 'second') {
-    const hours = (value / 3600).toFixed(1)
-    return hours.endsWith('.0') ? hours.slice(0, -2) + 'h' : hours + 'h'
-  }
-  if (unit === 'usd') return `$${value.toFixed(2)}`
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(0)}M`
-  if (value >= 1_000) return `${(value / 1_000).toFixed(0)}K`
-  return String(value)
+function fmtRecoveryTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString()
 }
 
 interface FormState {
@@ -98,7 +90,6 @@ interface FormState {
   apiKey: string
   presetKey: string
   defaultPriority: number
-  usageEndpoint: string
 }
 
 const emptyForm: FormState = {
@@ -109,7 +100,6 @@ const emptyForm: FormState = {
   apiKey: '',
   presetKey: '',
   defaultPriority: 0,
-  usageEndpoint: '',
 }
 
 export function ProvidersPage() {
@@ -350,7 +340,6 @@ export function ProvidersPage() {
           baseUrl: form.baseUrl.trim(),
           presetKey: form.presetKey.trim(),
           defaultPriority: form.defaultPriority,
-          usageEndpoint: form.usageEndpoint.trim() || undefined,
         }
         if (form.apiKey.trim()) patch.apiKey = form.apiKey.trim()
         return updateProvider(editing.id, patch)
@@ -362,7 +351,6 @@ export function ProvidersPage() {
         baseUrl: form.baseUrl.trim(),
         apiKey: form.apiKey.trim(),
         defaultPriority: form.defaultPriority,
-        usageEndpoint: form.usageEndpoint.trim() || undefined,
       }
       return createProvider(input)
     },
@@ -398,13 +386,6 @@ export function ProvidersPage() {
     },
   })
 
-  const fetchUsageMutation = useMutation({
-    mutationFn: (id: string) => fetchProviderUsage(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['provider-usages'] })
-    },
-  })
-
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -421,7 +402,6 @@ export function ProvidersPage() {
       apiKey: '',
       presetKey: provider.presetKey ?? '',
       defaultPriority: provider.defaultPriority ?? 0,
-      usageEndpoint: provider.usageEndpoint ?? '',
     })
     setError(null)
     setEditOpen(true)
@@ -643,21 +623,6 @@ export function ProvidersPage() {
           />
         )}
       </div>
-      <div>
-        <label className="mb-1 block text-sm text-muted-foreground">
-          用量查询端点（可选）
-        </label>
-        <Input
-          placeholder="如：https://api.moonshot.cn/v1/users/me/usage"
-          value={form.usageEndpoint}
-          onChange={(e) =>
-            setForm({ ...form, usageEndpoint: e.target.value })
-          }
-        />
-        <p className="mt-1 text-xs text-muted-foreground">
-          上游渠道自身的用量查询 API URL，用于获取实时额度/速率状态。留空则不启用用量探测
-        </p>
-      </div>
       {error && <p className="text-sm text-red-500">{error}</p>}
     </>
   )
@@ -700,7 +665,7 @@ export function ProvidersPage() {
                     <th className="py-2 pr-4 font-medium">Key</th>
                     <th className="py-2 pr-4 font-medium">优先级</th>
                     <th className="py-2 pr-4 font-medium">状态</th>
-                    <th className="py-2 pr-4 font-medium">用量探测</th>
+                    <th className="py-2 pr-4 font-medium">健康状态</th>
                     <th className="py-2 font-medium">操作</th>
                   </tr>
                 </thead>
@@ -732,68 +697,55 @@ export function ProvidersPage() {
                         )}
                       </td>
                       <td className="py-2 pr-4">
-                        <div className="flex items-center gap-1">
-                          {(() => {
-                            const usage = providerUsageMap.get(provider.id)
-                            if (usage?.isExhausted) {
-                              return (
-                                <span className="text-xs text-red-500" title={usage.errorMessage ?? '已耗尽'}>
-                                  已耗尽
-                                </span>
-                              )
-                            }
-                            if (usage?.lastStatus === 'error') {
-                              return (
-                                <span className="text-xs text-yellow-500" title={usage.errorMessage ?? '查询失败'}>
-                                  查询异常
-                                </span>
-                              )
-                            }
-                            if (usage) {
-                              const parts: string[] = []
-                              if (usage.quotaUsed != null && usage.quotaTotal != null) {
-                                parts.push(`${fmtQuota(usage.quotaUsed)}/${fmtQuota(usage.quotaTotal)}`)
-                              }
-                              if (usage.rateLimitRemaining != null) {
-                                parts.push(`速率:${usage.rateLimitRemaining}`)
-                              }
-                              if (parts.length > 0) {
-                                return (
-                                  <span className="text-xs text-green-600" title={`更新: ${new Date(usage.fetchedAt).toLocaleString()}`}>
-                                    {parts.join(' ')}
-                                  </span>
-                                )
-                              }
-                              return (
-                                <span className="text-xs text-green-600">
-                                  正常
-                                </span>
-                              )
-                            }
-                            return provider.usageEndpoint ? (
-                              <span className="text-xs text-muted-foreground">未探测</span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">未配置</span>
+                        {(() => {
+                          const usage = providerUsageMap.get(provider.id)
+                          if (!usage) {
+                            return (
+                              <span className="text-xs text-muted-foreground">
+                                未探测
+                              </span>
                             )
-                          })()}
-                          {provider.usageEndpoint && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-5 px-1 text-xs"
-                              disabled={fetchUsageMutation.isPending}
-                              onClick={() =>
-                                fetchUsageMutation.mutate(provider.id)
-                              }
-                              title="主动探测上游用量"
+                          }
+                          const now = Date.now()
+                          if (
+                            usage.exhaustedUntil &&
+                            new Date(usage.exhaustedUntil).getTime() > now
+                          ) {
+                            return (
+                              <span
+                                className="text-xs text-yellow-500"
+                                title={usage.errorMessage ?? '上游限流中'}
+                              >
+                                限流中（{fmtRecoveryTime(usage.exhaustedUntil)}{' '}
+                                恢复）
+                              </span>
+                            )
+                          }
+                          if (
+                            usage.cooldownUntil &&
+                            new Date(usage.cooldownUntil).getTime() > now
+                          ) {
+                            return (
+                              <span
+                                className="text-xs text-red-500"
+                                title={usage.errorMessage ?? '渠道熔断冷却中'}
+                              >
+                                冷却中（{fmtRecoveryTime(usage.cooldownUntil)}{' '}
+                                恢复，失败 {usage.consecutiveFailures} 次）
+                              </span>
+                            )
+                          }
+                          return (
+                            <span
+                              className="text-xs text-green-600"
+                              title={`更新: ${new Date(usage.fetchedAt).toLocaleString()}`}
                             >
-                              {fetchUsageMutation.isPending &&
-                              fetchUsageMutation.variables === provider.id
-                                ? '…'
-                                : '🔍'}
-                            </Button>
-                          )}
-                        </div>
+                              正常
+                              {usage.rateLimitRemaining != null &&
+                                ` · 速率:${usage.rateLimitRemaining}`}
+                            </span>
+                          )
+                        })()}
                       </td>
                       <td className="py-2">
                         <div className="flex gap-1">

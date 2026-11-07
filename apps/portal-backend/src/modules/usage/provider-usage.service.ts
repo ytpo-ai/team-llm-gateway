@@ -2,13 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { decrypt } from '../../common/crypto/cipher.js';
-import {
-  Provider,
-  ProviderStatus,
-} from '../providers/schemas/provider.schema.js';
-import { resolveAdapter } from '../proxy/adapters/adapter.factory.js';
-import type { ProviderUsageSnapshot } from '../proxy/adapters/upstream-adapter.js';
+import { Provider } from '../providers/schemas/provider.schema.js';
 import {
   ProviderUsage,
   ProviderUsageDocument,
@@ -18,19 +12,32 @@ import {
 export interface ProviderUsageView {
   providerId: string;
   providerName: string;
-  quotaTotal: number | null;
-  quotaUsed: number | null;
-  quotaUnit: string | null;
   rateLimitRemaining: number | null;
   rateLimitReset: string | null;
-  isExhausted: boolean;
+  exhaustedUntil: string | null;
+  cooldownUntil: string | null;
+  consecutiveFailures: number;
   errorMessage: string | null;
   lastStatus: string;
   fetchedAt: string;
 }
 
-const DEFAULT_CACHE_TTL_MS = 30_000; // 30s
+export interface ProviderAvailability {
+  available: boolean;
+  reason: string | null;
+}
 
+const DEFAULT_FAILURE_THRESHOLD = 3;
+const DEFAULT_COOLDOWN_BASE_MS = 30_000; // 30s
+const DEFAULT_COOLDOWN_MAX_MS = 600_000; // 10min
+const DEFAULT_RATE_LIMIT_COOLDOWN_MS = 60_000; // 60s
+
+/**
+ * Channel health service, driven by passive signals only (no upstream usage API):
+ * - 429 → mark exhausted until a recovery deadline (Retry-After / rate-limit-reset / backoff)
+ * - 5xx/408/network errors → consecutive failure count, circuit-breaker cooldown
+ * - success → reset all failure state
+ */
 @Injectable()
 export class ProviderUsageService {
   private readonly logger = new Logger(ProviderUsageService.name);
@@ -44,199 +51,119 @@ export class ProviderUsageService {
   ) {}
 
   /**
-   * Query upstream provider usage and cache the snapshot.
-   * Falls back to a generic HTTP GET on usageEndpoint if the adapter does not implement fetchUsage.
-   * Returns null only if the provider cannot be queried at all.
+   * Check whether a provider channel is currently available.
+   * Unavailable while exhaustedUntil (429) or cooldownUntil (circuit breaker) is in the future.
+   * Returns available=true when no snapshot exists (optimistic).
    */
-  async fetchAndCache(
+  async getAvailability(
     tenantId: string,
     teamId: string,
     providerId: string,
-  ): Promise<ProviderUsageDocument | null> {
-    const provider = await this.providerModel
-      .findOne({
-        _id: new Types.ObjectId(providerId),
-        tenantId,
-        teamId,
-        status: ProviderStatus.ACTIVE,
-      })
-      .exec();
-    if (!provider) return null;
+  ): Promise<ProviderAvailability> {
+    const snapshot = await this.findSnapshot(tenantId, teamId, providerId);
+    if (!snapshot) return { available: true, reason: null };
 
-    const secret = this.configService.getOrThrow<string>('encryption.secret');
-    const apiKey = decrypt(secret, provider.apiKeyCiphertext);
-
-    let snapshot: ProviderUsageSnapshot | null = null;
-
-    // 1. Try adapter-specific fetchUsage
-    const adapter = resolveAdapter(provider.type);
-    if (adapter.fetchUsage) {
-      try {
-        snapshot = await adapter.fetchUsage(
-          provider.baseUrl,
-          apiKey,
-          provider.usageEndpoint ?? undefined,
-        );
-      } catch (err) {
-        this.logger.warn(
-          `Adapter fetchUsage failed for ${provider.name}: ${err instanceof Error ? err.message : 'unknown'}`,
-        );
-      }
+    const now = Date.now();
+    if (snapshot.exhaustedUntil && snapshot.exhaustedUntil.getTime() > now) {
+      return {
+        available: false,
+        reason: snapshot.errorMessage ?? '上游限流中（429）',
+      };
     }
-
-    // 2. Fallback: generic HTTP GET to usageEndpoint
-    if (!snapshot && provider.usageEndpoint) {
-      try {
-        snapshot = await this.genericFetchUsage(
-          provider.usageEndpoint,
-          apiKey,
-          provider.name,
-        );
-      } catch (err) {
-        this.logger.warn(
-          `Generic fetchUsage failed for ${provider.name}: ${err instanceof Error ? err.message : 'unknown'}`,
-        );
-      }
+    if (snapshot.cooldownUntil && snapshot.cooldownUntil.getTime() > now) {
+      return {
+        available: false,
+        reason:
+          snapshot.errorMessage ??
+          `渠道熔断冷却中（连续失败 ${snapshot.consecutiveFailures} 次）`,
+      };
     }
-
-    if (!snapshot) {
-      return this.markError(tenantId, teamId, providerId, new Error('无法查询上游用量'));
-    }
-
-    return this.upsert(tenantId, teamId, providerId, snapshot);
+    return { available: true, reason: null };
   }
 
   /**
-   * Generic HTTP GET to a usage endpoint.
-   * Tries to parse common upstream usage response formats.
-   */
-  private async genericFetchUsage(
-    endpoint: string,
-    apiKey: string,
-    providerName: string,
-  ): Promise<ProviderUsageSnapshot | null> {
-    const res = await fetch(endpoint, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!res.ok) {
-      this.logger.warn(
-        `Usage endpoint for ${providerName} returned ${res.status}`,
-      );
-      return null;
-    }
-
-    const body = (await res.json()) as Record<string, unknown>;
-
-    // Try to extract usage data from common response formats
-    const data = (body.data ?? body.usage ?? body) as Record<string, unknown>;
-
-    const quotaTotal = this.pickNumber(data, [
-      'total', 'quota_total', 'limit',
-      'total_available', 'granted',
-    ]);
-    const quotaUsed = this.pickNumber(data, [
-      'used', 'usage', 'quota_used', 'consumed',
-      'total_used', 'available',
-    ]);
-    const quotaRemaining = this.pickNumber(data, [
-      'remaining', 'remain', 'quota_remaining',
-      'available', 'left',
-    ]);
-    const rateLimitRemaining = this.pickNumber(data, [
-      'rate_limit_remaining', 'rate_remaining',
-    ]);
-
-    // Detect unit from response hints
-    let quotaUnit: ProviderUsageSnapshot['quotaUnit'] = null;
-    const unit = this.pickString(data, ['unit', 'quota_unit', 'type']);
-    if (unit) {
-      if (unit.includes('second') || unit.includes('time')) quotaUnit = 'second';
-      else if (unit.includes('token')) quotaUnit = 'token';
-      else if (unit.includes('request')) quotaUnit = 'request';
-      else if (unit.includes('usd') || unit.includes('dollar')) quotaUnit = 'usd';
-    }
-
-    return {
-      quotaTotal,
-      quotaUsed,
-      quotaRemaining,
-      quotaUnit,
-      rateLimitRemaining,
-      rateLimitReset: null,
-    };
-  }
-
-  private pickNumber(obj: Record<string, unknown>, names: string[]): number | null {
-    for (const name of names) {
-      const v = obj[name];
-      if (typeof v === 'number' && Number.isFinite(v)) return v;
-      if (typeof v === 'string') {
-        const n = Number(v);
-        if (Number.isFinite(n)) return n;
-      }
-    }
-    return null;
-  }
-
-  private pickString(obj: Record<string, unknown>, names: string[]): string | null {
-    for (const name of names) {
-      const v = obj[name];
-      if (typeof v === 'string' && v.trim()) return v;
-    }
-    return null;
-  }
-
-  /**
-   * Get cached provider usage snapshot.
-   * If cache is stale (exceeded TTL), returns null — caller should refetch.
-   */
-  async getSnapshot(
-    tenantId: string,
-    teamId: string,
-    providerId: string,
-  ): Promise<ProviderUsageDocument | null> {
-    const cached = await this.providerUsageModel
-      .findOne({
-        tenantId: new Types.ObjectId(tenantId),
-        teamId: new Types.ObjectId(teamId),
-        providerId: new Types.ObjectId(providerId),
-      })
-      .exec();
-    if (!cached) return null;
-
-    const ttl = this.cacheTtlMs();
-    if (Date.now() - cached.fetchedAt.getTime() > ttl) return null;
-
-    return cached;
-  }
-
-  /**
-   * Check if a provider channel is currently exhausted.
-   * Returns false if no cached data (optimistic: assume available).
-   */
-  async isExhausted(
-    tenantId: string,
-    teamId: string,
-    providerId: string,
-  ): Promise<boolean> {
-    const snapshot = await this.getSnapshot(tenantId, teamId, providerId);
-    if (!snapshot) return false;
-    return snapshot.isExhausted;
-  }
-
-  /**
-   * Mark a provider as exhausted (e.g. after receiving 429 from upstream).
+   * Mark a provider as rate limited (429).
+   * Recovery deadline is resolved from response headers (Retry-After /
+   * x-ratelimit-reset-*) when present, otherwise an exponential backoff
+   * window based on the consecutive failure count.
    */
   async markExhausted(
     tenantId: string,
     teamId: string,
     providerId: string,
     message: string,
+    headers?: Record<string, string>,
+  ): Promise<void> {
+    const snapshot = await this.applyFailure(tenantId, teamId, providerId);
+    const failures = snapshot.consecutiveFailures;
+
+    const headerRecovery = headers ? this.resolveRateLimitRecovery(headers) : null;
+    const backoffMs = Math.min(
+      this.rateLimitCooldownMs() * 2 ** Math.max(failures - 1, 0),
+      this.cooldownMaxMs(),
+    );
+    const exhaustedUntil =
+      headerRecovery ?? new Date(Date.now() + backoffMs);
+
+    await this.providerUsageModel
+      .updateOne(
+        { _id: snapshot._id },
+        {
+          $set: {
+            exhaustedUntil,
+            errorMessage: message,
+            lastStatus: ProviderUsageStatus.EXHAUSTED,
+            fetchedAt: new Date(),
+          },
+        },
+      )
+      .exec();
+  }
+
+  /**
+   * Record a channel failure (5xx / 408 / network error).
+   * When consecutive failures reach the threshold, the channel enters a
+   * circuit-breaker cooldown with exponential backoff.
+   */
+  async recordFailure(
+    tenantId: string,
+    teamId: string,
+    providerId: string,
+    reason: string,
+  ): Promise<void> {
+    const snapshot = await this.applyFailure(tenantId, teamId, providerId);
+    const failures = snapshot.consecutiveFailures;
+
+    const update: Record<string, unknown> = {
+      errorMessage: reason,
+      lastStatus: ProviderUsageStatus.ERROR,
+      fetchedAt: new Date(),
+    };
+
+    const threshold = this.failureThreshold();
+    if (failures >= threshold) {
+      const backoffMs = Math.min(
+        this.cooldownBaseMs() * 2 ** (failures - threshold),
+        this.cooldownMaxMs(),
+      );
+      update.cooldownUntil = new Date(Date.now() + backoffMs);
+      this.logger.warn(
+        `Provider ${providerId} entered cooldown (${backoffMs}ms) after ${failures} consecutive failures`,
+      );
+    }
+
+    await this.providerUsageModel
+      .updateOne({ _id: snapshot._id }, { $set: update })
+      .exec();
+  }
+
+  /**
+   * Reset channel health after a successful upstream request.
+   */
+  async recordSuccess(
+    tenantId: string,
+    teamId: string,
+    providerId: string,
   ): Promise<void> {
     await this.providerUsageModel
       .updateOne(
@@ -247,10 +174,17 @@ export class ProviderUsageService {
         },
         {
           $set: {
-            isExhausted: true,
-            errorMessage: message,
-            lastStatus: ProviderUsageStatus.EXHAUSTED,
+            consecutiveFailures: 0,
+            exhaustedUntil: null,
+            cooldownUntil: null,
+            errorMessage: null,
+            lastStatus: ProviderUsageStatus.OK,
             fetchedAt: new Date(),
+          },
+          $setOnInsert: {
+            tenantId: new Types.ObjectId(tenantId),
+            teamId: new Types.ObjectId(teamId),
+            providerId: new Types.ObjectId(providerId),
           },
         },
         { upsert: true },
@@ -303,6 +237,101 @@ export class ProviderUsageService {
       .exec();
   }
 
+  /**
+   * Get usage snapshots for all providers in a team (for list display).
+   */
+  async getTeamProviderUsages(
+    tenantId: string,
+    teamId: string,
+  ): Promise<ProviderUsageView[]> {
+    const docs = await this.providerUsageModel
+      .find({
+        tenantId: new Types.ObjectId(tenantId),
+        teamId: new Types.ObjectId(teamId),
+      })
+      .sort({ fetchedAt: -1 })
+      .exec();
+    const providerIds = docs.map((d) => String(d.providerId));
+    const providers = await this.providerModel
+      .find({ _id: { $in: providerIds.map((id) => new Types.ObjectId(id)) } })
+      .select('name')
+      .exec();
+    const nameMap = new Map(providers.map((p) => [String(p._id), p.name]));
+
+    return docs.map((doc) =>
+      this.toView(doc, nameMap.get(String(doc.providerId)) ?? null),
+    );
+  }
+
+  /**
+   * Increment the consecutive failure counter and return the updated snapshot.
+   */
+  private async applyFailure(
+    tenantId: string,
+    teamId: string,
+    providerId: string,
+  ): Promise<ProviderUsageDocument> {
+    const doc = await this.providerUsageModel
+      .findOneAndUpdate(
+        {
+          tenantId: new Types.ObjectId(tenantId),
+          teamId: new Types.ObjectId(teamId),
+          providerId: new Types.ObjectId(providerId),
+        },
+        {
+          $inc: { consecutiveFailures: 1 },
+          $setOnInsert: {
+            tenantId: new Types.ObjectId(tenantId),
+            teamId: new Types.ObjectId(teamId),
+            providerId: new Types.ObjectId(providerId),
+            fetchedAt: new Date(),
+          },
+        },
+        { upsert: true, new: true },
+      )
+      .exec();
+    if (!doc) {
+      throw new Error('Failed to upsert ProviderUsage');
+    }
+    return doc;
+  }
+
+  private async findSnapshot(
+    tenantId: string,
+    teamId: string,
+    providerId: string,
+  ): Promise<ProviderUsageDocument | null> {
+    return this.providerUsageModel
+      .findOne({
+        tenantId: new Types.ObjectId(tenantId),
+        teamId: new Types.ObjectId(teamId),
+        providerId: new Types.ObjectId(providerId),
+      })
+      .exec();
+  }
+
+  /**
+   * Resolve the 429 recovery deadline from response headers.
+   * Supports Retry-After (seconds) and x-ratelimit-reset-* (epoch seconds).
+   */
+  private resolveRateLimitRecovery(
+    headers: Record<string, string>,
+  ): Date | null {
+    const retryAfter = this.parseRateLimitHeader(headers, ['retry-after']);
+    if (retryAfter !== null) {
+      return new Date(Date.now() + retryAfter * 1000);
+    }
+    const reset = this.parseRateLimitHeader(headers, [
+      'x-ratelimit-reset-requests',
+      'x-ratelimit-reset-tokens',
+    ]);
+    if (reset !== null) {
+      const resetDate = new Date(reset * 1000);
+      if (resetDate.getTime() > Date.now()) return resetDate;
+    }
+    return null;
+  }
+
   private parseRateLimitHeader(
     headers: Record<string, string>,
     names: string[],
@@ -311,152 +340,10 @@ export class ProviderUsageService {
       const value = headers[name.toLowerCase()] ?? headers[name];
       if (value !== undefined) {
         const num = Number(value);
-        if (!Number.isNaN(num)) return num;
+        if (Number.isFinite(num) && num >= 0) return num;
       }
     }
     return null;
-  }
-
-  private async upsert(
-    tenantId: string,
-    teamId: string,
-    providerId: string,
-    snapshot: ProviderUsageSnapshot,
-  ): Promise<ProviderUsageDocument> {
-    const isExhausted =
-      snapshot.quotaRemaining !== null && snapshot.quotaRemaining <= 0;
-
-    const doc = await this.providerUsageModel
-      .findOneAndUpdate(
-        {
-          tenantId: new Types.ObjectId(tenantId),
-          teamId: new Types.ObjectId(teamId),
-          providerId: new Types.ObjectId(providerId),
-        },
-        {
-          $set: {
-            quotaTotal: snapshot.quotaTotal ?? null,
-            quotaUsed: snapshot.quotaUsed ?? null,
-            quotaUnit: snapshot.quotaUnit ?? null,
-            rateLimitRemaining: snapshot.rateLimitRemaining ?? null,
-            rateLimitReset: snapshot.rateLimitReset ?? null,
-            isExhausted,
-            errorMessage: isExhausted ? '上游额度已耗尽' : null,
-            lastStatus: isExhausted
-              ? ProviderUsageStatus.EXHAUSTED
-              : ProviderUsageStatus.OK,
-            fetchedAt: new Date(),
-          },
-          $setOnInsert: {
-            tenantId: new Types.ObjectId(tenantId),
-            teamId: new Types.ObjectId(teamId),
-            providerId: new Types.ObjectId(providerId),
-          },
-        },
-        { upsert: true, new: true },
-      )
-      .exec();
-
-    if (!doc) {
-      throw new Error('Failed to upsert ProviderUsage');
-    }
-    return doc;
-  }
-
-  private async markError(
-    tenantId: string,
-    teamId: string,
-    providerId: string,
-    err: unknown,
-  ): Promise<ProviderUsageDocument | null> {
-    const message =
-      err instanceof Error ? err.message : '未知错误';
-
-    const doc = await this.providerUsageModel
-      .findOneAndUpdate(
-        {
-          tenantId: new Types.ObjectId(tenantId),
-          teamId: new Types.ObjectId(teamId),
-          providerId: new Types.ObjectId(providerId),
-        },
-        {
-          $set: {
-            lastStatus: ProviderUsageStatus.ERROR,
-            errorMessage: message,
-            fetchedAt: new Date(),
-          },
-          $setOnInsert: {
-            tenantId: new Types.ObjectId(tenantId),
-            teamId: new Types.ObjectId(teamId),
-            providerId: new Types.ObjectId(providerId),
-          },
-        },
-        { upsert: true, new: true },
-      )
-      .exec();
-
-    return doc;
-  }
-
-  /**
-   * Get usage snapshots for all providers in a team.
-   * Used by `GET /usage/by-provider` and frontend display.
-   */
-  async listSnapshots(
-    tenantId: string,
-    teamId: string,
-  ): Promise<ProviderUsageDocument[]> {
-    return this.providerUsageModel
-      .find({
-        tenantId: new Types.ObjectId(tenantId),
-        teamId: new Types.ObjectId(teamId),
-      })
-      .sort({ fetchedAt: -1 })
-      .exec();
-  }
-
-  /**
-   * Get usage snapshot for a specific provider, with provider name.
-   * Includes stale (expired) snapshots so the frontend can show last-known state.
-   */
-  async getProviderUsage(
-    tenantId: string,
-    teamId: string,
-    providerId: string,
-  ): Promise<ProviderUsageView | null> {
-    const cached = await this.providerUsageModel
-      .findOne({
-        tenantId: new Types.ObjectId(tenantId),
-        teamId: new Types.ObjectId(teamId),
-        providerId: new Types.ObjectId(providerId),
-      })
-      .exec();
-    if (!cached) return null;
-
-    const provider = await this.providerModel
-      .findById(providerId)
-      .select('name')
-      .exec();
-
-    return this.toView(cached, provider?.name ?? null);
-  }
-
-  /**
-   * Get usage snapshots for all providers in a team (for list display).
-   */
-  async getTeamProviderUsages(
-    tenantId: string,
-    teamId: string,
-  ): Promise<ProviderUsageView[]> {
-    const docs = await this.listSnapshots(tenantId, teamId);
-    const providerIds = docs.map((d) => String(d.providerId));
-    const providers = await this.providerModel
-      .find({ _id: { $in: providerIds.map((id) => new Types.ObjectId(id)) } })
-      .select('name')
-      .exec();
-    const nameMap = new Map(providers.map((p) => [String(p._id), p.name]));
-
-    return docs.map((doc) => this.toView(doc, nameMap.get(String(doc.providerId)) ?? null));
   }
 
   private toView(
@@ -466,22 +353,42 @@ export class ProviderUsageService {
     return {
       providerId: String(doc.providerId),
       providerName: providerName ?? '未知渠道',
-      quotaTotal: doc.quotaTotal,
-      quotaUsed: doc.quotaUsed,
-      quotaUnit: doc.quotaUnit,
       rateLimitRemaining: doc.rateLimitRemaining,
       rateLimitReset: doc.rateLimitReset?.toISOString() ?? null,
-      isExhausted: doc.isExhausted,
+      exhaustedUntil: doc.exhaustedUntil?.toISOString() ?? null,
+      cooldownUntil: doc.cooldownUntil?.toISOString() ?? null,
+      consecutiveFailures: doc.consecutiveFailures,
       errorMessage: doc.errorMessage,
       lastStatus: doc.lastStatus,
       fetchedAt: doc.fetchedAt.toISOString(),
     };
   }
 
-  private cacheTtlMs(): number {
+  private failureThreshold(): number {
     return (
-      this.configService.get<number>('providerUsage.cacheTtlMs') ??
-      DEFAULT_CACHE_TTL_MS
+      this.configService.get<number>('providerHealth.failureThreshold') ??
+      DEFAULT_FAILURE_THRESHOLD
+    );
+  }
+
+  private cooldownBaseMs(): number {
+    return (
+      this.configService.get<number>('providerHealth.cooldownBaseMs') ??
+      DEFAULT_COOLDOWN_BASE_MS
+    );
+  }
+
+  private cooldownMaxMs(): number {
+    return (
+      this.configService.get<number>('providerHealth.cooldownMaxMs') ??
+      DEFAULT_COOLDOWN_MAX_MS
+    );
+  }
+
+  private rateLimitCooldownMs(): number {
+    return (
+      this.configService.get<number>('providerHealth.rateLimitCooldownMs') ??
+      DEFAULT_RATE_LIMIT_COOLDOWN_MS
     );
   }
 }

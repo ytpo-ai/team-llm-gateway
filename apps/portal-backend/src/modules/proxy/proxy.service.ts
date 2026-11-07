@@ -158,12 +158,35 @@ export class ProxyService {
       // Attach concurrency release
       prepared.releaseConcurrency = releaseConcurrency;
 
-      const upstreamRes = await this.requestUpstream(prepared);
+      let upstreamRes: globalThis.Response;
+      try {
+        upstreamRes = await this.requestUpstream(prepared);
+      } catch (err) {
+        // Network error (DNS/timeout/connection refused) → record failure, try next
+        const message = err instanceof Error ? err.message : '网络错误';
+        await this.providerUsageService.recordFailure(
+          ctx.tenantId,
+          ctx.teamId,
+          prepared.providerId,
+          `上游网络错误：${message}`,
+        );
+        lastError = 502;
+        lastBody = { message: `上游网络错误：${message}` };
+        this.logger.warn(
+          `Provider channel ${prepared.providerId} network error: ${message}, trying next`,
+        );
+        continue;
+      }
       const text = await upstreamRes.text();
 
       if (upstreamRes.ok) {
         // Extract rate-limit headers for future reference
         await this.extractRateLimitHeaders(ctx, prepared, upstreamRes);
+        await this.providerUsageService.recordSuccess(
+          ctx.tenantId,
+          ctx.teamId,
+          prepared.providerId,
+        );
 
         const openaiJson = prepared.adapter.parseResponse(text, prepared.modelId);
         await this.recordUsage(
@@ -183,6 +206,7 @@ export class ProxyService {
           ctx.teamId,
           prepared.providerId,
           `上游返回 429 Too Many Requests`,
+          this.headersToRecord(upstreamRes),
         );
         this.logger.warn(
           `Provider channel ${prepared.providerId} rate limited (429), falling back`,
@@ -190,8 +214,14 @@ export class ProxyService {
         continue;
       }
 
-      // Server errors (5xx, 408) → try next candidate
+      // Server errors (5xx, 408) → record failure, try next candidate
       if (upstreamRes.status >= 500 || upstreamRes.status === 408) {
+        await this.providerUsageService.recordFailure(
+          ctx.tenantId,
+          ctx.teamId,
+          prepared.providerId,
+          `上游返回 ${upstreamRes.status}`,
+        );
         lastError = upstreamRes.status;
         lastBody = parseJsonObject(text) ?? { message: text };
         this.logger.warn(
@@ -240,7 +270,24 @@ export class ProxyService {
       );
       if (!prepared) continue;
 
-      const upstreamRes = await this.requestUpstream(prepared);
+      let upstreamRes: globalThis.Response;
+      try {
+        upstreamRes = await this.requestUpstream(prepared);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : '网络错误';
+        await this.providerUsageService.recordFailure(
+          ctx.tenantId,
+          ctx.teamId,
+          prepared.providerId,
+          `上游网络错误：${message}`,
+        );
+        lastError = 502;
+        lastBody = { message: `上游网络错误：${message}` };
+        this.logger.warn(
+          `Provider channel ${prepared.providerId} network error: ${message}, trying next`,
+        );
+        continue;
+      }
       if (!upstreamRes.ok || !upstreamRes.body) {
         const text = await upstreamRes.text();
 
@@ -251,6 +298,7 @@ export class ProxyService {
             ctx.teamId,
             prepared.providerId,
             `上游返回 429 Too Many Requests`,
+            this.headersToRecord(upstreamRes),
           );
           this.logger.warn(
             `Provider channel ${prepared.providerId} rate limited (429), falling back`,
@@ -258,8 +306,14 @@ export class ProxyService {
           continue;
         }
 
-        // Server errors → try next
+        // Server errors → record failure, try next
         if (upstreamRes.status >= 500 || upstreamRes.status === 408) {
+          await this.providerUsageService.recordFailure(
+            ctx.tenantId,
+            ctx.teamId,
+            prepared.providerId,
+            `上游返回 ${upstreamRes.status}`,
+          );
           lastError = upstreamRes.status;
           lastBody = parseJsonObject(text) ?? { message: text };
           continue;
@@ -274,6 +328,11 @@ export class ProxyService {
 
       // Success — stream the response
       await this.extractRateLimitHeaders(ctx, prepared, upstreamRes);
+      await this.providerUsageService.recordSuccess(
+        ctx.tenantId,
+        ctx.teamId,
+        prepared.providerId,
+      );
 
       res.status(200);
       res.setHeader('content-type', 'text/event-stream');
@@ -330,11 +389,33 @@ export class ProxyService {
       );
       if (!prepared) continue;
 
-      const upstreamRes = await this.requestUpstream(prepared);
+      let upstreamRes: globalThis.Response;
+      try {
+        upstreamRes = await this.requestUpstream(prepared);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : '网络错误';
+        await this.providerUsageService.recordFailure(
+          ctx.tenantId,
+          ctx.teamId,
+          prepared.providerId,
+          `上游网络错误：${message}`,
+        );
+        lastError = 502;
+        lastBody = anthropicError(`上游网络错误：${message}`);
+        this.logger.warn(
+          `Provider channel ${prepared.providerId} network error: ${message}, trying next`,
+        );
+        continue;
+      }
       const text = await upstreamRes.text();
 
       if (upstreamRes.ok) {
         await this.extractRateLimitHeaders(ctx, prepared, upstreamRes);
+        await this.providerUsageService.recordSuccess(
+          ctx.tenantId,
+          ctx.teamId,
+          prepared.providerId,
+        );
         const openaiJson = prepared.adapter.parseResponse(text, prepared.modelId);
         await this.recordUsage(
           ctx,
@@ -350,11 +431,16 @@ export class ProxyService {
         await this.providerUsageService.markExhausted(
           ctx.tenantId, ctx.teamId, prepared.providerId,
           `上游返回 429 Too Many Requests`,
+          this.headersToRecord(upstreamRes),
         );
         continue;
       }
 
       if (upstreamRes.status >= 500 || upstreamRes.status === 408) {
+        await this.providerUsageService.recordFailure(
+          ctx.tenantId, ctx.teamId, prepared.providerId,
+          `上游返回 ${upstreamRes.status}`,
+        );
         lastError = upstreamRes.status;
         const detail = parseJsonObject(text) ?? {};
         lastBody = anthropicError(
@@ -400,7 +486,24 @@ export class ProxyService {
       );
       if (!prepared) continue;
 
-      const upstreamRes = await this.requestUpstream(prepared);
+      let upstreamRes: globalThis.Response;
+      try {
+        upstreamRes = await this.requestUpstream(prepared);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : '网络错误';
+        await this.providerUsageService.recordFailure(
+          ctx.tenantId,
+          ctx.teamId,
+          prepared.providerId,
+          `上游网络错误：${message}`,
+        );
+        lastError = 502;
+        lastBody = anthropicError(`上游网络错误：${message}`);
+        this.logger.warn(
+          `Provider channel ${prepared.providerId} network error: ${message}, trying next`,
+        );
+        continue;
+      }
       if (!upstreamRes.ok || !upstreamRes.body) {
         const text = await upstreamRes.text();
 
@@ -408,11 +511,16 @@ export class ProxyService {
           await this.providerUsageService.markExhausted(
             ctx.tenantId, ctx.teamId, prepared.providerId,
             `上游返回 429 Too Many Requests`,
+            this.headersToRecord(upstreamRes),
           );
           continue;
         }
 
         if (upstreamRes.status >= 500 || upstreamRes.status === 408) {
+          await this.providerUsageService.recordFailure(
+            ctx.tenantId, ctx.teamId, prepared.providerId,
+            `上游返回 ${upstreamRes.status}`,
+          );
           lastError = upstreamRes.status;
           const detail = parseJsonObject(text) ?? {};
           lastBody = anthropicError(
@@ -436,6 +544,11 @@ export class ProxyService {
 
       // Success — stream the response
       await this.extractRateLimitHeaders(ctx, prepared, upstreamRes);
+      await this.providerUsageService.recordSuccess(
+        ctx.tenantId,
+        ctx.teamId,
+        prepared.providerId,
+      );
 
       res.status(200);
       res.setHeader('content-type', 'text/event-stream');
@@ -529,15 +642,15 @@ export class ProxyService {
       return null;
     }
 
-    // Skip if provider is marked exhausted
-    const isExhausted = await this.providerUsageService.isExhausted(
+    // Skip if provider is unavailable (rate limited or in circuit-breaker cooldown)
+    const availability = await this.providerUsageService.getAvailability(
       ctx.tenantId,
       ctx.teamId,
       providerId,
     );
-    if (isExhausted) {
+    if (!availability.available) {
       this.logger.debug(
-        `Provider ${provider.name} is exhausted, skipping`,
+        `Provider ${provider.name} unavailable (${availability.reason}), skipping`,
       );
       return null;
     }
@@ -662,16 +775,22 @@ export class ProxyService {
     prepared: PreparedRequest,
     upstreamRes: globalThis.Response,
   ): Promise<void> {
-    const headers: Record<string, string> = {};
-    upstreamRes.headers.forEach((value, key) => {
-      headers[key] = value;
-    });
     await this.providerUsageService.updateFromHeaders(
       ctx.tenantId,
       ctx.teamId,
       prepared.providerId,
-      headers,
+      this.headersToRecord(upstreamRes),
     );
+  }
+
+  private headersToRecord(
+    upstreamRes: globalThis.Response,
+  ): Record<string, string> {
+    const headers: Record<string, string> = {};
+    upstreamRes.headers.forEach((value, key) => {
+      headers[key] = value;
+    });
+    return headers;
   }
 
   private async enforceLimits(

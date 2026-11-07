@@ -15,8 +15,8 @@
 - 计量口径：`cost = multiplier × totalTokens`（倍率随请求快照落库）。
 - 上报：`UsageService.record()` 进程内方法，由 OpenAI 兼容转发层（`/v1/chat/completions`）在转发后调用。
 - 转发层：成员 key（`pk_`）鉴权 → 模型/上游解析 → 转发 → 采集 token → 落库（闭环 ADR-09 / M-01）。
-- 渠道用量感知：`ProviderUsage` 缓存上游渠道用量快照（额度/速率），`ProviderUsageService.fetchAndCache()` 通过 `UpstreamAdapter.fetchUsage()` 查询上游用量 API。
-- **多渠道 fallback**：转发层按 `Model.providerBindings` 优先级遍历候选渠道，跳过已耗尽渠道，429 自动标记并切换。
+- 渠道健康感知（纯被动信号，无上游用量 API 依赖）：429 → `markExhausted()`（恢复时间取响应头或退避窗口）；5xx/408/网络错误 → `recordFailure()` 累计熔断冷却；成功 → `recordSuccess()` 重置；响应头 `x-ratelimit-*` 提取速率信息。
+- **多渠道 fallback**：转发层按 `Model.providerBindings` 优先级遍历候选渠道，`getAvailability()` 跳过限流中/冷却中渠道，网络错误自动切换下一候选。
 - 查询 API：`GET /usage/summary`、`/usage/trends`、`/usage/by-model`、`/usage/by-member`、`/usage/by-key`、`/usage/by-provider`。
 - RBAC：`member` 仅本人，`team_admin`/`system` 团队全量。
 
@@ -32,6 +32,9 @@
 | 同上 | [REQ-002 转发层多渠道 fallback](../requirement/PROVIDER_USAGE_REQ-002_BACKEND_FALLBACK.md) | [同上](../development/PROVIDER_USAGE_REQ-001_DEVELOPMENT.md) | — |
 | 同上 | [REQ-003 backend by-provider 聚合](../requirement/PROVIDER_USAGE_REQ-003_BACKEND_BY_PROVIDER.md) | [同上](../development/PROVIDER_USAGE_REQ-001_DEVELOPMENT.md) | — |
 | 同上 | [REQ-004 前端展示](../requirement/PROVIDER_USAGE_REQ-004_FRONTEND.md) | [同上](../development/PROVIDER_USAGE_REQ-001_DEVELOPMENT.md) | — |
+| [PROVIDER_USAGE_HEALTH](../plan/PROVIDER_USAGE_HEALTH_PLAN.md) | [REQ-005 移除主动查询链路](../requirement/PROVIDER_USAGE_REQ-005_REMOVE_ACTIVE_QUERY.md) | [开发记录](../development/PROVIDER_USAGE_REQ-005_DEVELOPMENT.md) | — |
+| 同上 | [REQ-006 渠道健康模型+熔断冷却](../requirement/PROVIDER_USAGE_REQ-006_HEALTH_CIRCUIT_BREAKER.md) | [同上](../development/PROVIDER_USAGE_REQ-005_DEVELOPMENT.md) | — |
+| 同上 | [REQ-007 前端健康状态列](../requirement/PROVIDER_USAGE_REQ-007_FRONTEND_HEALTH_COLUMN.md) | [同上](../development/PROVIDER_USAGE_REQ-005_DEVELOPMENT.md) | — |
 
 ## 3. 相关文档
 - 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-06、§7.1、D-05）、`docs/technical/db_schema/USAGE_METERING_SCHEMA.MD`

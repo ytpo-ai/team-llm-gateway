@@ -41,6 +41,9 @@
 | 同上 | [REQ-002 转发层多渠道 fallback](../requirement/PROVIDER_USAGE_REQ-002_BACKEND_FALLBACK.md) | [同上](../development/PROVIDER_USAGE_REQ-001_DEVELOPMENT.md) | — |
 | 同上 | [REQ-003 backend by-provider 聚合](../requirement/PROVIDER_USAGE_REQ-003_BACKEND_BY_PROVIDER.md) | [同上](../development/PROVIDER_USAGE_REQ-001_DEVELOPMENT.md) | — |
 | 同上 | [REQ-004 前端展示](../requirement/PROVIDER_USAGE_REQ-004_FRONTEND.md) | [同上](../development/PROVIDER_USAGE_REQ-001_DEVELOPMENT.md) | — |
+| [PROVIDER_USAGE_HEALTH](../plan/PROVIDER_USAGE_HEALTH_PLAN.md) | [REQ-005 移除主动查询链路](../requirement/PROVIDER_USAGE_REQ-005_REMOVE_ACTIVE_QUERY.md) | [开发记录](../development/PROVIDER_USAGE_REQ-005_DEVELOPMENT.md) | — |
+| 同上 | [REQ-006 渠道健康模型+熔断冷却](../requirement/PROVIDER_USAGE_REQ-006_HEALTH_CIRCUIT_BREAKER.md) | [同上](../development/PROVIDER_USAGE_REQ-005_DEVELOPMENT.md) | — |
+| 同上 | [REQ-007 前端健康状态列](../requirement/PROVIDER_USAGE_REQ-007_FRONTEND_HEALTH_COLUMN.md) | [同上](../development/PROVIDER_USAGE_REQ-005_DEVELOPMENT.md) | — |
 | [PROVIDER_MODEL_LIFECYCLE](../plan/PROVIDER_MODEL_LIFECYCLE_PLAN.md) | [REQ-001 后端渠道生命周期](../requirement/PROVIDER_MODEL_LIFECYCLE_REQ-001_BACKEND_PROVIDER.md) | [开发记录](../development/PROVIDER_MODEL_LIFECYCLE_REQ-001_DEVELOPMENT.md) | — |
 | 同上 | [REQ-002 后端模型生命周期](../requirement/PROVIDER_MODEL_LIFECYCLE_REQ-002_BACKEND_MODEL.md) | [开发记录](../development/PROVIDER_MODEL_LIFECYCLE_REQ-002_DEVELOPMENT.md) | — |
 | 同上 | [REQ-003 前端禁用/启用/删除](../requirement/PROVIDER_MODEL_LIFECYCLE_REQ-003_FRONTEND.md) | [开发记录](../development/PROVIDER_MODEL_LIFECYCLE_REQ-003_DEVELOPMENT.md) | — |

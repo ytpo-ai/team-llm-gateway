@@ -3,9 +3,6 @@ import {
   Controller,
   Delete,
   Get,
-  HttpException,
-  HttpStatus,
-  NotFoundException,
   Param,
   Patch,
   Post,
@@ -25,7 +22,6 @@ import {
   AuditAction,
   AuditResourceType,
 } from '../system/schemas/audit-log.schema.js';
-import { ProviderUsageService } from '../usage/provider-usage.service.js';
 import { BatchTestProviderDto } from './dto/batch-test-provider.dto.js';
 import { CreateProviderDto } from './dto/create-provider.dto.js';
 import { CreateProviderFromPresetDto } from './dto/create-provider-from-preset.dto.js';
@@ -42,7 +38,6 @@ export class ProvidersController {
   constructor(
     private readonly providersService: ProvidersService,
     private readonly auditService: AuditService,
-    private readonly providerUsageService: ProviderUsageService,
   ) {}
 
   @Get()
@@ -138,30 +133,6 @@ export class ProvidersController {
       dto?.modelId,
       dto?.message,
     );
-  }
-
-  @Post(':id/fetch-usage')
-  @ApiOperation({ summary: '主动触发上游渠道用量探测（查询上游用量/限额 API）' })
-  async fetchUsage(
-    @CurrentUser('tenantId') tenantId: string,
-    @CurrentUser('teamId') teamId: string,
-    @Param('id') id: string,
-  ) {
-    const result = await this.providerUsageService.fetchAndCache(
-      tenantId,
-      teamId,
-      id,
-    );
-    if (!result) {
-      throw new NotFoundException('渠道不存在或已禁用');
-    }
-    if (result.lastStatus === 'error') {
-      throw new HttpException(
-        result.errorMessage ?? '上游用量查询失败',
-        HttpStatus.BAD_GATEWAY,
-      );
-    }
-    return result;
   }
 
   @Post(':id/sync-models')

@@ -92,11 +92,3 @@ export function batchTestProvider(
 export function getProviderUsages(): Promise<ProviderUsageView[]> {
   return request<ProviderUsageView[]>('/usage/providers')
 }
-
-export function fetchProviderUsage(
-  id: string,
-): Promise<ProviderUsageView> {
-  return request<ProviderUsageView>(`/providers/${id}/fetch-usage`, {
-    method: 'POST',
-  })
-}

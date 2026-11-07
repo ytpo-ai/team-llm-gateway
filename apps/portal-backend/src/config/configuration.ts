@@ -18,6 +18,12 @@ export interface AppConfig {
   modelPresets: {
     url: string;
   };
+  providerHealth: {
+    failureThreshold: number;
+    cooldownBaseMs: number;
+    cooldownMaxMs: number;
+    rateLimitCooldownMs: number;
+  };
 }
 
 export default (): AppConfig => ({
@@ -39,5 +45,23 @@ export default (): AppConfig => ({
   },
   modelPresets: {
     url: process.env.MODEL_PRESETS_URL ?? '',
+  },
+  providerHealth: {
+    failureThreshold: Number.parseInt(
+      process.env.PROVIDER_FAILURE_THRESHOLD ?? '3',
+      10,
+    ),
+    cooldownBaseMs: Number.parseInt(
+      process.env.PROVIDER_COOLDOWN_BASE_MS ?? '30000',
+      10,
+    ),
+    cooldownMaxMs: Number.parseInt(
+      process.env.PROVIDER_COOLDOWN_MAX_MS ?? '600000',
+      10,
+    ),
+    rateLimitCooldownMs: Number.parseInt(
+      process.env.PROVIDER_RATE_LIMIT_COOLDOWN_MS ?? '60000',
+      10,
+    ),
   },
 });
