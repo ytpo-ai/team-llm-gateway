@@ -52,4 +52,4 @@ JWT strategy 虽然能通过 `X-Tenant-Id` 头为 system 用户正确切换 `ten
 - [x] 后端测试：12/12 通过（新增 2 个 system 角色用例）
 - [x] 前端：API 异常时展示错误消息 + 重试按钮
 - [x] 前端 `npx tsc -b --noEmit` 通过
-- [x] 提交：`5aee6e7` — 前端错误处理；`<TBD>` — 后端权限修复
+- [x] 提交：`5aee6e7` — 前端错误处理；`6ec2838` — 后端权限修复
