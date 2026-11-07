@@ -303,6 +303,7 @@ export function ApiKeysPage() {
   }
 
   const keys: ApiKey[] = keysQuery.data ?? []
+  const hasKeyError = keysQuery.isError && !keysQuery.data
   const pending =
     submitMutation.isPending ||
     revokeMutation.isPending ||
@@ -327,6 +328,19 @@ export function ApiKeysPage() {
         <CardContent>
           {keysQuery.isLoading ? (
             <div className="text-sm text-muted-foreground">加载中…</div>
+          ) : hasKeyError ? (
+            <div className="space-y-3 py-8 text-center">
+              <p className="text-sm text-destructive">
+                加载失败：{keysQuery.error instanceof ApiError ? keysQuery.error.message : '请检查网络连接后重试'}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => keysQuery.refetch()}
+              >
+                重试
+              </Button>
+            </div>
           ) : keys.length === 0 ? (
             <div className="text-sm text-muted-foreground">
               暂无 API Key，点击右上角创建。
