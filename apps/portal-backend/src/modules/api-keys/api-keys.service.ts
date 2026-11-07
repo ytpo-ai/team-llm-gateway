@@ -54,12 +54,13 @@ export class ApiKeysService {
   }
 
   async list(user: AuthUser, userIdFilter?: string): Promise<ApiKeyView[]> {
-    const filter =
-      user.role === Role.TEAM_ADMIN
-        ? { tenantId: user.tenantId, teamId: user.teamId }
-        : { tenantId: user.tenantId, userId: user.id };
+    const isManager =
+      user.role === Role.TEAM_ADMIN || user.role === Role.SYSTEM;
+    const filter = isManager
+      ? { tenantId: user.tenantId, teamId: user.teamId }
+      : { tenantId: user.tenantId, userId: user.id };
 
-    if (user.role === Role.TEAM_ADMIN && userIdFilter) {
+    if (isManager && userIdFilter) {
       filter.userId = userIdFilter;
     }
 
@@ -194,8 +195,9 @@ export class ApiKeysService {
     }
 
     const isOwner = String(key.userId) === user.id;
-    const isTeamAdmin =
-      user.role === Role.TEAM_ADMIN && String(key.teamId) === user.teamId;
+    const isManager =
+      user.role === Role.TEAM_ADMIN || user.role === Role.SYSTEM;
+    const isTeamAdmin = isManager && String(key.teamId) === user.teamId;
     if (!isOwner && !isTeamAdmin) {
       throw new ForbiddenException('无权操作该 API Key');
     }

@@ -127,6 +127,18 @@ describe('ApiKeysService', () => {
       const filter = apiKeyModel.find.mock.calls[0][0];
       expect(filter).toEqual({ tenantId: String(tenantId), teamId: String(teamId) });
     });
+
+    it('should list team keys for system admin', async () => {
+      apiKeyModel.find.mockReturnValue({
+        sort: vi.fn().mockReturnThis(),
+        exec: vi.fn().mockResolvedValue([makeKey()]),
+      });
+
+      await service.list(makeUser({ role: Role.SYSTEM }));
+
+      const filter = apiKeyModel.find.mock.calls[0][0];
+      expect(filter).toEqual({ tenantId: String(tenantId), teamId: String(teamId) });
+    });
   });
 
   describe('get', () => {
@@ -138,6 +150,21 @@ describe('ApiKeysService', () => {
       await expect(
         service.get(makeUser(), String(keyId)),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should allow system admin to access any team key', async () => {
+      const otherKey = makeKey({ userId: otherUserId });
+      apiKeyModel.findOne.mockReturnValue({
+        exec: vi.fn().mockResolvedValue(otherKey),
+      });
+
+      // system admin accessing another member's key in same team: should succeed
+      const result = await service.get(
+        makeUser({ role: Role.SYSTEM, id: String(userId) }),
+        String(keyId),
+      );
+
+      expect(result.id).toBe(String(keyId));
     });
 
     it('should throw NotFound when key missing', async () => {
