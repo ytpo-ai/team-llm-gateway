@@ -5,7 +5,7 @@
 > - 上游决策：`docs/technical/PROXY_POLICY_PROTOCOL.MD`（v1 已定稿）
 > - feature：`docs/feature/usage_metering.md`（主，proxy 转发层）、`docs/feature/billing_quota.md`（策略集/限额解析）
 > - 定稿时间：2026-11-07
-> - 状态：`draft`（草稿，待审批，暂不执行开发）
+> - 状态：`done`（已完成）
 
 ---
 
@@ -84,8 +84,8 @@
 
 ## 6. 里程碑
 
-1. [ ] REQ-001 协议类型 + PolicyResolver
-2. [ ] REQ-002 ProxyCore 重构 + MeterBackend
+1. [x] REQ-001 协议类型 + PolicyResolver
+2. [x] REQ-002 ProxyCore 重构 + MeterBackend
 
 ## 7. 风险与待决
 
