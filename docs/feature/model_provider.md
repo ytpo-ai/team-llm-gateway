@@ -52,7 +52,7 @@
 | 同上 | [REQ-002 前端渠道展示与优先级管理](../requirement/MODEL_MULTI_CHANNEL_REQ-002_FRONTEND.md) | [开发记录](../development/MODEL_MULTI_CHANNEL_REQ-002_DEVELOPMENT.md) | — |
 | [MODEL_CARD_VIEW](../plan/MODEL_CARD_VIEW_PLAN.md) | [REQ-001 后端模型元信息扩展](../requirement/MODEL_CARD_VIEW_REQ-001_BACKEND.md) | — | — |
 | 同上 | [REQ-002 前端模型卡片化展示](../requirement/MODEL_CARD_VIEW_REQ-002_FRONTEND.md) | — | — |
-| [MODEL_PROVIDER_IMPORT_FLOW](../plan/MODEL_PROVIDER_IMPORT_FLOW_PLAN.md) | [REQ-001 渠道模型导入流程优化](../requirement/MODEL_PROVIDER_IMPORT_FLOW_REQ-001_IMPORT_FLOW.md) | — | — |
+| [MODEL_PROVIDER_IMPORT_FLOW](../plan/MODEL_PROVIDER_IMPORT_FLOW_PLAN.md) | [REQ-001 渠道模型导入流程优化](../requirement/MODEL_PROVIDER_IMPORT_FLOW_REQ-001_IMPORT_FLOW.md) | [开发记录](../development/MODEL_PROVIDER_IMPORT_FLOW_REQ-001_DEVELOPMENT.md) | — |
 
 ## 3. 相关文档
 - 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（§3、ADR-09/10、D-05）、`docs/technical/db_schema/MODEL_PROVIDER_SCHEMA.MD`
