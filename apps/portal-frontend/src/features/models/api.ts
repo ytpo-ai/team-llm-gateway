@@ -26,6 +26,7 @@ export interface BulkCreateModelsInput {
 
 export interface BulkCreateModelsResult {
   created: Model[]
+  bound: Model[]
   skipped: string[]
 }
 

@@ -134,6 +134,7 @@ export function ProvidersPage() {
   const [expandedReplies, setExpandedReplies] = useState<Set<string>>(
     new Set(),
   )
+  const [importResult, setImportResult] = useState<string | null>(null)
 
   const [enablePreset, setEnablePreset] =
     useState<OfficialProviderPreset | null>(null)
@@ -142,7 +143,6 @@ export function ProvidersPage() {
   const [enableName, setEnableName] = useState('')
   const [enableKey, setEnableKey] = useState('')
   const [enableError, setEnableError] = useState<string | null>(null)
-  const [enableResult, setEnableResult] = useState<string | null>(null)
   const [enableDefaultPriority, setEnableDefaultPriority] = useState(0)
 
   const providersQuery = useQuery({
@@ -207,20 +207,15 @@ export function ProvidersPage() {
         defaultPriority: enableDefaultPriority,
       })
     },
-    onSuccess: (result) => {
-      setEnableResult(
-        `已开启「${result.provider.name}」，导入 ${result.models.created.length} 个模型` +
-          (result.models.skipped.length
-            ? `，跳过 ${result.models.skipped.length} 个已存在`
-            : ''),
-      )
+    onSuccess: (provider) => {
       setEnablePreset(null)
       setAddOpen(false)
       setEnableName('')
       setEnableKey('')
       setEnableError(null)
       invalidate()
-      queryClient.invalidateQueries({ queryKey: ['models'] })
+      // 打开导入模型抽屉，引导管理员测试并导入模型
+      openTestDrawer(provider)
     },
     onError: (err) => {
       setEnableError(
@@ -276,7 +271,15 @@ export function ProvidersPage() {
         aliases: string[]
       }[]
     }) => bulkCreateModels({ providerId, models }),
-    onSuccess: () => {
+    onSuccess: (result) => {
+      const parts: string[] = []
+      if (result.created.length > 0)
+        parts.push(`新增 ${result.created.length} 个模型`)
+      if (result.bound.length > 0)
+        parts.push(`绑定 ${result.bound.length} 个到新渠道`)
+      if (result.skipped.length > 0)
+        parts.push(`跳过 ${result.skipped.length} 个（已绑定）`)
+      setImportResult(parts.length > 0 ? parts.join('，') : '无模型导入')
       queryClient.invalidateQueries({ queryKey: ['models'] })
     },
   })
@@ -288,6 +291,7 @@ export function ProvidersPage() {
     setModelTestResults({})
     setTestingModelIds(new Set())
     setExpandedReplies(new Set())
+    setImportResult(null)
     setTestDrawerOpen(true)
   }
 
@@ -435,7 +439,13 @@ export function ProvidersPage() {
 
   const importedModelIdSet = new Set(
     allModels
-      .filter((m) => m.providerId === testDrawerProvider?.id)
+      .filter(
+        (m) =>
+          m.providerId === testDrawerProvider?.id ||
+          m.providerBindings?.some(
+            (b) => b.providerId === testDrawerProvider?.id,
+          ),
+      )
       .map((m) => m.modelId),
   )
 
@@ -639,10 +649,6 @@ export function ProvidersPage() {
         <Button onClick={() => setAddOpen(true)}>添加渠道</Button>
       </div>
 
-      {enableResult && (
-        <p className="text-sm text-green-600">{enableResult}</p>
-      )}
-
       <Card>
         <CardHeader>
           <CardTitle>渠道列表</CardTitle>
@@ -754,7 +760,7 @@ export function ProvidersPage() {
                             size="sm"
                             onClick={() => openTestDrawer(provider)}
                           >
-                            测试
+                            导入模型
                           </Button>
                           <Button
                             variant="ghost"
@@ -1090,7 +1096,7 @@ export function ProvidersPage() {
         </DialogContent>
       </Dialog>
 
-      <Sheet
+      <Dialog
         open={testDrawerOpen}
         onOpenChange={(open) => {
           if (!open) {
@@ -1099,13 +1105,13 @@ export function ProvidersPage() {
           }
         }}
       >
-        <SheetContent className="flex flex-col sm:max-w-md">
-          <SheetHeader>
-            <SheetTitle>测试渠道「{testDrawerProvider?.name}」</SheetTitle>
-            <SheetDescription>
-              勾选模型后批量测试连通性，通过的模型可一键导入
-            </SheetDescription>
-          </SheetHeader>
+        <DialogContent className="flex flex-col sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>导入模型到「{testDrawerProvider?.name}」</DialogTitle>
+            <DialogDescription>
+              勾选模型后点击「开始测试」批量测试连通性，仅通过的模型导入
+            </DialogDescription>
+          </DialogHeader>
           <div className="mt-4 flex flex-1 flex-col gap-4 overflow-hidden">
             <div>
               <label className="mb-1 block text-sm text-muted-foreground">
@@ -1210,7 +1216,11 @@ export function ProvidersPage() {
               </>
             )}
 
-            <SheetFooter>
+            {importResult && (
+              <p className="text-sm text-muted-foreground">{importResult}</p>
+            )}
+
+            <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
@@ -1238,10 +1248,10 @@ export function ProvidersPage() {
               >
                 {batchTestMutation.isPending ? '测试中…' : '开始测试'}
               </Button>
-            </SheetFooter>
+            </DialogFooter>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog
         open={confirm !== null}

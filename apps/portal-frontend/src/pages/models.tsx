@@ -29,17 +29,14 @@ import {
 } from '@/components/ui/sheet'
 import { useAuthStore } from '@/features/auth/store'
 import {
-  bulkCreateModels,
   createModel,
   deleteModel,
   disableModel,
   enableModel,
   listModels,
-  listOfficialPresets,
   updateModel,
 } from '@/features/models/api'
 import { ModelCard } from '@/features/models/components/model-card'
-import { formatTokenCount } from '@/features/models/utils'
 import type { Model, ModelInput, ModelPatch, ProviderBindingInput } from '@/features/models/types'
 import { listProviders } from '@/features/providers/api'
 import type { Provider } from '@/features/providers/types'
@@ -137,18 +134,7 @@ export function ModelsPage() {
     kind: 'disable' | 'delete'
   } | null>(null)
 
-  const [importOpen, setImportOpen] = useState(false)
-  const [presetKey, setPresetKey] = useState<string>('')
-  const [importProviderId, setImportProviderId] = useState('')
-  const [selectedModels, setSelectedModels] = useState<string[]>([])
-  const [importResult, setImportResult] = useState<string | null>(null)
-
   const modelsQuery = useQuery({ queryKey: ['models'], queryFn: listModels })
-
-  const presetsQuery = useQuery({
-    queryKey: ['official-presets'],
-    queryFn: listOfficialPresets,
-  })
 
   const providersQuery = useQuery({
     queryKey: ['providers'],
@@ -158,58 +144,6 @@ export function ModelsPage() {
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['models'] })
-
-  const officialPresets = presetsQuery.data ?? []
-  const activePreset = officialPresets.find((p) => p.key === presetKey)
-
-  const toggleModel = (modelId: string) => {
-    setSelectedModels((prev) =>
-      prev.includes(modelId)
-        ? prev.filter((id) => id !== modelId)
-        : [...prev, modelId],
-    )
-  }
-
-  const openImport = () => {
-    setPresetKey(officialPresets[0]?.key ?? '')
-    setImportProviderId('')
-    setSelectedModels([])
-    setImportResult(null)
-    setImportOpen(true)
-  }
-
-  const importMutation = useMutation({
-    mutationFn: () => {
-      const preset = activePreset
-      const models = (preset?.models ?? [])
-        .filter((m) => selectedModels.includes(m.modelId))
-        .map((m) => ({
-          modelId: m.modelId,
-          displayName: m.displayName,
-          description: m.description,
-          contextLength: m.contextLength,
-          maxOutputLength: m.maxOutputLength,
-          inputModalities: m.inputModalities,
-          outputModalities: m.outputModalities,
-          multiplier: m.multiplier,
-          capabilities: m.capabilities,
-          aliases: [],
-        }))
-      return bulkCreateModels({ providerId: importProviderId, models })
-    },
-    onSuccess: (result) => {
-      setImportResult(
-        `导入完成：新增 ${result.created.length} 个，跳过 ${result.skipped.length} 个（已存在）`,
-      )
-      setSelectedModels([])
-      invalidate()
-    },
-    onError: (err) => {
-      setImportResult(
-        err instanceof ApiError ? err.message : '导入失败，请稍后重试',
-      )
-    },
-  })
 
   const resetForm = () => {
     setForm(emptyForm)
@@ -375,9 +309,6 @@ export function ModelsPage() {
         </div>
         {isAdmin && (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={openImport}>
-              官方预设导入
-            </Button>
             <Button onClick={openCreate}>添加模型</Button>
           </div>
         )}
@@ -675,117 +606,6 @@ export function ModelsPage() {
               </Button>
             </SheetFooter>
           </form>
-        </SheetContent>
-      </Sheet>
-
-      <Sheet open={importOpen} onOpenChange={setImportOpen}>
-        <SheetContent className="sm:max-w-md">
-          <SheetHeader>
-            <SheetTitle>官方预设导入</SheetTitle>
-            <SheetDescription>
-              从官方预置目录一键导入模型（能力标签与默认倍率自动填充），需先有对应的上游渠道
-            </SheetDescription>
-          </SheetHeader>
-          <div className="flex flex-1 flex-col gap-4 overflow-y-auto">
-            <div>
-              <label className="mb-1 block text-sm text-muted-foreground">
-                官方预置
-              </label>
-              <Select
-                value={presetKey}
-                onValueChange={(v) => {
-                  setPresetKey(v)
-                  setSelectedModels([])
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {officialPresets.map((preset) => (
-                    <SelectItem key={preset.key} value={preset.key}>
-                      {preset.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm text-muted-foreground">
-                目标渠道
-              </label>
-              <Select
-                value={importProviderId}
-                onValueChange={(v) => setImportProviderId(v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="请选择渠道" />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeProviders.map((provider) => (
-                    <SelectItem key={provider.id} value={provider.id}>
-                      {provider.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              {(activePreset?.models ?? []).map((model) => (
-                <label
-                  key={model.modelId}
-                  className="flex items-start gap-2 rounded-md border border-border p-2 text-sm"
-                >
-                  <input
-                    type="checkbox"
-                    className="mt-0.5"
-                    checked={selectedModels.includes(model.modelId)}
-                    onChange={() => toggleModel(model.modelId)}
-                  />
-                  <span>
-                    <code className="text-xs">{model.modelId}</code>
-                    <span className="ml-2 text-muted-foreground">
-                      {model.displayName} · ×{model.multiplier} ·{' '}
-                      {formatTokenCount(model.contextLength)} 上下文
-                    </span>
-                    {model.description && (
-                      <span className="block text-xs text-muted-foreground">
-                        {model.description}
-                      </span>
-                    )}
-                    <span className="block text-xs text-muted-foreground">
-                      {model.capabilities.join(', ')}
-                    </span>
-                  </span>
-                </label>
-              ))}
-            </div>
-
-            {importResult && (
-              <p className="text-sm text-muted-foreground">{importResult}</p>
-            )}
-
-            <SheetFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setImportOpen(false)}
-              >
-                取消
-              </Button>
-              <Button
-                disabled={
-                  importMutation.isPending ||
-                  !importProviderId ||
-                  selectedModels.length === 0
-                }
-                onClick={() => importMutation.mutate()}
-              >
-                {importMutation.isPending ? '导入中…' : '导入所选模型'}
-              </Button>
-            </SheetFooter>
-          </div>
         </SheetContent>
       </Sheet>
 

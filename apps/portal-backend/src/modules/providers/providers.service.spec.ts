@@ -138,12 +138,8 @@ describe('ProvidersService', () => {
       ],
     };
 
-    it('creates provider with preset fields and imports models', async () => {
+    it('creates provider with preset fields without auto-importing models', async () => {
       modelsService.getOfficialPresets.mockResolvedValue([preset]);
-      modelsService.bulkCreate.mockResolvedValue({
-        created: [],
-        skipped: [],
-      });
       providerModel.findOne.mockReturnValue({
         exec: vi.fn().mockResolvedValue(null),
       });
@@ -157,23 +153,12 @@ describe('ProvidersService', () => {
         apiKey: 'sk-live-1234567890abcd',
       });
 
-      expect(result.provider.name).toBe('DeepSeek');
-      expect(result.provider.presetKey).toBe('deepseek');
+      expect(result.name).toBe('DeepSeek');
+      expect(result.presetKey).toBe('deepseek');
       const createArg = providerModel.create.mock.calls[0][0];
       expect(createArg.baseUrl).toBe('https://api.deepseek.com');
       expect(createArg.type).toBe(ProviderType.OPENAI_COMPATIBLE);
-      expect(modelsService.bulkCreate).toHaveBeenCalledWith(tenantId, teamId, {
-        providerId: result.provider.id,
-        models: [
-          {
-            modelId: 'deepseek-flash',
-            displayName: 'DeepSeek Flash',
-            multiplier: 0.1,
-            capabilities: ['chat'],
-            aliases: [],
-          },
-        ],
-      });
+      expect(modelsService.bulkCreate).not.toHaveBeenCalled();
     });
 
     it('selects the requested format type and baseUrl', async () => {
@@ -252,7 +237,7 @@ describe('ProvidersService', () => {
         name: 'DeepSeek 公司主账号',
       });
 
-      expect(result.provider.name).toBe('DeepSeek 公司主账号');
+      expect(result.name).toBe('DeepSeek 公司主账号');
     });
   });
 
