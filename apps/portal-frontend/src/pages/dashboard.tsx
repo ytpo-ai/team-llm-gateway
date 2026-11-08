@@ -78,7 +78,21 @@ function TrendChart({
   )
 }
 
+const fmtPercent = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 })
+
 function BreakdownTable({ items }: { items: UsageBreakdownItem[] }) {
+  const totals = useMemo(() => {
+    let requestCount = 0
+    let totalTokens = 0
+    let totalCost = 0
+    for (const item of items) {
+      requestCount += item.requestCount
+      totalTokens += item.totalTokens
+      totalCost += item.totalCost
+    }
+    return { requestCount, totalTokens, totalCost }
+  }, [items])
+
   if (items.length === 0) {
     return <div className="py-6 text-sm text-muted-foreground">暂无数据</div>
   }
@@ -93,14 +107,40 @@ function BreakdownTable({ items }: { items: UsageBreakdownItem[] }) {
         </tr>
       </thead>
       <tbody>
-        {items.map((item) => (
-          <tr key={item.id} className="border-b last:border-0">
-            <td className="py-2 pr-4">{item.label ?? item.id}</td>
-            <td className="py-2 pr-4 text-right">{fmtInt.format(item.requestCount)}</td>
-            <td className="py-2 pr-4 text-right">{fmtInt.format(item.totalTokens)}</td>
-            <td className="py-2 text-right">{fmtCost.format(item.totalCost)}</td>
-          </tr>
-        ))}
+        {items.map((item) => {
+          const reqPct = totals.requestCount > 0
+            ? (item.requestCount / totals.requestCount) * 100
+            : 0
+          const tokenPct = totals.totalTokens > 0
+            ? (item.totalTokens / totals.totalTokens) * 100
+            : 0
+          const costPct = totals.totalCost > 0
+            ? (item.totalCost / totals.totalCost) * 100
+            : 0
+          return (
+            <tr key={item.id} className="border-b last:border-0">
+              <td className="py-2 pr-4">{item.label ?? item.id}</td>
+              <td className="py-2 pr-4 text-right">
+                {fmtInt.format(item.requestCount)}
+                <span className="ml-1 text-xs text-muted-foreground">
+                  ({fmtPercent.format(reqPct)}%)
+                </span>
+              </td>
+              <td className="py-2 pr-4 text-right">
+                {fmtInt.format(item.totalTokens)}
+                <span className="ml-1 text-xs text-muted-foreground">
+                  ({fmtPercent.format(tokenPct)}%)
+                </span>
+              </td>
+              <td className="py-2 text-right">
+                {fmtCost.format(item.totalCost)}
+                <span className="ml-1 text-xs text-muted-foreground">
+                  ({fmtPercent.format(costPct)}%)
+                </span>
+              </td>
+            </tr>
+          )
+        })}
       </tbody>
     </table>
   )
