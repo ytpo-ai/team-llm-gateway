@@ -8,7 +8,7 @@
 | 所属 plan | `docs/plan/PROXY_POLICY_PROTOCOL_PLAN.md` |
 | 需求管理 ID | — |
 | 分支 | `main` |
-| 状态 | `in-progress` |
+| 状态 | `done` |
 
 ## 2. 需求描述
 
@@ -42,6 +42,6 @@
 | fix | — |
 
 ## 5. 状态跟踪
-- [ ] 开发中
-- [ ] 待验收
-- [ ] 已交付
+- [x] 开发中
+- [x] 待验收
+- [x] 已交付

@@ -8,7 +8,7 @@
 | 所属 plan | `docs/plan/PROXY_POLICY_PROTOCOL_PLAN.md` |
 | 需求管理 ID | — |
 | 分支 | `main` |
-| 状态 | `draft` |
+| 状态 | `done` |
 
 ## 2. 需求描述
 
@@ -41,6 +41,6 @@ REQ-001 已落地协议类型与 `PolicyResolver`。本期重构转发核心，�
 | fix | — |
 
 ## 5. 状态跟踪
-- [ ] 开发中
-- [ ] 待验收
-- [ ] 已交付
+- [x] 开发中
+- [x] 待验收
+- [x] 已交付

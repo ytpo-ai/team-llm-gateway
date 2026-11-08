@@ -35,6 +35,7 @@
 | [PROVIDER_USAGE_HEALTH](../plan/PROVIDER_USAGE_HEALTH_PLAN.md) | [REQ-005 移除主动查询链路](../requirement/PROVIDER_USAGE_REQ-005_REMOVE_ACTIVE_QUERY.md) | [开发记录](../development/PROVIDER_USAGE_REQ-005_DEVELOPMENT.md) | — |
 | 同上 | [REQ-006 渠道健康模型+熔断冷却](../requirement/PROVIDER_USAGE_REQ-006_HEALTH_CIRCUIT_BREAKER.md) | [同上](../development/PROVIDER_USAGE_REQ-005_DEVELOPMENT.md) | — |
 | 同上 | [REQ-007 前端健康状态列](../requirement/PROVIDER_USAGE_REQ-007_FRONTEND_HEALTH_COLUMN.md) | [同上](../development/PROVIDER_USAGE_REQ-005_DEVELOPMENT.md) | — |
+| [PROXY_POLICY_PROTOCOL](../plan/PROXY_POLICY_PROTOCOL_PLAN.md) | [REQ-001 协议类型+PolicyResolver](../requirement/PROXY_POLICY_PROTOCOL_REQ-001_TYPES_RESOLVER.md)、[REQ-002 ProxyCore+MeterBackend](../requirement/PROXY_POLICY_PROTOCOL_REQ-002_CORE_METER.md) | [开发记录](../development/PROXY_POLICY_PROTOCOL_REQ-001_DEVELOPMENT.md) | — |
 
 ## 3. 相关文档
 - 技术文档：`SYSTEM_POSITIONING_AND_ARCHITECTURE.MD`（ADR-06、§7.1、D-05）、`docs/technical/db_schema/USAGE_METERING_SCHEMA.MD`
