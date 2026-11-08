@@ -17,6 +17,7 @@ import { User, UserSchema } from '../users/schemas/user.schema.js';
 import { UsageModule } from '../usage/usage.module.js';
 import { ApiKeyAuthGuard } from './guards/api-key-auth.guard.js';
 import { ConcurrencyService } from './concurrency.service.js';
+import { MemoryMeterBackend } from './memory-meter-backend.js';
 import { METER_BACKEND_TOKEN } from './meter-backend.interface.js';
 import { PolicyResolver } from './policy-resolver.service.js';
 import { ProxyController } from './proxy.controller.js';
@@ -52,10 +53,7 @@ import { RedisMeterBackend } from './redis-meter-backend.js';
         if (redisUrl) {
           return new RedisMeterBackend(redisUrl);
         }
-        // TODO: fallback to MemoryMeterBackend when Redis is not configured
-        throw new Error(
-          'MeterBackend requires REDIS_URL; MemoryMeterBackend not yet implemented',
-        );
+        return new MemoryMeterBackend();
       },
     },
   ],
