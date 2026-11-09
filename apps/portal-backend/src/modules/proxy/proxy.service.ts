@@ -1,40 +1,35 @@
 import {
-  BadRequestException,
-  ForbiddenException,
   HttpException,
   HttpStatus,
+  Inject,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { randomUUID } from 'node:crypto';
 import type { Response as ExpressResponse } from 'express';
 import { Model, Types } from 'mongoose';
-import { decrypt } from '../../common/crypto/cipher.js';
 import { BillingService } from '../billing/billing.service.js';
 import {
   QuotaLimitService,
-  type ResolvedPolicyContext,
 } from '../billing/quota-limit.service.js';
+import type { ApiKeyDocument } from '../api-keys/schemas/api-key.schema.js';
 import { ApiKey } from '../api-keys/schemas/api-key.schema.js';
 import {
   Model as ModelEntity,
-  ModelDocument,
   ModelStatus,
-  type ProviderBinding,
 } from '../models/schemas/model.schema.js';
 import {
   Provider,
+  ProviderAuthType,
   ProviderStatus,
+  ProviderType,
 } from '../providers/schemas/provider.schema.js';
 import { UsageService } from '../usage/usage.service.js';
 import { UsageStatus } from '../usage/schemas/usage-log.schema.js';
 import { ProviderUsageService } from '../usage/provider-usage.service.js';
 import type { ApiKeyContext } from './decorators/api-key-context.decorator.js';
-import { ConcurrencyService } from './concurrency.service.js';
-import { RateLimitService } from './rate-limit.service.js';
 import { resolveAdapter } from './adapters/adapter.factory.js';
 import {
   anthropicError,
@@ -49,6 +44,10 @@ import {
   type UpstreamAdapter,
   type UpstreamUsage,
 } from './adapters/upstream-adapter.js';
+import { PolicyResolver } from './policy-resolver.service.js';
+import type { MeterBackend } from './meter-backend.interface.js';
+import { METER_BACKEND_TOKEN } from './meter-backend.interface.js';
+import { Action, Candidate, Measure, StandardPolicy } from './protocol/types.js';
 
 interface ChatCompletionsBody {
   model?: unknown;
@@ -65,7 +64,7 @@ interface PreparedRequest {
   request: AdapterRequest;
   requestId: string;
   startedAt: number;
-  releaseConcurrency: () => void;
+  releaseConcurrency: () => Promise<void>;
 }
 
 @Injectable()
@@ -81,9 +80,9 @@ export class ProxyService {
     private readonly usageService: UsageService,
     private readonly billingService: BillingService,
     private readonly quotaLimitService: QuotaLimitService,
-    private readonly rateLimitService: RateLimitService,
-    private readonly concurrencyService: ConcurrencyService,
     private readonly providerUsageService: ProviderUsageService,
+    private readonly policyResolver: PolicyResolver,
+    @Inject(METER_BACKEND_TOKEN) private readonly meterBackend: MeterBackend,
   ) {}
 
   async listModels(ctx: ApiKeyContext) {
@@ -113,9 +112,10 @@ export class ProxyService {
       apiKey: ctx.apiKey,
     });
     const whitelist = resolved.key?.modelWhitelist ?? [];
-    const visible = whitelist.length > 0
-      ? models.filter((m) => whitelist.includes(m.modelId))
-      : models;
+    const visible =
+      whitelist.length > 0
+        ? models.filter((m) => whitelist.includes(m.modelId))
+        : models;
 
     return {
       object: 'list',
@@ -133,114 +133,7 @@ export class ProxyService {
     body: ChatCompletionsBody,
     res: ExpressResponse,
   ): Promise<unknown> {
-    // Enforce limits once (shared across retries)
-    const { resolved, releaseConcurrency } = await this.enforceLimits(ctx);
-
-    // Resolve model once
-    const model = await this.resolveModel(ctx, body.model, resolved);
-
-    // Get sorted provider candidates
-    const candidates = this.getProviderCandidates(model);
-
-    let lastError: number = 502;
-    let lastBody: unknown = { message: '无可用的上游渠道' };
-
-    for (const candidateId of candidates) {
-      const prepared = await this.tryCandidate(
-        ctx,
-        model,
-        body,
-        candidateId,
-        resolved,
-      );
-      if (!prepared) continue;
-
-      // Attach concurrency release
-      prepared.releaseConcurrency = releaseConcurrency;
-
-      let upstreamRes: globalThis.Response;
-      try {
-        upstreamRes = await this.requestUpstream(prepared);
-      } catch (err) {
-        // Network error (DNS/timeout/connection refused) → record failure, try next
-        const message = err instanceof Error ? err.message : '网络错误';
-        await this.providerUsageService.recordFailure(
-          ctx.tenantId,
-          ctx.teamId,
-          prepared.providerId,
-          `上游网络错误：${message}`,
-        );
-        lastError = 502;
-        lastBody = { message: `上游网络错误：${message}` };
-        this.logger.warn(
-          `Provider channel ${prepared.providerId} network error: ${message}, trying next`,
-        );
-        continue;
-      }
-      const text = await upstreamRes.text();
-
-      if (upstreamRes.ok) {
-        // Extract rate-limit headers for future reference
-        await this.extractRateLimitHeaders(ctx, prepared, upstreamRes);
-        await this.providerUsageService.recordSuccess(
-          ctx.tenantId,
-          ctx.teamId,
-          prepared.providerId,
-        );
-
-        const openaiJson = prepared.adapter.parseResponse(text, prepared.modelId);
-        await this.recordUsage(
-          ctx,
-          prepared,
-          (openaiJson as { usage?: UpstreamUsage }).usage,
-        );
-        releaseConcurrency();
-        res.status(upstreamRes.status);
-        return openaiJson;
-      }
-
-      // 429 Rate Limited → mark exhausted, try next candidate
-      if (upstreamRes.status === 429) {
-        await this.providerUsageService.markExhausted(
-          ctx.tenantId,
-          ctx.teamId,
-          prepared.providerId,
-          `上游返回 429 Too Many Requests`,
-          this.headersToRecord(upstreamRes),
-        );
-        this.logger.warn(
-          `Provider channel ${prepared.providerId} rate limited (429), falling back`,
-        );
-        continue;
-      }
-
-      // Server errors (5xx, 408) → record failure, try next candidate
-      if (upstreamRes.status >= 500 || upstreamRes.status === 408) {
-        await this.providerUsageService.recordFailure(
-          ctx.tenantId,
-          ctx.teamId,
-          prepared.providerId,
-          `上游返回 ${upstreamRes.status}`,
-        );
-        lastError = upstreamRes.status;
-        lastBody = parseJsonObject(text) ?? { message: text };
-        this.logger.warn(
-          `Provider channel ${prepared.providerId} returned ${upstreamRes.status}, trying next`,
-        );
-        continue;
-      }
-
-      // Client errors other than 429 → don't retry, return immediately
-      await this.recordError(ctx, prepared, upstreamRes.status);
-      releaseConcurrency();
-      res.status(upstreamRes.status);
-      return parseJsonObject(text) ?? { message: text };
-    }
-
-    // All candidates exhausted
-    releaseConcurrency();
-    res.status(lastError);
-    return lastBody;
+    return this.process(ctx, body, res, 'non-stream');
   }
 
   async streamChatCompletions(
@@ -248,122 +141,7 @@ export class ProxyService {
     body: ChatCompletionsBody,
     res: ExpressResponse,
   ): Promise<void> {
-    // Enforce limits once (shared across retries)
-    const { resolved, releaseConcurrency } = await this.enforceLimits(ctx);
-
-    // Resolve model once
-    const model = await this.resolveModel(ctx, body.model, resolved);
-
-    // Get sorted provider candidates
-    const candidates = this.getProviderCandidates(model);
-
-    let lastError: number = 502;
-    let lastBody: unknown = { message: '无可用的上游渠道' };
-
-    for (const candidateId of candidates) {
-      const prepared = await this.tryCandidate(
-        ctx,
-        model,
-        body,
-        candidateId,
-        resolved,
-      );
-      if (!prepared) continue;
-
-      let upstreamRes: globalThis.Response;
-      try {
-        upstreamRes = await this.requestUpstream(prepared);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : '网络错误';
-        await this.providerUsageService.recordFailure(
-          ctx.tenantId,
-          ctx.teamId,
-          prepared.providerId,
-          `上游网络错误：${message}`,
-        );
-        lastError = 502;
-        lastBody = { message: `上游网络错误：${message}` };
-        this.logger.warn(
-          `Provider channel ${prepared.providerId} network error: ${message}, trying next`,
-        );
-        continue;
-      }
-      if (!upstreamRes.ok || !upstreamRes.body) {
-        const text = await upstreamRes.text();
-
-        // 429 Rate Limited → mark exhausted, try next
-        if (upstreamRes.status === 429) {
-          await this.providerUsageService.markExhausted(
-            ctx.tenantId,
-            ctx.teamId,
-            prepared.providerId,
-            `上游返回 429 Too Many Requests`,
-            this.headersToRecord(upstreamRes),
-          );
-          this.logger.warn(
-            `Provider channel ${prepared.providerId} rate limited (429), falling back`,
-          );
-          continue;
-        }
-
-        // Server errors → record failure, try next
-        if (upstreamRes.status >= 500 || upstreamRes.status === 408) {
-          await this.providerUsageService.recordFailure(
-            ctx.tenantId,
-            ctx.teamId,
-            prepared.providerId,
-            `上游返回 ${upstreamRes.status}`,
-          );
-          lastError = upstreamRes.status;
-          lastBody = parseJsonObject(text) ?? { message: text };
-          continue;
-        }
-
-        // Client error → return immediately
-        await this.recordError(ctx, prepared, upstreamRes.status);
-        releaseConcurrency();
-        res.status(upstreamRes.status).json(parseJsonObject(text) ?? { message: text });
-        return;
-      }
-
-      // Success — stream the response
-      await this.extractRateLimitHeaders(ctx, prepared, upstreamRes);
-      await this.providerUsageService.recordSuccess(
-        ctx.tenantId,
-        ctx.teamId,
-        prepared.providerId,
-      );
-
-      res.status(200);
-      res.setHeader('content-type', 'text/event-stream');
-      res.setHeader('cache-control', 'no-cache');
-      res.setHeader('connection', 'keep-alive');
-
-      const transformer = prepared.adapter.createStreamTransformer();
-      const reader = upstreamRes.body.getReader();
-      const decoder = new TextDecoder();
-
-      try {
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          const chunk = decoder.decode(value, { stream: true });
-          const emit = transformer.push(chunk);
-          if (emit) res.write(emit);
-        }
-        const tail = transformer.finish();
-        if (tail) res.write(tail);
-      } finally {
-        res.end();
-        await this.recordUsage(ctx, prepared, transformer.getUsage());
-        releaseConcurrency();
-      }
-      return;
-    }
-
-    // All candidates exhausted
-    releaseConcurrency();
-    res.status(lastError).json(lastBody);
+    await this.process(ctx, body, res, 'stream-openai');
   }
 
   async messages(
@@ -372,95 +150,13 @@ export class ProxyService {
     res: ExpressResponse,
   ): Promise<unknown> {
     const openaiBody = anthropicToOpenAI(body);
-    const { resolved, releaseConcurrency } = await this.enforceLimits(ctx);
-    const model = await this.resolveModel(ctx, openaiBody.model, resolved);
-    const candidates = this.getProviderCandidates(model);
-
-    let lastError: number = 502;
-    let lastBody: unknown = { message: '无可用的上游渠道' };
-
-    for (const candidateId of candidates) {
-      const prepared = await this.tryCandidate(
-        ctx,
-        model,
-        openaiBody as ChatCompletionsBody,
-        candidateId,
-        resolved,
-      );
-      if (!prepared) continue;
-
-      let upstreamRes: globalThis.Response;
-      try {
-        upstreamRes = await this.requestUpstream(prepared);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : '网络错误';
-        await this.providerUsageService.recordFailure(
-          ctx.tenantId,
-          ctx.teamId,
-          prepared.providerId,
-          `上游网络错误：${message}`,
-        );
-        lastError = 502;
-        lastBody = anthropicError(`上游网络错误：${message}`);
-        this.logger.warn(
-          `Provider channel ${prepared.providerId} network error: ${message}, trying next`,
-        );
-        continue;
-      }
-      const text = await upstreamRes.text();
-
-      if (upstreamRes.ok) {
-        await this.extractRateLimitHeaders(ctx, prepared, upstreamRes);
-        await this.providerUsageService.recordSuccess(
-          ctx.tenantId,
-          ctx.teamId,
-          prepared.providerId,
-        );
-        const openaiJson = prepared.adapter.parseResponse(text, prepared.modelId);
-        await this.recordUsage(
-          ctx,
-          prepared,
-          (openaiJson as { usage?: UpstreamUsage }).usage,
-        );
-        releaseConcurrency();
-        res.status(upstreamRes.status);
-        return openAIToAnthropic(openaiJson, prepared.modelId);
-      }
-
-      if (upstreamRes.status === 429) {
-        await this.providerUsageService.markExhausted(
-          ctx.tenantId, ctx.teamId, prepared.providerId,
-          `上游返回 429 Too Many Requests`,
-          this.headersToRecord(upstreamRes),
-        );
-        continue;
-      }
-
-      if (upstreamRes.status >= 500 || upstreamRes.status === 408) {
-        await this.providerUsageService.recordFailure(
-          ctx.tenantId, ctx.teamId, prepared.providerId,
-          `上游返回 ${upstreamRes.status}`,
-        );
-        lastError = upstreamRes.status;
-        const detail = parseJsonObject(text) ?? {};
-        lastBody = anthropicError(
-          asString((detail as Record<string, unknown>).message, text),
-        );
-        continue;
-      }
-
-      await this.recordError(ctx, prepared, upstreamRes.status);
-      releaseConcurrency();
-      res.status(upstreamRes.status);
-      const detail = parseJsonObject(text) ?? {};
-      return anthropicError(
-        asString((detail as Record<string, unknown>).message, text),
-      );
-    }
-
-    releaseConcurrency();
-    res.status(lastError);
-    return lastBody;
+    const result = await this.process(
+      ctx,
+      openaiBody as ChatCompletionsBody,
+      res,
+      'non-stream',
+    );
+    return openAIToAnthropic(result as Record<string, unknown>, (openaiBody.model as string) ?? '');
   }
 
   async streamMessages(
@@ -469,22 +165,152 @@ export class ProxyService {
     res: ExpressResponse,
   ): Promise<void> {
     const openaiBody = anthropicToOpenAI(body);
-    const { resolved, releaseConcurrency } = await this.enforceLimits(ctx);
-    const model = await this.resolveModel(ctx, openaiBody.model, resolved);
-    const candidates = this.getProviderCandidates(model);
+    await this.process(
+      ctx,
+      openaiBody as ChatCompletionsBody,
+      res,
+      'stream-anthropic',
+    );
+  }
 
+  // ── unified process method (new protocol path) ──
+
+  private async process(
+    ctx: ApiKeyContext,
+    body: ChatCompletionsBody,
+    res: ExpressResponse,
+    mode: 'non-stream' | 'stream-openai' | 'stream-anthropic',
+  ): Promise<unknown> {
+    // 1. Resolve policy + candidates via PolicyResolver
+    const { policy, candidates } = await this.policyResolver.resolve({
+      tenantId: ctx.tenantId,
+      teamId: ctx.teamId,
+      userId: ctx.userId,
+      apiKey: ctx.apiKey as unknown as ApiKeyDocument,
+      requestedModel: typeof body.model === 'string' ? body.model : '',
+    });
+
+    // 2. Layer ①: state check
+    this.assertPolicyStates(policy);
+
+    // 3. Layer ③: limit check + concurrency acquisition
+    const releaseConcurrency = await this.assertLimits(policy);
+
+    // 4. Fallback loop over pre-resolved candidates
+    return this.executeWithFallback(
+      ctx, body, policy, candidates, res, mode, releaseConcurrency,
+    );
+  }
+
+  // ── three-layer check ──
+
+  private assertPolicyStates(policy: StandardPolicy): void {
+    for (const state of policy.states) {
+      if (!state.ok && state.action === Action.BLOCK) {
+        const status =
+          state.code === 'BALANCE_INSUFFICIENT'
+            ? HttpStatus.PAYMENT_REQUIRED
+            : HttpStatus.FORBIDDEN;
+        throw new HttpException(state.message ?? '请求被拒绝', status);
+      }
+      if (!state.ok && state.action === Action.WARN) {
+        this.logger.warn(`策略预警：${state.name} - ${state.message}`);
+      }
+    }
+  }
+
+  private async assertLimits(
+    policy: StandardPolicy,
+  ): Promise<() => Promise<void>> {
+    const releases: Array<() => Promise<void>> = [];
+
+    for (const limit of policy.limits) {
+      // Concurrency is handled separately
+      if (limit.measure === Measure.CONCURRENCY) {
+        if (limit.scope !== 'key') continue;
+        try {
+          const release = await (
+            this.meterBackend as MeterBackend & {
+              tryAcquireConcurrency?: (
+                key: string,
+                limit: number,
+              ) => Promise<() => Promise<void>>;
+            }
+          ).tryAcquireConcurrency?.(policy.subject.apiKeyId, limit.limit);
+          if (release) {
+            releases.push(release);
+          } else {
+            releases.push(
+              this.meterBackend.acquireConcurrency(
+                policy.subject.apiKeyId,
+                limit.limit,
+              ),
+            );
+          }
+        } catch {
+          throw new HttpException(
+            '并发数已达上限',
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
+        continue;
+      }
+
+      const scope = {
+        kind: limit.scope,
+        id:
+          limit.scope === 'team'
+            ? policy.subject.teamId
+            : limit.scope === 'member'
+              ? policy.subject.userId
+              : policy.subject.apiKeyId,
+      };
+
+      const ok = await this.meterBackend.checkLimit(
+        scope,
+        limit.measure,
+        limit.window,
+        limit.limit,
+      );
+
+      if (!ok && limit.action === Action.BLOCK) {
+        throw new HttpException(
+          `${limit.scope}级限额已用尽`,
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+      if (!ok && limit.action === Action.WARN) {
+        this.logger.warn(
+          `策略预警：${limit.scope}级 ${limit.measure}/${limit.window} 限额已用尽`,
+        );
+      }
+    }
+
+    return async () => {
+      for (const release of releases.reverse()) {
+        await release();
+      }
+    };
+  }
+
+  // ── fallback execution ──
+
+  private async executeWithFallback(
+    ctx: ApiKeyContext,
+    body: ChatCompletionsBody,
+    policy: StandardPolicy,
+    candidates: Candidate[],
+    res: ExpressResponse,
+    mode: 'non-stream' | 'stream-openai' | 'stream-anthropic',
+    releaseConcurrency: () => Promise<void>,
+  ): Promise<unknown> {
     let lastError: number = 502;
     let lastBody: unknown = { message: '无可用的上游渠道' };
 
-    for (const candidateId of candidates) {
-      const prepared = await this.tryCandidate(
-        ctx,
-        model,
-        openaiBody as ChatCompletionsBody,
-        candidateId,
-        resolved,
-      );
+    for (const candidate of candidates) {
+      const prepared = await this.prepareCandidate(ctx, body, candidate);
       if (!prepared) continue;
+      prepared.releaseConcurrency = releaseConcurrency;
 
       let upstreamRes: globalThis.Response;
       try {
@@ -498,348 +324,145 @@ export class ProxyService {
           `上游网络错误：${message}`,
         );
         lastError = 502;
-        lastBody = anthropicError(`上游网络错误：${message}`);
+        lastBody = { message: `上游网络错误：${message}` };
         this.logger.warn(
           `Provider channel ${prepared.providerId} network error: ${message}, trying next`,
         );
         continue;
       }
+
+      if (mode === 'non-stream') {
+        const text = await upstreamRes.text();
+        if (upstreamRes.ok) {
+          await this.handleSuccess(ctx, prepared, upstreamRes);
+          const openaiJson = prepared.adapter.parseResponse(
+            text,
+            prepared.modelId,
+          );
+          await this.recordUsage(
+            ctx,
+            prepared,
+            policy,
+            (openaiJson as { usage?: UpstreamUsage }).usage,
+          );
+          await releaseConcurrency();
+          res.status(upstreamRes.status);
+          return openaiJson;
+        }
+        if (upstreamRes.status === 429) {
+          await this.handleRateLimited(ctx, prepared, upstreamRes);
+          continue;
+        }
+        if (upstreamRes.status >= 500 || upstreamRes.status === 408) {
+          await this.handleServerError(ctx, prepared, upstreamRes);
+          lastError = upstreamRes.status;
+          lastBody = parseJsonObject(text) ?? { message: text };
+          continue;
+        }
+        await this.recordError(ctx, prepared, upstreamRes.status);
+        await releaseConcurrency();
+        res.status(upstreamRes.status);
+        return parseJsonObject(text) ?? { message: text };
+      }
+
+      // Streaming path
       if (!upstreamRes.ok || !upstreamRes.body) {
         const text = await upstreamRes.text();
-
         if (upstreamRes.status === 429) {
-          await this.providerUsageService.markExhausted(
-            ctx.tenantId, ctx.teamId, prepared.providerId,
-            `上游返回 429 Too Many Requests`,
-            this.headersToRecord(upstreamRes),
-          );
+          await this.handleRateLimited(ctx, prepared, upstreamRes);
           continue;
         }
-
         if (upstreamRes.status >= 500 || upstreamRes.status === 408) {
-          await this.providerUsageService.recordFailure(
-            ctx.tenantId, ctx.teamId, prepared.providerId,
-            `上游返回 ${upstreamRes.status}`,
-          );
+          await this.handleServerError(ctx, prepared, upstreamRes);
           lastError = upstreamRes.status;
-          const detail = parseJsonObject(text) ?? {};
-          lastBody = anthropicError(
-            asString((detail as Record<string, unknown>).message, text),
-          );
+          lastBody = parseJsonObject(text) ?? { message: text };
           continue;
         }
-
         await this.recordError(ctx, prepared, upstreamRes.status);
-        releaseConcurrency();
-        const detail = parseJsonObject(text) ?? {};
-        res
-          .status(upstreamRes.status)
-          .json(
-            anthropicError(
-              asString((detail as Record<string, unknown>).message, text),
-            ),
-          );
+        await releaseConcurrency();
+        if (mode === 'stream-anthropic') {
+          const detail = parseJsonObject(text) ?? {};
+          res
+            .status(upstreamRes.status)
+            .json(
+              anthropicError(
+                asString(
+                  (detail as Record<string, unknown>).message,
+                  text,
+                ),
+              ),
+            );
+        } else {
+          res
+            .status(upstreamRes.status)
+            .json(parseJsonObject(text) ?? { message: text });
+        }
         return;
       }
 
-      // Success — stream the response
-      await this.extractRateLimitHeaders(ctx, prepared, upstreamRes);
-      await this.providerUsageService.recordSuccess(
-        ctx.tenantId,
-        ctx.teamId,
-        prepared.providerId,
+      // Stream processing
+      await this.handleSuccess(ctx, prepared, upstreamRes);
+      await this.streamResponse(
+        ctx,
+        prepared,
+        policy,
+        upstreamRes,
+        res,
+        mode,
+        releaseConcurrency,
       );
-
-      res.status(200);
-      res.setHeader('content-type', 'text/event-stream');
-      res.setHeader('cache-control', 'no-cache');
-      res.setHeader('connection', 'keep-alive');
-
-      const openaiTransformer = prepared.adapter.createStreamTransformer();
-      const anthropicTransformer = new OpenAIAnthropicStreamTransformer();
-      const reader = upstreamRes.body.getReader();
-      const decoder = new TextDecoder();
-
-      try {
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          const chunk = decoder.decode(value, { stream: true });
-          const openaiSse = openaiTransformer.push(chunk);
-          if (openaiSse) {
-            const anthropicSse = anthropicTransformer.push(openaiSse);
-            if (anthropicSse) res.write(anthropicSse);
-          }
-        }
-        const openaiTail = openaiTransformer.finish();
-        if (openaiTail) {
-          const anthropicSse = anthropicTransformer.push(openaiTail);
-          if (anthropicSse) res.write(anthropicSse);
-        }
-        const anthropicTail = anthropicTransformer.finish();
-        if (anthropicTail) res.write(anthropicTail);
-      } finally {
-        res.end();
-        await this.recordUsage(ctx, prepared, openaiTransformer.getUsage());
-        releaseConcurrency();
-      }
       return;
     }
 
-    releaseConcurrency();
-    res.status(lastError).json(lastBody);
-  }
-
-  /**
-   * Build sorted provider candidate IDs from model bindings, ordered by priority (ascending).
-   * Falls back to model.providerId if no bindings configured.
-   */
-  private getProviderCandidates(model: ModelDocument): string[] {
-    const bindings: ProviderBinding[] =
-      model.providerBindings && model.providerBindings.length > 0
-        ? [...model.providerBindings]
-        : [];
-
-    // Ensure primary providerId is included (highest priority = 0)
-    const primaryId = String(model.providerId);
-    const hasPrimary = bindings.some(
-      (b) => String(b.providerId) === primaryId,
-    );
-    if (!hasPrimary) {
-      bindings.push({
-        providerId: model.providerId,
-        priority: 0,
-      } as ProviderBinding);
-    }
-
-    // Sort by priority ascending (0 = highest, 2 = lowest)
-    bindings.sort((a, b) => a.priority - b.priority);
-    return bindings.map((b) => String(b.providerId));
-  }
-
-  /**
-   * Try to build a PreparedRequest for a specific provider candidate.
-   * Returns null if the provider is not available (disabled, exhausted, or not allowed).
-   */
-  private async tryCandidate(
-    ctx: ApiKeyContext,
-    model: ModelDocument,
-    body: ChatCompletionsBody,
-    providerId: string,
-    resolved: ResolvedPolicyContext,
-  ): Promise<PreparedRequest | null> {
-    const provider = await this.providerModel
-      .findOne({
-        _id: new Types.ObjectId(providerId),
-        tenantId: ctx.tenantId,
-        teamId: ctx.teamId,
-        status: ProviderStatus.ACTIVE,
-      })
-      .exec();
-    if (!provider) return null;
-
-    if (!this.quotaLimitService.isProviderAllowed(resolved, providerId)) {
-      return null;
-    }
-
-    // Skip if provider is unavailable (rate limited or in circuit-breaker cooldown)
-    const availability = await this.providerUsageService.getAvailability(
-      ctx.tenantId,
-      ctx.teamId,
-      providerId,
-    );
-    if (!availability.available) {
-      this.logger.debug(
-        `Provider ${provider.name} unavailable (${availability.reason}), skipping`,
+    // All exhausted
+    await releaseConcurrency();
+    if (mode === 'stream-anthropic' && typeof lastBody === 'object') {
+      lastBody = anthropicError(
+        asString(
+          (lastBody as Record<string, unknown>).message as string | undefined,
+          '无可用的上游渠道',
+        ),
       );
-      return null;
     }
+    res.status(lastError);
+    return lastBody;
+  }
 
-    const adapter = resolveAdapter(provider.type);
-    const upstreamKey = decrypt(
-      this.encryptionSecret(),
-      provider.apiKeyCiphertext,
-    );
+  // ── candidate preparation ──
+
+  private async prepareCandidate(
+    ctx: ApiKeyContext,
+    body: ChatCompletionsBody,
+    candidate: Candidate,
+  ): Promise<PreparedRequest | null> {
+    const adapter = resolveAdapter(candidate.type as unknown as ProviderType);
     const stream = body.stream === true;
+
     const request = await adapter.buildRequest({
-      baseUrl: provider.baseUrl,
-      apiKey: upstreamKey,
-      modelId: model.modelId,
+      baseUrl: candidate.baseUrl,
+      apiKey: candidate.apiKey,
+      modelId: ctx.apiKey ? '' : '', // modelId will be set by adapter from body
       body,
       stream,
-      authType: provider.authType,
+      authType: candidate.authType as unknown as ProviderAuthType,
     });
 
+    // Override modelId with the original requested model
+    const modelId = typeof body.model === 'string' ? body.model : 'unknown';
+
     return {
-      modelId: model.modelId,
-      providerId: String(provider._id),
-      multiplier: model.multiplier,
+      modelId,
+      providerId: candidate.providerId,
+      multiplier: candidate.multiplier,
       adapter,
       request,
       requestId: `req_${randomUUID()}`,
       startedAt: Date.now(),
-      releaseConcurrency: () => {},
+      releaseConcurrency: () => Promise.resolve(),
     };
   }
 
-  private async prepare(
-    ctx: ApiKeyContext,
-    body: ChatCompletionsBody,
-  ): Promise<PreparedRequest> {
-    const { resolved, releaseConcurrency } = await this.enforceLimits(ctx);
-
-    const requestedModel = body.model;
-    if (typeof requestedModel !== 'string' || !requestedModel.trim()) {
-      releaseConcurrency();
-      throw new BadRequestException('请求体缺少 model 字段');
-    }
-
-    const model = await this.modelModel
-      .findOne({
-        tenantId: ctx.tenantId,
-        teamId: ctx.teamId,
-        status: ModelStatus.ACTIVE,
-        $or: [{ modelId: requestedModel }, { aliases: requestedModel }],
-      })
-      .exec();
-    if (!model) {
-      releaseConcurrency();
-      throw new NotFoundException(`模型不存在或已禁用：${requestedModel}`);
-    }
-
-    if (!this.quotaLimitService.isModelAllowed(resolved, model.modelId)) {
-      releaseConcurrency();
-      throw new ForbiddenException('该 API Key 或成员角色不允许访问此模型');
-    }
-
-    // Get sorted provider candidates
-    const candidates = this.getProviderCandidates(model);
-
-    // Try each candidate in priority order
-    for (const candidateId of candidates) {
-      const prepared = await this.tryCandidate(
-        ctx,
-        model,
-        body,
-        candidateId,
-        resolved,
-      );
-      if (prepared) {
-        // Attach the releaseConcurrency from enforceLimits
-        prepared.releaseConcurrency = releaseConcurrency;
-        return prepared;
-      }
-    }
-
-    // No candidate available
-    releaseConcurrency();
-    throw new NotFoundException('无可用的上游渠道（所有渠道已禁用或已耗尽）');
-  }
-
-  /**
-   * Resolve a model by its id or aliases.
-   */
-  private async resolveModel(
-    ctx: ApiKeyContext,
-    requestedModel: unknown,
-    resolved: ResolvedPolicyContext,
-  ): Promise<ModelDocument> {
-    if (typeof requestedModel !== 'string' || !requestedModel.trim()) {
-      throw new BadRequestException('请求体缺少 model 字段');
-    }
-
-    const model = await this.modelModel
-      .findOne({
-        tenantId: ctx.tenantId,
-        teamId: ctx.teamId,
-        status: ModelStatus.ACTIVE,
-        $or: [{ modelId: requestedModel }, { aliases: requestedModel }],
-      })
-      .exec();
-    if (!model) {
-      throw new NotFoundException(`模型不存在或已禁用：${requestedModel}`);
-    }
-
-    if (!this.quotaLimitService.isModelAllowed(resolved, model.modelId)) {
-      throw new ForbiddenException('该 API Key 或成员角色不允许访问此模型');
-    }
-
-    return model;
-  }
-
-  /**
-   * Extract rate-limit info from upstream response headers.
-   */
-  private async extractRateLimitHeaders(
-    ctx: ApiKeyContext,
-    prepared: PreparedRequest,
-    upstreamRes: globalThis.Response,
-  ): Promise<void> {
-    await this.providerUsageService.updateFromHeaders(
-      ctx.tenantId,
-      ctx.teamId,
-      prepared.providerId,
-      this.headersToRecord(upstreamRes),
-    );
-  }
-
-  private headersToRecord(
-    upstreamRes: globalThis.Response,
-  ): Record<string, string> {
-    const headers: Record<string, string> = {};
-    upstreamRes.headers.forEach((value, key) => {
-      headers[key] = value;
-    });
-    return headers;
-  }
-
-  private async enforceLimits(
-    ctx: ApiKeyContext,
-  ): Promise<{ resolved: ResolvedPolicyContext; releaseConcurrency: () => void }> {
-    const resolved = await this.quotaLimitService.resolve({
-      teamId: ctx.teamId,
-      userId: ctx.userId,
-      apiKey: ctx.apiKey,
-    });
-
-    const rateLimits = this.quotaLimitService.resolveRateLimits(resolved);
-
-    if (rateLimits.teamPerMinute != null) {
-      this.rateLimitService.assertAllowed(
-        `team:${ctx.teamId}`,
-        rateLimits.teamPerMinute,
-      );
-    }
-    if (rateLimits.memberPerMinute != null) {
-      this.rateLimitService.assertAllowed(ctx.userId, rateLimits.memberPerMinute);
-    }
-    if (rateLimits.keyPerMinute != null) {
-      this.rateLimitService.assertAllowed(ctx.apiKeyId, rateLimits.keyPerMinute);
-    }
-
-    await this.quotaLimitService.assertUsageLimits(resolved, {
-      tenantId: ctx.tenantId,
-      teamId: ctx.teamId,
-      userId: ctx.userId,
-      apiKeyId: ctx.apiKeyId,
-    });
-
-    const balance = await this.billingService.getSpendableBalance(
-      ctx.tenantId,
-      ctx.teamId,
-      ctx.userId,
-    );
-    if (balance <= 0) {
-      throw new HttpException('额度余额不足', HttpStatus.PAYMENT_REQUIRED);
-    }
-
-    const releaseConcurrency = this.concurrencyService.acquire(
-      ctx.apiKeyId,
-      rateLimits.keyConcurrency,
-    );
-
-    return { resolved, releaseConcurrency };
-  }
+  // ── upstream call ──
 
   private async requestUpstream(
     prepared: PreparedRequest,
@@ -851,14 +474,127 @@ export class ProxyService {
     });
   }
 
+  // ── response handling ──
+
+  private async handleSuccess(
+    ctx: ApiKeyContext,
+    prepared: PreparedRequest,
+    upstreamRes: globalThis.Response,
+  ): Promise<void> {
+    await this.providerUsageService.updateFromHeaders(
+      ctx.tenantId,
+      ctx.teamId,
+      prepared.providerId,
+      this.headersToRecord(upstreamRes),
+    );
+    await this.providerUsageService.recordSuccess(
+      ctx.tenantId,
+      ctx.teamId,
+      prepared.providerId,
+    );
+  }
+
+  private async handleRateLimited(
+    ctx: ApiKeyContext,
+    prepared: PreparedRequest,
+    upstreamRes: globalThis.Response,
+  ): Promise<void> {
+    await this.providerUsageService.markExhausted(
+      ctx.tenantId,
+      ctx.teamId,
+      prepared.providerId,
+      '上游返回 429 Too Many Requests',
+      this.headersToRecord(upstreamRes),
+    );
+    this.logger.warn(
+      `Provider channel ${prepared.providerId} rate limited (429), falling back`,
+    );
+  }
+
+  private async handleServerError(
+    ctx: ApiKeyContext,
+    prepared: PreparedRequest,
+    upstreamRes: globalThis.Response,
+  ): Promise<void> {
+    await this.providerUsageService.recordFailure(
+      ctx.tenantId,
+      ctx.teamId,
+      prepared.providerId,
+      `上游返回 ${upstreamRes.status}`,
+    );
+    this.logger.warn(
+      `Provider channel ${prepared.providerId} returned ${upstreamRes.status}, trying next`,
+    );
+  }
+
+  private async streamResponse(
+    ctx: ApiKeyContext,
+    prepared: PreparedRequest,
+    policy: StandardPolicy,
+    upstreamRes: globalThis.Response,
+    res: ExpressResponse,
+    mode: 'stream-openai' | 'stream-anthropic',
+    releaseConcurrency: () => Promise<void>,
+  ): Promise<void> {
+    res.status(200);
+    res.setHeader('content-type', 'text/event-stream');
+    res.setHeader('cache-control', 'no-cache');
+    res.setHeader('connection', 'keep-alive');
+
+    const transformer = prepared.adapter.createStreamTransformer();
+    const anthropicTransformer =
+      mode === 'stream-anthropic'
+        ? new OpenAIAnthropicStreamTransformer()
+        : null;
+    const reader = upstreamRes.body!.getReader();
+    const decoder = new TextDecoder();
+
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        const emit = transformer.push(chunk);
+        if (emit) {
+          if (anthropicTransformer) {
+            const anthropicSse = anthropicTransformer.push(emit);
+            if (anthropicSse) res.write(anthropicSse);
+          } else {
+            res.write(emit);
+          }
+        }
+      }
+      const tail = transformer.finish();
+      if (tail) {
+        if (anthropicTransformer) {
+          const ath = anthropicTransformer.push(tail);
+          if (ath) res.write(ath);
+          const finalTail = anthropicTransformer.finish();
+          if (finalTail) res.write(finalTail);
+        } else {
+          res.write(tail);
+        }
+      }
+    } finally {
+      res.end();
+      await this.recordUsage(ctx, prepared, policy, transformer.getUsage());
+      await releaseConcurrency();
+    }
+  }
+
+  // ── metering ──
+
   private async recordUsage(
     ctx: ApiKeyContext,
     prepared: PreparedRequest,
+    policy: StandardPolicy,
     usage: UpstreamUsage | undefined,
   ): Promise<void> {
     const promptTokens = usage?.prompt_tokens ?? 0;
     const completionTokens = usage?.completion_tokens ?? 0;
     const totalTokens = usage?.total_tokens ?? promptTokens + completionTokens;
+    const cost = prepared.multiplier * totalTokens;
+    const latencyMs = Date.now() - prepared.startedAt;
 
     await this.usageService.record({
       tenantId: ctx.tenantId,
@@ -873,8 +609,8 @@ export class ProxyService {
       completionTokens,
       totalTokens,
       multiplier: prepared.multiplier,
-      cost: prepared.multiplier * totalTokens,
-      latencyMs: Date.now() - prepared.startedAt,
+      cost,
+      latencyMs,
     });
 
     await this.apiKeyModel.updateOne(
@@ -887,17 +623,32 @@ export class ProxyService {
         tenantId: ctx.tenantId,
         teamId: ctx.teamId,
         userId: ctx.userId,
-        cost: prepared.multiplier * totalTokens,
+        cost,
         referenceId: prepared.requestId,
         totalTokens,
       });
+    }
+
+    // Increment MeterBackend counters
+    const subj = policy.subject;
+    for (const scope of [
+      { kind: 'team' as const, id: subj.teamId },
+      { kind: 'member' as const, id: subj.userId },
+      { kind: 'key' as const, id: subj.apiKeyId },
+    ]) {
+      await this.meterBackend.increment(
+        scope,
+        Measure.TOKEN,
+        'day' as never, // permanent: increment the cumulative counter
+        totalTokens,
+      );
     }
   }
 
   private async recordError(
     ctx: ApiKeyContext,
     prepared: PreparedRequest,
-    upstreamStatus: number,
+    upstreamStatus: number = 0,
   ): Promise<void> {
     await this.usageService.record({
       tenantId: ctx.tenantId,
@@ -918,7 +669,13 @@ export class ProxyService {
     });
   }
 
-  private encryptionSecret(): string {
-    return this.configService.getOrThrow<string>('encryption.secret');
+  private headersToRecord(
+    upstreamRes: globalThis.Response,
+  ): Record<string, string> {
+    const headers: Record<string, string> = {};
+    upstreamRes.headers.forEach((value, key) => {
+      headers[key] = value;
+    });
+    return headers;
   }
 }

@@ -46,11 +46,6 @@ export interface ProviderProbeResult {
   modelId?: string;
 }
 
-export interface CreateFromPresetResult {
-  provider: ProviderView;
-  models: BulkCreateResult;
-}
-
 const PROBE_MODEL: Record<ProviderType, string> = {
   [ProviderType.OPENAI_COMPATIBLE]: 'gpt-4o-mini',
   [ProviderType.ANTHROPIC]: 'claude-3-5-haiku-20241022',
@@ -155,7 +150,7 @@ export class ProvidersService {
     tenantId: string,
     teamId: string,
     dto: CreateProviderFromPresetDto,
-  ): Promise<CreateFromPresetResult> {
+  ): Promise<ProviderView> {
     const presets = await this.modelsService.getOfficialPresets();
     const preset = presets.find((p) => p.key === dto.presetKey);
     if (!preset) {
@@ -178,18 +173,7 @@ export class ProvidersService {
       defaultPriority: dto.defaultPriority,
     });
 
-    const models = await this.modelsService.bulkCreate(tenantId, teamId, {
-      providerId: provider.id,
-      models: preset.models.map((model) => ({
-        modelId: model.modelId,
-        displayName: model.displayName,
-        multiplier: model.multiplier,
-        capabilities: model.capabilities,
-        aliases: [],
-      })),
-    });
-
-    return { provider, models };
+    return provider;
   }
 
   async update(
@@ -270,13 +254,13 @@ export class ProvidersService {
     const provider = await this.findInTeam(tenantId, teamId, id);
 
     if (!provider.presetKey) {
-      return { created: [], skipped: [] };
+      return { created: [], bound: [], skipped: [] };
     }
 
     const presets = await this.modelsService.getOfficialPresets();
     const preset = presets.find((p) => p.key === provider.presetKey);
     if (!preset || !preset.models.length) {
-      return { created: [], skipped: [] };
+      return { created: [], bound: [], skipped: [] };
     }
 
     return this.modelsService.bulkCreate(tenantId, teamId, {

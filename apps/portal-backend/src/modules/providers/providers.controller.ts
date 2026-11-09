@@ -77,7 +77,7 @@ export class ProvidersController {
   }
 
   @Post('from-preset')
-  @ApiOperation({ summary: '一键开启官方直连渠道（预填名称/类型/Base URL + 自动导入官方模型）' })
+  @ApiOperation({ summary: '一键开启官方直连渠道（预填名称/类型/Base URL，模型需后续导入）' })
   async createFromPreset(
     @CurrentUser() user: AuthUser,
     @Body() dto: CreateProviderFromPresetDto,
@@ -94,13 +94,13 @@ export class ProvidersController {
       actorUserId: user.id,
       action: AuditAction.CREATE,
       resourceType: AuditResourceType.PROVIDER,
-      resourceId: result.provider.id,
-      summary: `一键开启官方直连渠道（${result.provider.name}，导入 ${result.models.created.length} 模型）`,
+      resourceId: result.id,
+      summary: `一键开启官方直连渠道（${result.name}）`,
       after: {
-        id: result.provider.id,
-        name: result.provider.name,
-        type: result.provider.type,
-        presetKey: result.provider.presetKey,
+        id: result.id,
+        name: result.name,
+        type: result.type,
+        presetKey: result.presetKey,
       },
       ip: req.ip ?? null,
       userAgent: req.headers['user-agent'] ?? null,

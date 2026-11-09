@@ -47,6 +47,7 @@ export interface ModelView {
 
 export interface BulkCreateResult {
   created: ModelView[];
+  bound: ModelView[];
   skipped: string[];
 }
 
@@ -211,14 +212,34 @@ export class ModelsService {
     await this.assertProviderInTeam(tenantId, teamId, dto.providerId);
 
     const created: ModelView[] = [];
+    const bound: ModelView[] = [];
     const skipped: string[] = [];
+    const targetProviderOid = new Types.ObjectId(dto.providerId);
 
     for (const item of dto.models) {
       const existing = await this.modelModel
         .findOne({ tenantId, teamId, modelId: item.modelId })
         .exec();
+
       if (existing) {
-        skipped.push(item.modelId);
+        // Model exists — check if already bound to this provider
+        const isPrimary = String(existing.providerId) === dto.providerId;
+        const isBound = existing.providerBindings?.some(
+          (b) => String(b.providerId) === dto.providerId,
+        );
+
+        if (isPrimary || isBound) {
+          // Already bound to this provider, skip
+          skipped.push(item.modelId);
+        } else {
+          // Not yet bound — add as additional binding
+          existing.providerBindings = [
+            ...(existing.providerBindings ?? []),
+            { providerId: targetProviderOid, priority: 0 },
+          ];
+          await existing.save();
+          bound.push(await this.toView(existing, true));
+        }
         continue;
       }
 
@@ -242,7 +263,7 @@ export class ModelsService {
       created.push(await this.toView(model, true));
     }
 
-    return { created, skipped };
+    return { created, bound, skipped };
   }
 
   async update(
