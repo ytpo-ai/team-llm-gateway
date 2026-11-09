@@ -1,0 +1,88 @@
+version: "3.8"
+
+services:
+  # ---- MongoDB ----
+  mongodb:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: portal
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - app-net
+
+  # ---- Redis ----
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-net
+
+  # ---- Portal Backend (NestJS) ----
+  backend:
+    build:
+      context: .
+      dockerfile: apps/portal-backend/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - MONGODB_URI=mongodb://mongodb:27017/portal
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      - ENCRYPTION_SECRET=${ENCRYPTION_SECRET:?ENCRYPTION_SECRET is required}
+      - SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL:-}
+      - SUPER_ADMIN_PASSWORD=${SUPER_ADMIN_PASSWORD:-}
+      - PROVIDER_FAILURE_THRESHOLD=${PROVIDER_FAILURE_THRESHOLD:-3}
+      - PROVIDER_COOLDOWN_BASE_MS=${PROVIDER_COOLDOWN_BASE_MS:-30000}
+      - PROVIDER_COOLDOWN_MAX_MS=${PROVIDER_COOLDOWN_MAX_MS:-600000}
+      - PROVIDER_RATE_LIMIT_COOLDOWN_MS=${PROVIDER_RATE_LIMIT_COOLDOWN_MS:-60000}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app-net
+
+  # ---- Portal Frontend (React + Nginx) ----
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/portal-frontend/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      - backend
+    networks:
+      - app-net
+
+volumes:
+  mongodb_data:
+  redis_data:
+
+networks:
+  app-net:
+    driver: bridge

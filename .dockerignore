@@ -1,0 +1,14 @@
+node_modules
+dist
+.turbo
+.git
+.gitignore
+.env
+.env.*
+*.log
+logs
+coverage
+.vscode
+.idea
+*.md
+!README.md
